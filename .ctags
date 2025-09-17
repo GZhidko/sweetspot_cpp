@@ -1,0 +1,6 @@
+--languages=C,C++
+--c++-kinds=+p
+--fields=+iaS
+--extras=+q
+--recurse
+

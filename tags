@@ -1,0 +1,88 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_OUTPUT_EXCMD	mixed	/number, pattern, mixed, or combineV2/
+!_TAG_OUTPUT_FILESEP	slash	/slash or backslash/
+!_TAG_OUTPUT_MODE	u-ctags	/u-ctags or e-ctags/
+!_TAG_PATTERN_LENGTH_LIMIT	96	/0 for no limit/
+!_TAG_PROC_CWD	/home/grigory/sweetspot_cpp/	//
+!_TAG_PROGRAM_AUTHOR	Universal Ctags Team	//
+!_TAG_PROGRAM_NAME	Universal Ctags	/Derived from Exuberant Ctags/
+!_TAG_PROGRAM_URL	https://ctags.io/	/official site/
+!_TAG_PROGRAM_VERSION	5.9.0	//
+EthernetHeader	include/ethernet.h	/^struct EthernetHeader { uint8_t dst[6]; uint8_t src[6]; uint16_t ethertype; };$/;"	s
+Filter	filters/filter.h	/^struct Filter { bool operator()(const Header&) { return true; } };$/;"	s
+Filter	filters/filter_icmp.cpp	/^struct Filter<ICMPHeader> {$/;"	s	file:
+Filter	filters/filter_ipv4.cpp	/^struct Filter<IPv4Header> {$/;"	s	file:
+Filter	filters/filter_tcp.cpp	/^struct Filter<TCPHeader> {$/;"	s	file:
+Filter	filters/filter_udp.cpp	/^struct Filter<UDPHeader> {$/;"	s	file:
+HeaderChainTuple	chain/header_chain.h	/^class HeaderChainTuple {$/;"	c
+ICMPHeader	include/icmp.h	/^struct ICMPHeader { uint8_t type, code; uint16_t checksum; };$/;"	s
+IPv4Header	include/ipv4.h	/^struct IPv4Header { uint8_t ver_ihl, tos; uint16_t tot_len; uint32_t saddr, daddr; uint8_t proto/;"	s
+MyChain	main.cpp	/^using MyChain = HeaderChainTuple<EthernetHeader, IPv4Header, TCPHeader, UDPHeader, ICMPHeader>;$/;"	t	typeref:typename:HeaderChainTuple<EthernetHeader,IPv4Header,TCPHeader,UDPHeader,ICMPHeader>	file:
+Nat	nat/nat.h	/^struct Nat { void operator()(Header&) {} };$/;"	s
+Nat	nat/nat_icmp.cpp	/^struct Nat<ICMPHeader> { void operator()(ICMPHeader&) {} };$/;"	s	file:
+Nat	nat/nat_ipv4.cpp	/^struct Nat<IPv4Header> {$/;"	s	file:
+Nat	nat/nat_tcp.cpp	/^struct Nat<TCPHeader> {$/;"	s	file:
+Nat	nat/nat_udp.cpp	/^struct Nat<UDPHeader> {$/;"	s	file:
+Parser	parsers/parser.h	/^struct Parser {$/;"	s
+Parser	parsers/parser_icmp.cpp	/^struct Parser<ICMPHeader> {$/;"	s	file:
+Parser	parsers/parser_ipv4.cpp	/^struct Parser<IPv4Header> {$/;"	s	file:
+Parser	parsers/parser_tcp.cpp	/^struct Parser<TCPHeader> {$/;"	s	file:
+Parser	parsers/parser_udp.cpp	/^struct Parser<UDPHeader> {$/;"	s	file:
+TCPHeader	include/tcp.h	/^struct TCPHeader { uint16_t src_port, dst_port; };$/;"	s
+UDPHeader	include/udp.h	/^struct UDPHeader { uint16_t src_port, dst_port; };$/;"	s
+__anon05dda4d80102	chain/header_chain.h	/^        std::apply([&](auto*... hdrs) { (func(*hdrs), ...); }, headers);$/;"	f	function:HeaderChainTuple::for_each	file:
+__anon3b5b11db0102	main.cpp	/^    chain.for_each([&](auto& hdr) {$/;"	f	function:apply_filters	file:
+__anon3b5b11db0202	main.cpp	/^    chain.for_each([&](auto& hdr) {$/;"	f	function:apply_nat	file:
+_filter_icmp_cpp_anchor	filters/filter_icmp.cpp	/^static int _filter_icmp_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
+_filter_ipv4_cpp_anchor	filters/filter_ipv4.cpp	/^static int _filter_ipv4_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
+_filter_tcp_cpp_anchor	filters/filter_tcp.cpp	/^static int _filter_tcp_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
+_filter_udp_cpp_anchor	filters/filter_udp.cpp	/^static int _filter_udp_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
+_nat_icmp_cpp_anchor	nat/nat_icmp.cpp	/^static int _nat_icmp_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
+_nat_ipv4_cpp_anchor	nat/nat_ipv4.cpp	/^static int _nat_ipv4_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
+_nat_tcp_cpp_anchor	nat/nat_tcp.cpp	/^static int _nat_tcp_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
+_nat_udp_cpp_anchor	nat/nat_udp.cpp	/^static int _nat_udp_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
+_parser_icmp_cpp_anchor	parsers/parser_icmp.cpp	/^static int _parser_icmp_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
+_parser_ipv4_cpp_anchor	parsers/parser_ipv4.cpp	/^static int _parser_ipv4_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
+_parser_tcp_cpp_anchor	parsers/parser_tcp.cpp	/^static int _parser_tcp_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
+_parser_udp_cpp_anchor	parsers/parser_udp.cpp	/^static int _parser_udp_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
+apply_filters	main.cpp	/^bool apply_filters(const Chain& chain) {$/;"	f	typeref:typename:bool
+apply_nat	main.cpp	/^void apply_nat(Chain& chain) {$/;"	f	typeref:typename:void
+checksum	include/icmp.h	/^struct ICMPHeader { uint8_t type, code; uint16_t checksum; };$/;"	m	struct:ICMPHeader	typeref:typename:uint16_t
+code	include/icmp.h	/^struct ICMPHeader { uint8_t type, code; uint16_t checksum; };$/;"	m	struct:ICMPHeader	typeref:typename:uint8_t
+daddr	include/ipv4.h	/^struct IPv4Header { uint8_t ver_ihl, tos; uint16_t tot_len; uint32_t saddr, daddr; uint8_t proto/;"	m	struct:IPv4Header	typeref:typename:uint32_t
+dst	include/ethernet.h	/^struct EthernetHeader { uint8_t dst[6]; uint8_t src[6]; uint16_t ethertype; };$/;"	m	struct:EthernetHeader	typeref:typename:uint8_t[6]
+dst_port	include/tcp.h	/^struct TCPHeader { uint16_t src_port, dst_port; };$/;"	m	struct:TCPHeader	typeref:typename:uint16_t
+dst_port	include/udp.h	/^struct UDPHeader { uint16_t src_port, dst_port; };$/;"	m	struct:UDPHeader	typeref:typename:uint16_t
+ethertype	include/ethernet.h	/^struct EthernetHeader { uint8_t dst[6]; uint8_t src[6]; uint16_t ethertype; };$/;"	m	struct:EthernetHeader	typeref:typename:uint16_t
+for_each	chain/header_chain.h	/^    void for_each(F&& func) const {$/;"	f	class:HeaderChainTuple	typeref:typename:void
+get	chain/header_chain.h	/^    T& get() { return *std::get<T*>(headers); }$/;"	f	class:HeaderChainTuple	typeref:typename:T &
+headers	chain/header_chain.h	/^    std::tuple<Headers*...> headers {};$/;"	m	class:HeaderChainTuple	typeref:typename:std::tuple<Headers * ...>
+main	main.cpp	/^int main() {$/;"	f	typeref:typename:int
+operator ()	filters/filter.h	/^struct Filter { bool operator()(const Header&) { return true; } };$/;"	f	struct:Filter	typeref:typename:bool
+operator ()	filters/filter_icmp.cpp	/^    bool operator()(const ICMPHeader& icmp) { return (icmp.type == 0 || icmp.type == 8); }$/;"	f	struct:Filter	typeref:typename:bool	file:
+operator ()	filters/filter_ipv4.cpp	/^    bool operator()(const IPv4Header& ip) { return (ip.protocol == 1 || ip.protocol == 6 || ip.p/;"	f	struct:Filter	typeref:typename:bool	file:
+operator ()	filters/filter_tcp.cpp	/^    bool operator()(const TCPHeader& tcp) { return ntohs(tcp.dst_port) != 22; }$/;"	f	struct:Filter	typeref:typename:bool	file:
+operator ()	filters/filter_udp.cpp	/^    bool operator()(const UDPHeader&) { return true; }$/;"	f	struct:Filter	typeref:typename:bool	file:
+operator ()	nat/nat.h	/^struct Nat { void operator()(Header&) {} };$/;"	f	struct:Nat	typeref:typename:void
+operator ()	nat/nat_icmp.cpp	/^struct Nat<ICMPHeader> { void operator()(ICMPHeader&) {} };$/;"	f	struct:Nat	typeref:typename:void	file:
+operator ()	nat/nat_ipv4.cpp	/^    void operator()(IPv4Header& ip) { ip.saddr = htonl(0x0A000001); }$/;"	f	struct:Nat	typeref:typename:void	file:
+operator ()	nat/nat_tcp.cpp	/^    void operator()(TCPHeader& tcp) { if (ntohs(tcp.src_port) == 0) tcp.src_port = htons(40000);/;"	f	struct:Nat	typeref:typename:void	file:
+operator ()	nat/nat_udp.cpp	/^    void operator()(UDPHeader& udp) { if (ntohs(udp.src_port) == 0) udp.src_port = htons(40000);/;"	f	struct:Nat	typeref:typename:void	file:
+operator ()	parsers/parser.h	/^    bool operator()(Header* hdr, const uint8_t* data, size_t len) {$/;"	f	struct:Parser	typeref:typename:bool
+operator ()	parsers/parser_icmp.cpp	/^    bool operator()(ICMPHeader* hdr, const uint8_t* data, size_t len) {$/;"	f	struct:Parser	typeref:typename:bool	file:
+operator ()	parsers/parser_ipv4.cpp	/^    bool operator()(IPv4Header* hdr, const uint8_t* data, size_t len) {$/;"	f	struct:Parser	typeref:typename:bool	file:
+operator ()	parsers/parser_tcp.cpp	/^    bool operator()(TCPHeader* hdr, const uint8_t* data, size_t len) {$/;"	f	struct:Parser	typeref:typename:bool	file:
+operator ()	parsers/parser_udp.cpp	/^    bool operator()(UDPHeader* hdr, const uint8_t* data, size_t len) {$/;"	f	struct:Parser	typeref:typename:bool	file:
+parse	chain/header_chain.h	/^    bool parse(const uint8_t* data, size_t len) {$/;"	f	class:HeaderChainTuple	typeref:typename:bool
+parse_all	chain/header_chain.h	/^    bool parse_all(const uint8_t* data, size_t len, size_t& offset) {$/;"	f	class:HeaderChainTuple	typeref:typename:bool
+parse_one	chain/header_chain.h	/^    bool parse_one(const uint8_t* data, size_t len, size_t& offset) {$/;"	f	class:HeaderChainTuple	typeref:typename:bool
+protocol	include/ipv4.h	/^struct IPv4Header { uint8_t ver_ihl, tos; uint16_t tot_len; uint32_t saddr, daddr; uint8_t proto/;"	m	struct:IPv4Header	typeref:typename:uint8_t
+saddr	include/ipv4.h	/^struct IPv4Header { uint8_t ver_ihl, tos; uint16_t tot_len; uint32_t saddr, daddr; uint8_t proto/;"	m	struct:IPv4Header	typeref:typename:uint32_t
+src	include/ethernet.h	/^struct EthernetHeader { uint8_t dst[6]; uint8_t src[6]; uint16_t ethertype; };$/;"	m	struct:EthernetHeader	typeref:typename:uint8_t[6]
+src_port	include/tcp.h	/^struct TCPHeader { uint16_t src_port, dst_port; };$/;"	m	struct:TCPHeader	typeref:typename:uint16_t
+src_port	include/udp.h	/^struct UDPHeader { uint16_t src_port, dst_port; };$/;"	m	struct:UDPHeader	typeref:typename:uint16_t
+tos	include/ipv4.h	/^struct IPv4Header { uint8_t ver_ihl, tos; uint16_t tot_len; uint32_t saddr, daddr; uint8_t proto/;"	m	struct:IPv4Header	typeref:typename:uint8_t
+tot_len	include/ipv4.h	/^struct IPv4Header { uint8_t ver_ihl, tos; uint16_t tot_len; uint32_t saddr, daddr; uint8_t proto/;"	m	struct:IPv4Header	typeref:typename:uint16_t
+type	include/icmp.h	/^struct ICMPHeader { uint8_t type, code; uint16_t checksum; };$/;"	m	struct:ICMPHeader	typeref:typename:uint8_t
+ver_ihl	include/ipv4.h	/^struct IPv4Header { uint8_t ver_ihl, tos; uint16_t tot_len; uint32_t saddr, daddr; uint8_t proto/;"	m	struct:IPv4Header	typeref:typename:uint8_t
