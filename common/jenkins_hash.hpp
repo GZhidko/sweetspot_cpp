@@ -1,63 +1,72 @@
 #pragma once
 #include <cstdint>
 #include <cstring>
+#include <tuple>
+
 // Точная копия хэш-функции из Linux kernel для PACKET_FANOUT_CPU
+// Адаптирована для использования в NAT (njn rjl)
 class CPUFanoutHash {
 public:
-    // Основная функция как в __fanout_hash() из Linux kernel
-    static uint32_t hash(const void* data, size_t len, uint32_t seed) {
-        return jenkins_hash(data, len, seed);
-    }
-    
-    // Для IP пакетов (как в net/core/filter.c)
-    static uint32_t hash_ipv4(uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, uint8_t protocol) {
-        // Точный порядок как в Linux kernel
-        struct flow_keys {
-            uint32_t src;
-            uint32_t dst;
-            union {
-                struct {
-                    uint16_t sport;
-                    uint16_t dport;
-                };
-                uint32_t ports;
-            };
-            uint8_t ip_proto;
-        } __attribute__((packed)) keys;
+    // Основная функция хэширования для NAT
+    template<typename Tuple>
+    static uint32_t hash_tuple(const Tuple& tuple) {
+        // Сериализуем tuple в байтовый буфер
+        constexpr size_t max_size = 64;
+        uint8_t buffer[max_size];
+        size_t offset = 0;
         
-        keys.src = saddr;
-        keys.dst = daddr;
-        keys.sport = sport;
-        keys.dport = dport;
-        keys.ip_proto = protocol;
+        // Сериализация tuple с сохранением выравнивания как в ядре
+        auto serialize = [&](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_integral_v<T> || std::is_enum_v<T>) {
+                std::memcpy(buffer + offset, &value, sizeof(value));
+                offset += sizeof(value);
+            }
+        };
         
-        return jenkins_hash(&keys, sizeof(keys), 0);
+        std::apply([&](const auto&... args) {
+            (serialize(args), ...);
+        }, tuple);
+        
+        // Хэшируем только данные потока, БЕЗ CPU_ID!
+        return jenkins_hash(buffer, offset, 0);
+    }   
+    // Специализированные хэш-функции для NAT
+    
+    // Для IP пакетов в NAT
+    static uint32_t hash_ipv4(uint32_t saddr, uint32_t daddr, 
+                                 uint16_t sport, uint16_t dport, 
+                                 uint8_t protocol) {
+        return hash_tuple(std::make_tuple(saddr, daddr, sport, dport, protocol));
     }
     
-    // Для Ethernet фреймов
-    static uint32_t hash_ethernet(const void* frame_data, size_t frame_len) {
-        // Linux использует весь кадр для хэширования
-        return jenkins_hash(frame_data, frame_len, 0);
+    static uint32_t hash_udp(uint32_t saddr, uint32_t daddr, 
+                                uint16_t sport, uint16_t dport) {
+        return hash_ipv4(saddr, daddr, sport, dport, 17);
     }
     
-    // UDP специфичный хэш (как в UDP_GRO)
-    static uint32_t hash_udp(uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport) {
-        return hash_ipv4(saddr, daddr, sport, dport, 17); // 17 = IPPROTO_UDP
+    static uint32_t hash_tcp(uint32_t saddr, uint32_t daddr, 
+                                uint16_t sport, uint16_t dport) {
+        return hash_ipv4(saddr, daddr, sport, dport, 6);
     }
     
-    // TCP специфичный хэш
-    static uint32_t hash_tcp(uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport) {
-        return hash_ipv4(saddr, daddr, sport, dport, 6); // 6 = IPPROTO_TCP
+    static uint32_t hash_icmp(uint32_t saddr, uint32_t daddr, 
+                                 uint16_t id, uint16_t seq) {
+        return hash_ipv4(saddr, daddr, id, seq, 1);
+    }    
+    // Хэш для выбора порта в диапазоне (для CPU affinity)
+    static uint16_t select_port_in_range(uint32_t hash_value, uint16_t port_min, uint16_t port_max) {
+        uint32_t range_size = port_max - port_min + 1;
+        return port_min + (hash_value % range_size);
     }
     
-    // ICMP специфичный хэш
-    static uint32_t hash_icmp(uint32_t saddr, uint32_t daddr, uint16_t id, uint16_t seq) {
-        // Для ICMP используем id как порт
-        return hash_ipv4(saddr, daddr, id, seq, 1); // 1 = IPPROTO_ICMP
+    // Выбор CPU на основе хэша (для fanout)
+    static uint32_t select_cpu(uint32_t hash_value, uint32_t cpu_count) {
+        return hash_value % cpu_count;
     }
 
 private:
-    // Точная копия jhash из Linux kernel
+    // Точная копия jhash из Linux kernel (ваша реализация)
     static uint32_t jenkins_hash(const void* key, size_t length, uint32_t initval) {
         uint32_t a, b, c;
         const uint8_t* k = (const uint8_t*)key;

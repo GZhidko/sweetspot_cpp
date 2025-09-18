@@ -9,31 +9,221 @@
 !_TAG_PROGRAM_NAME	Universal Ctags	/Derived from Exuberant Ctags/
 !_TAG_PROGRAM_URL	https://ctags.io/	/official site/
 !_TAG_PROGRAM_VERSION	5.9.0	//
+$(VERBOSE).SILENT	build/Makefile	/^$(VERBOSE).SILENT:$/;"	t
+$(VERBOSE)MAKESILENT	build/Makefile	/^$(VERBOSE)MAKESILENT = -s$/;"	m
+%	build/Makefile	/^% : %,v$/;"	t
+%	build/Makefile	/^% : RCS\/%$/;"	t
+%	build/Makefile	/^% : RCS\/%,v$/;"	t
+%	build/Makefile	/^% : SCCS\/s.%$/;"	t
+%	build/Makefile	/^% : s.%$/;"	t
+0	build/compile_commands.json	/^{$/;"	o
+1	build/compile_commands.json	/^{$/;"	o
+10	build/compile_commands.json	/^{$/;"	o
+11	build/compile_commands.json	/^{$/;"	o
+12	build/compile_commands.json	/^{$/;"	o
+2	build/compile_commands.json	/^{$/;"	o
+3	build/compile_commands.json	/^{$/;"	o
+4	build/compile_commands.json	/^{$/;"	o
+5	build/compile_commands.json	/^{$/;"	o
+6	build/compile_commands.json	/^{$/;"	o
+7	build/compile_commands.json	/^{$/;"	o
+8	build/compile_commands.json	/^{$/;"	o
+9	build/compile_commands.json	/^{$/;"	o
+ARCHITECTURE_ID	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#   define ARCHITECTURE_ID /;"	d	file:
+ARCHITECTURE_ID	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#  define ARCHITECTURE_ID /;"	d	file:
+ARCHITECTURE_ID	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#  define ARCHITECTURE_ID$/;"	d	file:
+CMAKE_AR	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_AR "\/usr\/bin\/ar")$/;"	v
+CMAKE_BINARY_DIR	build/Makefile	/^CMAKE_BINARY_DIR = \/home\/grigory\/sweetspot_cpp\/build$/;"	m
+CMAKE_CL_SHOWINCLUDES_PREFIX	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^  set(CMAKE_CL_SHOWINCLUDES_PREFIX "${CMAKE_CXX_CL_SHOWINCLUDES_PREFIX}")$/;"	v
+CMAKE_COMMAND	build/Makefile	/^CMAKE_COMMAND = \/usr\/bin\/cmake$/;"	m
+CMAKE_COMPILER_IS_GNUCXX	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_COMPILER_IS_GNUCXX 1)$/;"	v
+CMAKE_CROSSCOMPILING	build/CMakeFiles/3.28.3/CMakeSystem.cmake	/^set(CMAKE_CROSSCOMPILING "FALSE")$/;"	v
+CMAKE_CROSSCOMPILING	build/cmake_install.cmake	/^  set(CMAKE_CROSSCOMPILING "FALSE")$/;"	v
+CMAKE_CXX11_COMPILE_FEATURES	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX11_COMPILE_FEATURES "cxx_std_11;cxx_alias_templates;cxx_alignas;cxx_alignof;cxx_att/;"	v
+CMAKE_CXX14_COMPILE_FEATURES	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX14_COMPILE_FEATURES "cxx_std_14;cxx_aggregate_default_initializers;cxx_attribute_de/;"	v
+CMAKE_CXX17_COMPILE_FEATURES	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX17_COMPILE_FEATURES "cxx_std_17")$/;"	v
+CMAKE_CXX20_COMPILE_FEATURES	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX20_COMPILE_FEATURES "cxx_std_20")$/;"	v
+CMAKE_CXX23_COMPILE_FEATURES	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX23_COMPILE_FEATURES "cxx_std_23")$/;"	v
+CMAKE_CXX98_COMPILE_FEATURES	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX98_COMPILE_FEATURES "cxx_std_98;cxx_template_template_parameters")$/;"	v
+CMAKE_CXX_ABI_COMPILED	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_ABI_COMPILED TRUE)$/;"	v
+CMAKE_CXX_BYTE_ORDER	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_BYTE_ORDER "LITTLE_ENDIAN")$/;"	v
+CMAKE_CXX_CL_SHOWINCLUDES_PREFIX	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_CL_SHOWINCLUDES_PREFIX "")$/;"	v
+CMAKE_CXX_COMPILER	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_COMPILER "\/usr\/bin\/c++")$/;"	v
+CMAKE_CXX_COMPILER_ABI	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_COMPILER_ABI "ELF")$/;"	v
+CMAKE_CXX_COMPILER_AR	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_COMPILER_AR "\/usr\/bin\/gcc-ar-13")$/;"	v
+CMAKE_CXX_COMPILER_ARG1	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_COMPILER_ARG1 "")$/;"	v
+CMAKE_CXX_COMPILER_ENV_VAR	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_COMPILER_ENV_VAR "CXX")$/;"	v
+CMAKE_CXX_COMPILER_FRONTEND_VARIANT	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_COMPILER_FRONTEND_VARIANT "GNU")$/;"	v
+CMAKE_CXX_COMPILER_ID	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_COMPILER_ID "GNU")$/;"	v
+CMAKE_CXX_COMPILER_ID_RUN	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_COMPILER_ID_RUN 1)$/;"	v
+CMAKE_CXX_COMPILER_LOADED	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_COMPILER_LOADED 1)$/;"	v
+CMAKE_CXX_COMPILER_RANLIB	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_COMPILER_RANLIB "\/usr\/bin\/gcc-ranlib-13")$/;"	v
+CMAKE_CXX_COMPILER_VERSION	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_COMPILER_VERSION "13.3.0")$/;"	v
+CMAKE_CXX_COMPILER_VERSION_INTERNAL	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_COMPILER_VERSION_INTERNAL "")$/;"	v
+CMAKE_CXX_COMPILER_WORKS	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_COMPILER_WORKS TRUE)$/;"	v
+CMAKE_CXX_COMPILER_WRAPPER	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_COMPILER_WRAPPER "")$/;"	v
+CMAKE_CXX_COMPILE_FEATURES	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_COMPILE_FEATURES "cxx_std_98;cxx_template_template_parameters;cxx_std_11;cxx_alias/;"	v
+CMAKE_CXX_EXTENSIONS_COMPUTED_DEFAULT	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_EXTENSIONS_COMPUTED_DEFAULT "ON")$/;"	v
+CMAKE_CXX_IGNORE_EXTENSIONS	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_IGNORE_EXTENSIONS inl;h;hpp;HPP;H;o;O;obj;OBJ;def;DEF;rc;RC)$/;"	v
+CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES "\/usr\/include\/c++\/13;\/usr\/include\/x86_64-linux/;"	v
+CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "\/usr\/lib\/gcc\/x86_64-linux-gnu\/13;\/usr\/lib\/x86_6/;"	v
+CMAKE_CXX_IMPLICIT_LINK_FRAMEWORK_DIRECTORIES	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_IMPLICIT_LINK_FRAMEWORK_DIRECTORIES "")$/;"	v
+CMAKE_CXX_IMPLICIT_LINK_LIBRARIES	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "stdc++;m;gcc_s;gcc;c;gcc_s;gcc")$/;"	v
+CMAKE_CXX_INCLUDE_REGEX_COMPLAIN	build/CMakeFiles/CMakeDirectoryInformation.cmake	/^set(CMAKE_CXX_INCLUDE_REGEX_COMPLAIN ${CMAKE_C_INCLUDE_REGEX_COMPLAIN})$/;"	v
+CMAKE_CXX_INCLUDE_REGEX_SCAN	build/CMakeFiles/CMakeDirectoryInformation.cmake	/^set(CMAKE_CXX_INCLUDE_REGEX_SCAN ${CMAKE_C_INCLUDE_REGEX_SCAN})$/;"	v
+CMAKE_CXX_LIBRARY_ARCHITECTURE	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_LIBRARY_ARCHITECTURE "x86_64-linux-gnu")$/;"	v
+CMAKE_CXX_LINKER_DEPFILE_SUPPORTED	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_LINKER_DEPFILE_SUPPORTED TRUE)$/;"	v
+CMAKE_CXX_LINKER_PREFERENCE	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_LINKER_PREFERENCE 30)$/;"	v
+CMAKE_CXX_LINKER_PREFERENCE_PROPAGATES	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_LINKER_PREFERENCE_PROPAGATES 1)$/;"	v
+CMAKE_CXX_PLATFORM_ID	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_PLATFORM_ID "Linux")$/;"	v
+CMAKE_CXX_SIMULATE_ID	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_SIMULATE_ID "")$/;"	v
+CMAKE_CXX_SIMULATE_VERSION	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_SIMULATE_VERSION "")$/;"	v
+CMAKE_CXX_SIZEOF_DATA_PTR	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_SIZEOF_DATA_PTR "8")$/;"	v
+CMAKE_CXX_SOURCE_FILE_EXTENSIONS	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_SOURCE_FILE_EXTENSIONS C;M;c++;cc;cpp;cxx;m;mm;mpp;CPP;ixx;cppm;ccm;cxxm;c++m)$/;"	v
+CMAKE_CXX_STANDARD	CMakeLists.txt	/^set(CMAKE_CXX_STANDARD 17)$/;"	v
+CMAKE_CXX_STANDARD_COMPUTED_DEFAULT	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_CXX_STANDARD_COMPUTED_DEFAULT "17")$/;"	v
+CMAKE_CXX_STANDARD_REQUIRED	CMakeLists.txt	/^set(CMAKE_CXX_STANDARD_REQUIRED ON)$/;"	v
+CMAKE_C_INCLUDE_REGEX_COMPLAIN	build/CMakeFiles/CMakeDirectoryInformation.cmake	/^set(CMAKE_C_INCLUDE_REGEX_COMPLAIN "^$")$/;"	v
+CMAKE_C_INCLUDE_REGEX_SCAN	build/CMakeFiles/CMakeDirectoryInformation.cmake	/^set(CMAKE_C_INCLUDE_REGEX_SCAN "^.*$")$/;"	v
+CMAKE_DEPENDS_DEPENDENCY_FILES	build/CMakeFiles/PacketProcessor.dir/DependInfo.cmake	/^set(CMAKE_DEPENDS_DEPENDENCY_FILES$/;"	v
+CMAKE_DEPENDS_GENERATOR	build/CMakeFiles/Makefile.cmake	/^set(CMAKE_DEPENDS_GENERATOR "Unix Makefiles")$/;"	v
+CMAKE_DEPENDS_IN_PROJECT_ONLY	build/CMakeFiles/PacketProcessor.dir/DependInfo.cmake	/^set(CMAKE_DEPENDS_IN_PROJECT_ONLY OFF)$/;"	v
+CMAKE_DEPENDS_LANGUAGES	build/CMakeFiles/PacketProcessor.dir/DependInfo.cmake	/^set(CMAKE_DEPENDS_LANGUAGES$/;"	v
+CMAKE_DEPEND_INFO_FILES	build/CMakeFiles/Makefile.cmake	/^set(CMAKE_DEPEND_INFO_FILES$/;"	v
+CMAKE_EXPORT_COMPILE_COMMANDS	CMakeLists.txt	/^set(CMAKE_EXPORT_COMPILE_COMMANDS ON)$/;"	v
+CMAKE_FORCE_UNIX_PATHS	build/CMakeFiles/CMakeDirectoryInformation.cmake	/^set(CMAKE_FORCE_UNIX_PATHS 1)$/;"	v
+CMAKE_Fortran_TARGET_FORWARD_LINKED_INFO_FILES	build/CMakeFiles/PacketProcessor.dir/DependInfo.cmake	/^set(CMAKE_Fortran_TARGET_FORWARD_LINKED_INFO_FILES$/;"	v
+CMAKE_Fortran_TARGET_LINKED_INFO_FILES	build/CMakeFiles/PacketProcessor.dir/DependInfo.cmake	/^set(CMAKE_Fortran_TARGET_LINKED_INFO_FILES$/;"	v
+CMAKE_Fortran_TARGET_MODULE_DIR	build/CMakeFiles/PacketProcessor.dir/DependInfo.cmake	/^set(CMAKE_Fortran_TARGET_MODULE_DIR "")$/;"	v
+CMAKE_HOST_SYSTEM	build/CMakeFiles/3.28.3/CMakeSystem.cmake	/^set(CMAKE_HOST_SYSTEM "Linux-6.8.0-71-generic")$/;"	v
+CMAKE_HOST_SYSTEM_NAME	build/CMakeFiles/3.28.3/CMakeSystem.cmake	/^set(CMAKE_HOST_SYSTEM_NAME "Linux")$/;"	v
+CMAKE_HOST_SYSTEM_PROCESSOR	build/CMakeFiles/3.28.3/CMakeSystem.cmake	/^set(CMAKE_HOST_SYSTEM_PROCESSOR "x86_64")$/;"	v
+CMAKE_HOST_SYSTEM_VERSION	build/CMakeFiles/3.28.3/CMakeSystem.cmake	/^set(CMAKE_HOST_SYSTEM_VERSION "6.8.0-71-generic")$/;"	v
+CMAKE_INSTALL_COMPONENT	build/cmake_install.cmake	/^    set(CMAKE_INSTALL_COMPONENT "${COMPONENT}")$/;"	v
+CMAKE_INSTALL_COMPONENT	build/cmake_install.cmake	/^    set(CMAKE_INSTALL_COMPONENT)$/;"	v
+CMAKE_INSTALL_CONFIG_NAME	build/cmake_install.cmake	/^    set(CMAKE_INSTALL_CONFIG_NAME "")$/;"	v
+CMAKE_INSTALL_MANIFEST	build/cmake_install.cmake	/^  set(CMAKE_INSTALL_MANIFEST "install_manifest.txt")$/;"	v
+CMAKE_INSTALL_MANIFEST	build/cmake_install.cmake	/^  set(CMAKE_INSTALL_MANIFEST "install_manifest_${CMAKE_INSTALL_COMPONENT}.txt")$/;"	v
+CMAKE_INSTALL_PREFIX	build/cmake_install.cmake	/^  set(CMAKE_INSTALL_PREFIX "\/usr\/local")$/;"	v
+CMAKE_INSTALL_SO_NO_EXE	build/cmake_install.cmake	/^  set(CMAKE_INSTALL_SO_NO_EXE "1")$/;"	v
+CMAKE_INTERNAL_PLATFORM_ABI	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^  set(CMAKE_INTERNAL_PLATFORM_ABI "${CMAKE_CXX_COMPILER_ABI}")$/;"	v
+CMAKE_LIBRARY_ARCHITECTURE	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^  set(CMAKE_LIBRARY_ARCHITECTURE "x86_64-linux-gnu")$/;"	v
+CMAKE_LINKER	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_LINKER "\/usr\/bin\/ld")$/;"	v
+CMAKE_MAKEFILE_DEPENDS	build/CMakeFiles/Makefile.cmake	/^set(CMAKE_MAKEFILE_DEPENDS$/;"	v
+CMAKE_MAKEFILE_OUTPUTS	build/CMakeFiles/Makefile.cmake	/^set(CMAKE_MAKEFILE_OUTPUTS$/;"	v
+CMAKE_MAKEFILE_PRODUCTS	build/CMakeFiles/Makefile.cmake	/^set(CMAKE_MAKEFILE_PRODUCTS$/;"	v
+CMAKE_MT	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_MT "")$/;"	v
+CMAKE_OBJDUMP	build/cmake_install.cmake	/^  set(CMAKE_OBJDUMP "\/usr\/bin\/objdump")$/;"	v
+CMAKE_RANLIB	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_RANLIB "\/usr\/bin\/ranlib")$/;"	v
+CMAKE_RELATIVE_PATH_TOP_BINARY	build/CMakeFiles/CMakeDirectoryInformation.cmake	/^set(CMAKE_RELATIVE_PATH_TOP_BINARY "\/home\/grigory\/sweetspot_cpp\/build")$/;"	v
+CMAKE_RELATIVE_PATH_TOP_SOURCE	build/CMakeFiles/CMakeDirectoryInformation.cmake	/^set(CMAKE_RELATIVE_PATH_TOP_SOURCE "\/home\/grigory\/sweetspot_cpp")$/;"	v
+CMAKE_SIZEOF_VOID_P	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^  set(CMAKE_SIZEOF_VOID_P "${CMAKE_CXX_SIZEOF_DATA_PTR}")$/;"	v
+CMAKE_SOURCE_DIR	build/Makefile	/^CMAKE_SOURCE_DIR = \/home\/grigory\/sweetspot_cpp$/;"	m
+CMAKE_SYSTEM	build/CMakeFiles/3.28.3/CMakeSystem.cmake	/^set(CMAKE_SYSTEM "Linux-6.8.0-71-generic")$/;"	v
+CMAKE_SYSTEM_LOADED	build/CMakeFiles/3.28.3/CMakeSystem.cmake	/^set(CMAKE_SYSTEM_LOADED 1)$/;"	v
+CMAKE_SYSTEM_NAME	build/CMakeFiles/3.28.3/CMakeSystem.cmake	/^set(CMAKE_SYSTEM_NAME "Linux")$/;"	v
+CMAKE_SYSTEM_PROCESSOR	build/CMakeFiles/3.28.3/CMakeSystem.cmake	/^set(CMAKE_SYSTEM_PROCESSOR "x86_64")$/;"	v
+CMAKE_SYSTEM_VERSION	build/CMakeFiles/3.28.3/CMakeSystem.cmake	/^set(CMAKE_SYSTEM_VERSION "6.8.0-71-generic")$/;"	v
+CMAKE_TAPI	build/CMakeFiles/3.28.3/CMakeCXXCompiler.cmake	/^set(CMAKE_TAPI "CMAKE_TAPI-NOTFOUND")$/;"	v
+COMPILER_ID	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^# define COMPILER_ID /;"	d	file:
+COMPILER_VERSION	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#   define COMPILER_VERSION /;"	d	file:
+COMPILER_VERSION_INTERNAL	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#   define COMPILER_VERSION_INTERNAL /;"	d	file:
+COMPILER_VERSION_INTERNAL	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#  define COMPILER_VERSION_INTERNAL /;"	d	file:
+COMPILER_VERSION_INTERNAL	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^# define COMPILER_VERSION_INTERNAL /;"	d	file:
+COMPILER_VERSION_INTERNAL_STR	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^# define COMPILER_VERSION_INTERNAL_STR /;"	d	file:
+COMPILER_VERSION_MAJOR	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^  # define COMPILER_VERSION_MAJOR /;"	d	file:
+COMPILER_VERSION_MAJOR	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#   define COMPILER_VERSION_MAJOR /;"	d	file:
+COMPILER_VERSION_MAJOR	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#  define COMPILER_VERSION_MAJOR /;"	d	file:
+COMPILER_VERSION_MAJOR	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^# define COMPILER_VERSION_MAJOR /;"	d	file:
+COMPILER_VERSION_MINOR	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^  # define COMPILER_VERSION_MINOR /;"	d	file:
+COMPILER_VERSION_MINOR	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#   define COMPILER_VERSION_MINOR /;"	d	file:
+COMPILER_VERSION_MINOR	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#  define COMPILER_VERSION_MINOR /;"	d	file:
+COMPILER_VERSION_MINOR	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^# define COMPILER_VERSION_MINOR /;"	d	file:
+COMPILER_VERSION_PATCH	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^  # define COMPILER_VERSION_PATCH /;"	d	file:
+COMPILER_VERSION_PATCH	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#   define COMPILER_VERSION_PATCH /;"	d	file:
+COMPILER_VERSION_PATCH	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#  define COMPILER_VERSION_PATCH /;"	d	file:
+COMPILER_VERSION_PATCH	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^# define COMPILER_VERSION_PATCH /;"	d	file:
+COMPILER_VERSION_TWEAK	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#  define COMPILER_VERSION_TWEAK /;"	d	file:
+COMPILER_VERSION_TWEAK	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^# define COMPILER_VERSION_TWEAK /;"	d	file:
+CPUFanoutHash	common/jenkins_hash.hpp	/^class CPUFanoutHash {$/;"	c
+CXX_STD	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#      define CXX_STD /;"	d	file:
+CXX_STD	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#    define CXX_STD /;"	d	file:
+CXX_STD	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#  define CXX_STD /;"	d	file:
+DEBUG_ALL	common/logger.h	/^    DEBUG_ALL    = 0xFFFFFFFF$/;"	e	enum:DebugFlags
+DEBUG_ERROR	common/logger.h	/^    DEBUG_ERROR  = 1 << 3,$/;"	e	enum:DebugFlags
+DEBUG_NAT	common/logger.h	/^    DEBUG_NAT    = 1 << 2,$/;"	e	enum:DebugFlags
+DEBUG_NETSET	common/logger.h	/^    DEBUG_NETSET = 1 << 0,$/;"	e	enum:DebugFlags
+DEBUG_PARSER	common/logger.h	/^    DEBUG_PARSER = 1 << 1,$/;"	e	enum:DebugFlags
+DEC	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#define DEC(/;"	d	file:
+DebugFlags	common/logger.h	/^enum DebugFlags : uint32_t {$/;"	g	typeref:typename:uint32_t
+EQUALS	build/Makefile	/^EQUALS = =$/;"	m
+EndpointBase	nat/endpoint_base.hpp	/^    EndpointBase(const NatConfig& config, uint32_t cpu_count = 1)$/;"	f	class:EndpointBase
+EndpointBase	nat/endpoint_base.hpp	/^class EndpointBase {$/;"	c
 EthernetHeader	include/ethernet.h	/^struct EthernetHeader { uint8_t dst[6]; uint8_t src[6]; uint16_t ethertype; };$/;"	s
 Filter	filters/filter.h	/^struct Filter { bool operator()(const Header&) { return true; } };$/;"	s
 Filter	filters/filter_icmp.cpp	/^struct Filter<ICMPHeader> {$/;"	s	file:
 Filter	filters/filter_ipv4.cpp	/^struct Filter<IPv4Header> {$/;"	s	file:
 Filter	filters/filter_tcp.cpp	/^struct Filter<TCPHeader> {$/;"	s	file:
 Filter	filters/filter_udp.cpp	/^struct Filter<UDPHeader> {$/;"	s	file:
-HeaderChainTuple	chain/header_chain.h	/^class HeaderChainTuple {$/;"	c
-ICMPHeader	include/icmp.h	/^struct ICMPHeader { uint8_t type, code; uint16_t checksum; };$/;"	s
-IPv4Header	include/ipv4.h	/^struct IPv4Header { uint8_t ver_ihl, tos; uint16_t tot_len; uint32_t saddr, daddr; uint8_t proto/;"	s
-MyChain	main.cpp	/^using MyChain = HeaderChainTuple<EthernetHeader, IPv4Header, TCPHeader, UDPHeader, ICMPHeader>;$/;"	t	typeref:typename:HeaderChainTuple<EthernetHeader,IPv4Header,TCPHeader,UDPHeader,ICMPHeader>	file:
+Flow	include/icmp.h	/^    struct Flow {$/;"	s	struct:ICMPHeader
+Flow	include/ipv4.h	/^    struct Flow {$/;"	s	struct:IPv4Header
+Flow	include/tcp.h	/^    struct Flow {$/;"	s	struct:TCPHeader
+Flow	include/udp.h	/^    struct Flow {$/;"	s	struct:UDPHeader
+HEX	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#define HEX(/;"	d	file:
+HeaderChainTuple	chain/header_chain.h	/^template <typename... Headers> class HeaderChainTuple {$/;"	c
+ICMPHeader	include/icmp.h	/^struct ICMPHeader {$/;"	s
+IPv4Header	include/ipv4.h	/^struct IPv4Header {$/;"	s
+LOG	common/logger.h	/^#define LOG(/;"	d
+Logger	common/logger.h	/^    Logger() : running_(true), worker_(&Logger::processQueue, this) {}$/;"	f	class:Logger
+Logger	common/logger.h	/^class Logger {$/;"	c
+MyChain	main.cpp	/^using MyChain = HeaderChainTuple< IPv4Header, TCPHeader, UDPHeader, ICMPHeader >;$/;"	t	typeref:typename:HeaderChainTuple<IPv4Header,TCPHeader,UDPHeader,ICMPHeader>	file:
 Nat	nat/nat.h	/^struct Nat { void operator()(Header&) {} };$/;"	s
 Nat	nat/nat_icmp.cpp	/^struct Nat<ICMPHeader> { void operator()(ICMPHeader&) {} };$/;"	s	file:
 Nat	nat/nat_ipv4.cpp	/^struct Nat<IPv4Header> {$/;"	s	file:
 Nat	nat/nat_tcp.cpp	/^struct Nat<TCPHeader> {$/;"	s	file:
 Nat	nat/nat_udp.cpp	/^struct Nat<UDPHeader> {$/;"	s	file:
+NatConfig	nat/nat_config.hpp	/^struct NatConfig {$/;"	s
+Netset	common/netset.hpp	/^class Netset {$/;"	c
+PLATFORM_ID	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#  define PLATFORM_ID /;"	d	file:
+PLATFORM_ID	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#  define PLATFORM_ID$/;"	d	file:
+PLATFORM_ID	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^# define PLATFORM_ID /;"	d	file:
+PLATFORM_ID	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^# define PLATFORM_ID$/;"	d	file:
+PacketProcessor	CMakeLists.txt	/^add_executable(PacketProcessor ${SOURCES})$/;"	t
+PacketProcessor	CMakeLists.txt	/^project(PacketProcessor LANGUAGES CXX)$/;"	p
+PacketProcessor	build/Makefile	/^PacketProcessor: cmake_check_build_system$/;"	t
+PacketProcessor/fast	build/Makefile	/^PacketProcessor\/fast:$/;"	t
 Parser	parsers/parser.h	/^struct Parser {$/;"	s
-Parser	parsers/parser_icmp.cpp	/^struct Parser<ICMPHeader> {$/;"	s	file:
-Parser	parsers/parser_ipv4.cpp	/^struct Parser<IPv4Header> {$/;"	s	file:
-Parser	parsers/parser_tcp.cpp	/^struct Parser<TCPHeader> {$/;"	s	file:
-Parser	parsers/parser_udp.cpp	/^struct Parser<UDPHeader> {$/;"	s	file:
-TCPHeader	include/tcp.h	/^struct TCPHeader { uint16_t src_port, dst_port; };$/;"	s
-UDPHeader	include/udp.h	/^struct UDPHeader { uint16_t src_port, dst_port; };$/;"	s
-__anon05dda4d80102	chain/header_chain.h	/^        std::apply([&](auto*... hdrs) { (func(*hdrs), ...); }, headers);$/;"	f	function:HeaderChainTuple::for_each	file:
+Parser	parsers/parser.h	/^struct Parser<ICMPHeader> {$/;"	s
+Parser	parsers/parser.h	/^struct Parser<IPv4Header> {$/;"	s
+Parser	parsers/parser.h	/^struct Parser<TCPHeader> {$/;"	s
+Parser	parsers/parser.h	/^struct Parser<UDPHeader> {$/;"	s
+RM	build/Makefile	/^RM = \/usr\/bin\/cmake -E rm -f$/;"	m
+Range	common/netset.hpp	/^        Range(uint32_t min, uint32_t max) : ip_min(min), ip_max(max), next(nullptr) {}$/;"	f	struct:Netset::Range
+Range	common/netset.hpp	/^    struct Range {$/;"	s	class:Netset
+SHELL	build/Makefile	/^SHELL = \/bin\/sh$/;"	m
+SIMULATE_ID	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#  define SIMULATE_ID /;"	d	file:
+SIMULATE_ID	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^# define SIMULATE_ID /;"	d	file:
+SIMULATE_VERSION_MAJOR	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#  define SIMULATE_VERSION_MAJOR /;"	d	file:
+SIMULATE_VERSION_MAJOR	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^# define SIMULATE_VERSION_MAJOR /;"	d	file:
+SIMULATE_VERSION_MINOR	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#  define SIMULATE_VERSION_MINOR /;"	d	file:
+SIMULATE_VERSION_MINOR	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^# define SIMULATE_VERSION_MINOR /;"	d	file:
+SIMULATE_VERSION_PATCH	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#   define SIMULATE_VERSION_PATCH /;"	d	file:
+SIMULATE_VERSION_PATCH	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#  define SIMULATE_VERSION_PATCH /;"	d	file:
+SIMULATE_VERSION_PATCH	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^# define SIMULATE_VERSION_PATCH /;"	d	file:
+STRINGIFY	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#define STRINGIFY(/;"	d	file:
+STRINGIFY_HELPER	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#define STRINGIFY_HELPER(/;"	d	file:
+T	common/jenkins_hash.hpp	/^            using T = std::decay_t<decltype(value)>;$/;"	t	function:CPUFanoutHash::hash_tuple::__anon79872ee80102
+TCPHeader	include/tcp.h	/^struct TCPHeader {$/;"	s
+UDPHeader	include/udp.h	/^struct UDPHeader {$/;"	s
+__anon05dda4d80102	chain/header_chain.h	/^        std::apply([&](auto&... hdrs) { ((hdrs ? func(*hdrs) : void()), ...); }, headers);$/;"	f	function:HeaderChainTuple::for_each	file:
+__anon0853ca730102	common/logger.h	/^            cv_.wait(lock, [&]{ return !queue_.empty() || !running_; });$/;"	f	function:Logger::processQueue	file:
 __anon3b5b11db0102	main.cpp	/^    chain.for_each([&](auto& hdr) {$/;"	f	function:apply_filters	file:
 __anon3b5b11db0202	main.cpp	/^    chain.for_each([&](auto& hdr) {$/;"	f	function:apply_nat	file:
+__anon79872ee80102	common/jenkins_hash.hpp	/^        auto serialize = [&](const auto& value) {$/;"	f	function:CPUFanoutHash::hash_tuple	file:
+__anon79872ee80202	common/jenkins_hash.hpp	/^        std::apply([&](const auto&... args) {$/;"	f	function:CPUFanoutHash::hash_tuple	file:
+__anond41471e80102	nat/endpoint_base.hpp	/^        auto builder = [&](uint16_t pub_port) {$/;"	f	function:EndpointBase::map_tcp_udp	file:
+__anond41471e80202	nat/endpoint_base.hpp	/^        auto builder = [&](uint16_t new_id) {$/;"	f	function:EndpointBase::map_icmp	file:
+__has_include	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#  define __has_include(/;"	d	file:
 _filter_icmp_cpp_anchor	filters/filter_icmp.cpp	/^static int _filter_icmp_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
 _filter_ipv4_cpp_anchor	filters/filter_ipv4.cpp	/^static int _filter_ipv4_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
 _filter_tcp_cpp_anchor	filters/filter_tcp.cpp	/^static int _filter_tcp_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
@@ -42,47 +232,299 @@ _nat_icmp_cpp_anchor	nat/nat_icmp.cpp	/^static int _nat_icmp_cpp_anchor = 0;$/;"
 _nat_ipv4_cpp_anchor	nat/nat_ipv4.cpp	/^static int _nat_ipv4_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
 _nat_tcp_cpp_anchor	nat/nat_tcp.cpp	/^static int _nat_tcp_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
 _nat_udp_cpp_anchor	nat/nat_udp.cpp	/^static int _nat_udp_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
-_parser_icmp_cpp_anchor	parsers/parser_icmp.cpp	/^static int _parser_icmp_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
-_parser_ipv4_cpp_anchor	parsers/parser_ipv4.cpp	/^static int _parser_ipv4_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
-_parser_tcp_cpp_anchor	parsers/parser_tcp.cpp	/^static int _parser_tcp_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
-_parser_udp_cpp_anchor	parsers/parser_udp.cpp	/^static int _parser_udp_cpp_anchor = 0;$/;"	v	typeref:typename:int	file:
+all	build/Makefile	/^all: cmake_check_build_system$/;"	t
 apply_filters	main.cpp	/^bool apply_filters(const Chain& chain) {$/;"	f	typeref:typename:bool
 apply_nat	main.cpp	/^void apply_nat(Chain& chain) {$/;"	f	typeref:typename:void
-checksum	include/icmp.h	/^struct ICMPHeader { uint8_t type, code; uint16_t checksum; };$/;"	m	struct:ICMPHeader	typeref:typename:uint16_t
-code	include/icmp.h	/^struct ICMPHeader { uint8_t type, code; uint16_t checksum; };$/;"	m	struct:ICMPHeader	typeref:typename:uint8_t
-daddr	include/ipv4.h	/^struct IPv4Header { uint8_t ver_ihl, tos; uint16_t tot_len; uint32_t saddr, daddr; uint8_t proto/;"	m	struct:IPv4Header	typeref:typename:uint32_t
+calculate_netmask	common/netset.cpp	/^uint32_t Netset::calculate_netmask(int prefix_len) {$/;"	f	class:Netset	typeref:typename:uint32_t
+choose_port_for_cpu	nat/endpoint_base.hpp	/^    uint16_t choose_port_for_cpu(uint32_t desired_cpu,$/;"	f	class:EndpointBase	typeref:typename:uint16_t
+clean	build/Makefile	/^clean:$/;"	t
+clean/fast	build/Makefile	/^clean\/fast: clean$/;"	t
+cmake_check_build_system	build/Makefile	/^cmake_check_build_system:$/;"	t
+cmake_force	build/Makefile	/^cmake_force:$/;"	t
+colorForFlag	common/logger.h	/^inline const char* colorForFlag(uint32_t flag) {$/;"	f	typeref:typename:const char *
+command	build/compile_commands.json	/^  "command": "\/usr\/bin\/c++  -I\/home\/grigory\/sweetspot_cpp\/include -I\/home\/grigory\/swee/;"	s	object:0
+command	build/compile_commands.json	/^  "command": "\/usr\/bin\/c++  -I\/home\/grigory\/sweetspot_cpp\/include -I\/home\/grigory\/swee/;"	s	object:1
+command	build/compile_commands.json	/^  "command": "\/usr\/bin\/c++  -I\/home\/grigory\/sweetspot_cpp\/include -I\/home\/grigory\/swee/;"	s	object:10
+command	build/compile_commands.json	/^  "command": "\/usr\/bin\/c++  -I\/home\/grigory\/sweetspot_cpp\/include -I\/home\/grigory\/swee/;"	s	object:11
+command	build/compile_commands.json	/^  "command": "\/usr\/bin\/c++  -I\/home\/grigory\/sweetspot_cpp\/include -I\/home\/grigory\/swee/;"	s	object:12
+command	build/compile_commands.json	/^  "command": "\/usr\/bin\/c++  -I\/home\/grigory\/sweetspot_cpp\/include -I\/home\/grigory\/swee/;"	s	object:2
+command	build/compile_commands.json	/^  "command": "\/usr\/bin\/c++  -I\/home\/grigory\/sweetspot_cpp\/include -I\/home\/grigory\/swee/;"	s	object:3
+command	build/compile_commands.json	/^  "command": "\/usr\/bin\/c++  -I\/home\/grigory\/sweetspot_cpp\/include -I\/home\/grigory\/swee/;"	s	object:4
+command	build/compile_commands.json	/^  "command": "\/usr\/bin\/c++  -I\/home\/grigory\/sweetspot_cpp\/include -I\/home\/grigory\/swee/;"	s	object:5
+command	build/compile_commands.json	/^  "command": "\/usr\/bin\/c++  -I\/home\/grigory\/sweetspot_cpp\/include -I\/home\/grigory\/swee/;"	s	object:6
+command	build/compile_commands.json	/^  "command": "\/usr\/bin\/c++  -I\/home\/grigory\/sweetspot_cpp\/include -I\/home\/grigory\/swee/;"	s	object:7
+command	build/compile_commands.json	/^  "command": "\/usr\/bin\/c++  -I\/home\/grigory\/sweetspot_cpp\/include -I\/home\/grigory\/swee/;"	s	object:8
+command	build/compile_commands.json	/^  "command": "\/usr\/bin\/c++  -I\/home\/grigory\/sweetspot_cpp\/include -I\/home\/grigory\/swee/;"	s	object:9
+config_	nat/endpoint_base.hpp	/^    const NatConfig& config_;$/;"	m	class:EndpointBase	typeref:typename:const NatConfig &
+contains	common/netset.cpp	/^bool Netset::contains(uint32_t ip) const {$/;"	f	class:Netset	typeref:typename:bool
+cpu_count_	nat/endpoint_base.hpp	/^    uint32_t cpu_count_;$/;"	m	class:EndpointBase	typeref:typename:uint32_t
+create	common/netset.cpp	/^std::shared_ptr<Netset> Netset::create(const std::string& cidrs) {$/;"	f	class:Netset	typeref:typename:std::shared_ptr<Netset>
+cv_	common/logger.h	/^    std::condition_variable cv_;$/;"	m	class:Logger	typeref:typename:std::condition_variable
+default_target	build/Makefile	/^default_target: all$/;"	t
+depend	build/Makefile	/^depend:$/;"	t
+destroy	common/netset.cpp	/^void Netset::destroy() {$/;"	f	class:Netset	typeref:typename:void
+directory	build/compile_commands.json	/^  "directory": "\/home\/grigory\/sweetspot_cpp\/build",$/;"	s	object:0
+directory	build/compile_commands.json	/^  "directory": "\/home\/grigory\/sweetspot_cpp\/build",$/;"	s	object:1
+directory	build/compile_commands.json	/^  "directory": "\/home\/grigory\/sweetspot_cpp\/build",$/;"	s	object:10
+directory	build/compile_commands.json	/^  "directory": "\/home\/grigory\/sweetspot_cpp\/build",$/;"	s	object:11
+directory	build/compile_commands.json	/^  "directory": "\/home\/grigory\/sweetspot_cpp\/build",$/;"	s	object:12
+directory	build/compile_commands.json	/^  "directory": "\/home\/grigory\/sweetspot_cpp\/build",$/;"	s	object:2
+directory	build/compile_commands.json	/^  "directory": "\/home\/grigory\/sweetspot_cpp\/build",$/;"	s	object:3
+directory	build/compile_commands.json	/^  "directory": "\/home\/grigory\/sweetspot_cpp\/build",$/;"	s	object:4
+directory	build/compile_commands.json	/^  "directory": "\/home\/grigory\/sweetspot_cpp\/build",$/;"	s	object:5
+directory	build/compile_commands.json	/^  "directory": "\/home\/grigory\/sweetspot_cpp\/build",$/;"	s	object:6
+directory	build/compile_commands.json	/^  "directory": "\/home\/grigory\/sweetspot_cpp\/build",$/;"	s	object:7
+directory	build/compile_commands.json	/^  "directory": "\/home\/grigory\/sweetspot_cpp\/build",$/;"	s	object:8
+directory	build/compile_commands.json	/^  "directory": "\/home\/grigory\/sweetspot_cpp\/build",$/;"	s	object:9
 dst	include/ethernet.h	/^struct EthernetHeader { uint8_t dst[6]; uint8_t src[6]; uint16_t ethertype; };$/;"	m	struct:EthernetHeader	typeref:typename:uint8_t[6]
-dst_port	include/tcp.h	/^struct TCPHeader { uint16_t src_port, dst_port; };$/;"	m	struct:TCPHeader	typeref:typename:uint16_t
-dst_port	include/udp.h	/^struct UDPHeader { uint16_t src_port, dst_port; };$/;"	m	struct:UDPHeader	typeref:typename:uint16_t
+dst_ip	include/icmp.h	/^        uint32_t dst_ip;$/;"	m	struct:ICMPHeader::Flow	typeref:typename:uint32_t
+dst_ip	include/ipv4.h	/^        uint32_t dst_ip;$/;"	m	struct:IPv4Header::Flow	typeref:typename:uint32_t
+dst_ip	include/tcp.h	/^        uint32_t dst_ip;$/;"	m	struct:TCPHeader::Flow	typeref:typename:uint32_t
+dst_ip	include/udp.h	/^        uint32_t dst_ip;$/;"	m	struct:UDPHeader::Flow	typeref:typename:uint32_t
+dst_port	include/tcp.h	/^        uint16_t dst_port;$/;"	m	struct:TCPHeader::Flow	typeref:typename:uint16_t
+dst_port	include/udp.h	/^        uint16_t dst_port;$/;"	m	struct:UDPHeader::Flow	typeref:typename:uint16_t
+edit_cache	build/Makefile	/^edit_cache:$/;"	t
+edit_cache/fast	build/Makefile	/^edit_cache\/fast: edit_cache$/;"	t
+enqueue	common/logger.h	/^    void enqueue(uint32_t flag, std::string&& msg) {$/;"	f	class:Logger	typeref:typename:void
 ethertype	include/ethernet.h	/^struct EthernetHeader { uint8_t dst[6]; uint8_t src[6]; uint16_t ethertype; };$/;"	m	struct:EthernetHeader	typeref:typename:uint16_t
-for_each	chain/header_chain.h	/^    void for_each(F&& func) const {$/;"	f	class:HeaderChainTuple	typeref:typename:void
-get	chain/header_chain.h	/^    T& get() { return *std::get<T*>(headers); }$/;"	f	class:HeaderChainTuple	typeref:typename:T &
-headers	chain/header_chain.h	/^    std::tuple<Headers*...> headers {};$/;"	m	class:HeaderChainTuple	typeref:typename:std::tuple<Headers * ...>
+file	build/compile_commands.json	/^  "file": "\/home\/grigory\/sweetspot_cpp\/filters\/filter_icmp.cpp",$/;"	s	object:0
+file	build/compile_commands.json	/^  "file": "\/home\/grigory\/sweetspot_cpp\/filters\/filter_ipv4.cpp",$/;"	s	object:1
+file	build/compile_commands.json	/^  "file": "\/home\/grigory\/sweetspot_cpp\/filters\/filter_tcp.cpp",$/;"	s	object:2
+file	build/compile_commands.json	/^  "file": "\/home\/grigory\/sweetspot_cpp\/filters\/filter_udp.cpp",$/;"	s	object:3
+file	build/compile_commands.json	/^  "file": "\/home\/grigory\/sweetspot_cpp\/main.cpp",$/;"	s	object:4
+file	build/compile_commands.json	/^  "file": "\/home\/grigory\/sweetspot_cpp\/nat\/nat_icmp.cpp",$/;"	s	object:5
+file	build/compile_commands.json	/^  "file": "\/home\/grigory\/sweetspot_cpp\/nat\/nat_ipv4.cpp",$/;"	s	object:6
+file	build/compile_commands.json	/^  "file": "\/home\/grigory\/sweetspot_cpp\/nat\/nat_tcp.cpp",$/;"	s	object:7
+file	build/compile_commands.json	/^  "file": "\/home\/grigory\/sweetspot_cpp\/nat\/nat_udp.cpp",$/;"	s	object:8
+file	build/compile_commands.json	/^  "file": "\/home\/grigory\/sweetspot_cpp\/parsers\/parser_icmp.cpp",$/;"	s	object:9
+file	build/compile_commands.json	/^  "file": "\/home\/grigory\/sweetspot_cpp\/parsers\/parser_ipv4.cpp",$/;"	s	object:10
+file	build/compile_commands.json	/^  "file": "\/home\/grigory\/sweetspot_cpp\/parsers\/parser_tcp.cpp",$/;"	s	object:11
+file	build/compile_commands.json	/^  "file": "\/home\/grigory\/sweetspot_cpp\/parsers\/parser_udp.cpp",$/;"	s	object:12
+filters/filter_icmp.cpp.i	build/Makefile	/^filters\/filter_icmp.cpp.i:$/;"	t
+filters/filter_icmp.cpp.o	build/Makefile	/^filters\/filter_icmp.cpp.o:$/;"	t
+filters/filter_icmp.cpp.s	build/Makefile	/^filters\/filter_icmp.cpp.s:$/;"	t
+filters/filter_icmp.i	build/Makefile	/^filters\/filter_icmp.i: filters\/filter_icmp.cpp.i$/;"	t
+filters/filter_icmp.o	build/Makefile	/^filters\/filter_icmp.o: filters\/filter_icmp.cpp.o$/;"	t
+filters/filter_icmp.s	build/Makefile	/^filters\/filter_icmp.s: filters\/filter_icmp.cpp.s$/;"	t
+filters/filter_ipv4.cpp.i	build/Makefile	/^filters\/filter_ipv4.cpp.i:$/;"	t
+filters/filter_ipv4.cpp.o	build/Makefile	/^filters\/filter_ipv4.cpp.o:$/;"	t
+filters/filter_ipv4.cpp.s	build/Makefile	/^filters\/filter_ipv4.cpp.s:$/;"	t
+filters/filter_ipv4.i	build/Makefile	/^filters\/filter_ipv4.i: filters\/filter_ipv4.cpp.i$/;"	t
+filters/filter_ipv4.o	build/Makefile	/^filters\/filter_ipv4.o: filters\/filter_ipv4.cpp.o$/;"	t
+filters/filter_ipv4.s	build/Makefile	/^filters\/filter_ipv4.s: filters\/filter_ipv4.cpp.s$/;"	t
+filters/filter_tcp.cpp.i	build/Makefile	/^filters\/filter_tcp.cpp.i:$/;"	t
+filters/filter_tcp.cpp.o	build/Makefile	/^filters\/filter_tcp.cpp.o:$/;"	t
+filters/filter_tcp.cpp.s	build/Makefile	/^filters\/filter_tcp.cpp.s:$/;"	t
+filters/filter_tcp.i	build/Makefile	/^filters\/filter_tcp.i: filters\/filter_tcp.cpp.i$/;"	t
+filters/filter_tcp.o	build/Makefile	/^filters\/filter_tcp.o: filters\/filter_tcp.cpp.o$/;"	t
+filters/filter_tcp.s	build/Makefile	/^filters\/filter_tcp.s: filters\/filter_tcp.cpp.s$/;"	t
+filters/filter_udp.cpp.i	build/Makefile	/^filters\/filter_udp.cpp.i:$/;"	t
+filters/filter_udp.cpp.o	build/Makefile	/^filters\/filter_udp.cpp.o:$/;"	t
+filters/filter_udp.cpp.s	build/Makefile	/^filters\/filter_udp.cpp.s:$/;"	t
+filters/filter_udp.i	build/Makefile	/^filters\/filter_udp.i: filters\/filter_udp.cpp.i$/;"	t
+filters/filter_udp.o	build/Makefile	/^filters\/filter_udp.o: filters\/filter_udp.cpp.o$/;"	t
+filters/filter_udp.s	build/Makefile	/^filters\/filter_udp.s: filters\/filter_udp.cpp.s$/;"	t
+flags_	common/logger.h	/^    uint32_t flags_ = DEBUG_ALL;$/;"	m	class:Logger	typeref:typename:uint32_t
+for_each	chain/header_chain.h	/^    template <typename F> void for_each(F&& func) const {$/;"	f	class:HeaderChainTuple	typeref:typename:void
+full_range_size	nat/endpoint_base.hpp	/^    static inline uint32_t full_range_size(uint16_t port_min, uint16_t port_max) {$/;"	f	class:EndpointBase	typeref:typename:uint32_t
+get	chain/header_chain.h	/^    template <typename T> T* get() {$/;"	f	class:HeaderChainTuple	typeref:typename:T *
+get	chain/header_chain.h	/^    template <typename T> const T* get() const {$/;"	f	class:HeaderChainTuple	typeref:typename:const T *
+get_flow	chain/header_chain.h	/^    template <typename Proto> auto get_flow() const {$/;"	f	class:HeaderChainTuple	typeref:typename:auto
+get_flow	include/icmp.h	/^    Flow get_flow() const {$/;"	f	struct:ICMPHeader	typeref:typename:Flow
+get_flow	include/ipv4.h	/^    Flow get_flow() const {$/;"	f	struct:IPv4Header	typeref:typename:Flow
+get_flow	include/tcp.h	/^    Flow get_flow() const {$/;"	f	struct:TCPHeader	typeref:typename:Flow
+get_flow	include/udp.h	/^    Flow get_flow() const {$/;"	f	struct:UDPHeader	typeref:typename:Flow
+get_head	common/netset.hpp	/^    std::shared_ptr<Range> get_head() const { return head; }$/;"	f	class:Netset	typeref:typename:std::shared_ptr<Range>
+get_port_range	nat/endpoint_base.hpp	/^    std::pair<uint16_t,uint16_t> get_port_range(uint32_t prv_ip,$/;"	f	class:EndpointBase	typeref:typename:std::pair<uint16_t,uint16_t>
+hash	include/icmp.h	/^    static uint32_t hash(uint32_t saddr, uint32_t daddr,$/;"	f	struct:ICMPHeader	typeref:typename:uint32_t
+hash	include/ipv4.h	/^    static uint32_t hash(uint32_t saddr, uint32_t daddr, uint16_t sport = 0, uint16_t dport = 0)/;"	f	struct:IPv4Header	typeref:typename:uint32_t
+hash	include/tcp.h	/^    static uint32_t hash(uint32_t saddr, uint32_t daddr,$/;"	f	struct:TCPHeader	typeref:typename:uint32_t
+hash	include/udp.h	/^    static uint32_t hash(uint32_t saddr, uint32_t daddr,$/;"	f	struct:UDPHeader	typeref:typename:uint32_t
+hash_icmp	common/jenkins_hash.hpp	/^    static uint32_t hash_icmp(uint32_t saddr, uint32_t daddr, $/;"	f	class:CPUFanoutHash	typeref:typename:uint32_t
+hash_ipv4	common/jenkins_hash.hpp	/^    static uint32_t hash_ipv4(uint32_t saddr, uint32_t daddr, $/;"	f	class:CPUFanoutHash	typeref:typename:uint32_t
+hash_tcp	common/jenkins_hash.hpp	/^    static uint32_t hash_tcp(uint32_t saddr, uint32_t daddr, $/;"	f	class:CPUFanoutHash	typeref:typename:uint32_t
+hash_tuple	common/jenkins_hash.hpp	/^    static uint32_t hash_tuple(const Tuple& tuple) {$/;"	f	class:CPUFanoutHash	typeref:typename:uint32_t
+hash_udp	common/jenkins_hash.hpp	/^    static uint32_t hash_udp(uint32_t saddr, uint32_t daddr, $/;"	f	class:CPUFanoutHash	typeref:typename:uint32_t
+head	common/netset.hpp	/^    std::shared_ptr<Range> head = nullptr;$/;"	m	class:Netset	typeref:typename:std::shared_ptr<Range>
+headers	chain/header_chain.h	/^    std::tuple<std::unique_ptr<Headers>...> headers{};$/;"	m	class:HeaderChainTuple	typeref:typename:std::tuple<std::unique_ptr<Headers>...>
+help	build/Makefile	/^help:$/;"	t
+icmp_id_max	nat/nat_config.hpp	/^    uint16_t icmp_id_max = 65535;$/;"	m	struct:NatConfig	typeref:typename:uint16_t
+icmp_id_min	nat/nat_config.hpp	/^    uint16_t icmp_id_min = 1000;$/;"	m	struct:NatConfig	typeref:typename:uint16_t
+icmph	include/icmp.h	/^    struct icmphdr icmph;$/;"	m	struct:ICMPHeader	typeref:struct:icmphdr
+ident	include/icmp.h	/^        uint16_t ident;$/;"	m	struct:ICMPHeader::Flow	typeref:typename:uint16_t
+idx	common/netset.cpp	/^uint32_t Netset::idx(uint32_t ip) const {$/;"	f	class:Netset	typeref:typename:uint32_t
+info_arch	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^char const* info_arch = "INFO" ":" "arch[" ARCHITECTURE_ID "]";$/;"	v	typeref:typename:char const *
+info_compiler	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^char const* info_compiler = "INFO" ":" "compiler[" COMPILER_ID "]";$/;"	v	typeref:typename:char const *
+info_cray	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^char const *info_cray = "INFO" ":" "compiler_wrapper[CrayPrgEnv]";$/;"	v	typeref:typename:char const *
+info_language_extensions_default	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^const char* info_language_extensions_default = "INFO" ":" "extensions_default["$/;"	v	typeref:typename:const char *
+info_language_standard_default	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^const char* info_language_standard_default = "INFO" ":" "standard_default["$/;"	v	typeref:typename:const char *
+info_platform	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^char const* info_platform = "INFO" ":" "platform[" PLATFORM_ID "]";$/;"	v	typeref:typename:char const *
+info_simulate	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^char const* info_simulate = "INFO" ":" "simulate[" SIMULATE_ID "]";$/;"	v	typeref:typename:char const *
+info_simulate_version	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^char const info_simulate_version[] = {$/;"	v	typeref:typename:char const[]
+info_version	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^char const info_version[] = {$/;"	v	typeref:typename:char const[]
+info_version	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^char const* info_version = "INFO" ":" "compiler_version[" COMPILER_VERSION "]";$/;"	v	typeref:typename:char const *
+info_version_internal	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^char const info_version_internal[] = {$/;"	v	typeref:typename:char const[]
+info_version_internal	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^char const* info_version_internal = "INFO" ":" "compiler_version_internal[" COMPILER_VERSION_INT/;"	v	typeref:typename:char const *
+instance	common/logger.h	/^    static Logger& instance() {$/;"	f	class:Logger	typeref:typename:Logger &
+ip	common/netset.cpp	/^uint32_t Netset::ip(uint32_t ip_idx) const {$/;"	f	class:Netset	typeref:typename:uint32_t
+ip_header	include/icmp.h	/^    IPv4Header* ip_header = nullptr;$/;"	m	struct:ICMPHeader	typeref:typename:IPv4Header *
+ip_header	include/tcp.h	/^    IPv4Header* ip_header = nullptr;$/;"	m	struct:TCPHeader	typeref:typename:IPv4Header *
+ip_header	include/udp.h	/^    IPv4Header* ip_header = nullptr;$/;"	m	struct:UDPHeader	typeref:typename:IPv4Header *
+ip_max	common/netset.hpp	/^        uint32_t ip_max;$/;"	m	struct:Netset::Range	typeref:typename:uint32_t
+ip_min	common/netset.hpp	/^        uint32_t ip_min;$/;"	m	struct:Netset::Range	typeref:typename:uint32_t
+ip_to_string	common/netset.cpp	/^std::string Netset::ip_to_string(uint32_t ip) {$/;"	f	class:Netset	typeref:typename:std::string
+ip_to_string	include/ipv4.h	/^    static std::string ip_to_string(uint32_t ip) {$/;"	f	struct:IPv4Header	typeref:typename:std::string
+iph	include/ipv4.h	/^    struct iphdr iph;$/;"	m	struct:IPv4Header	typeref:struct:iphdr
+is_valid	nat/nat_config.hpp	/^    bool is_valid() const {$/;"	f	struct:NatConfig	typeref:typename:bool
+jenkins_hash	common/jenkins_hash.hpp	/^    static uint32_t jenkins_hash(const void* key, size_t length, uint32_t initval) {$/;"	f	class:CPUFanoutHash	typeref:typename:uint32_t
+log	common/logger.h	/^    static void log(uint32_t flag, const char* file, int line, const char* func, Args&&... args)/;"	f	class:Logger	typeref:typename:void
+main	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^int main(int argc, char* argv[])$/;"	f	typeref:typename:int
 main	main.cpp	/^int main() {$/;"	f	typeref:typename:int
+main.cpp.i	build/Makefile	/^main.cpp.i:$/;"	t
+main.cpp.o	build/Makefile	/^main.cpp.o:$/;"	t
+main.cpp.s	build/Makefile	/^main.cpp.s:$/;"	t
+main.i	build/Makefile	/^main.i: main.cpp.i$/;"	t
+main.o	build/Makefile	/^main.o: main.cpp.o$/;"	t
+main.s	build/Makefile	/^main.s: main.cpp.s$/;"	t
+map_icmp	nat/endpoint_base.hpp	/^    std::pair<uint32_t,uint16_t> map_icmp(uint32_t prv_ip,$/;"	f	class:EndpointBase	typeref:typename:std::pair<uint32_t,uint16_t>
+map_tcp_udp	nat/endpoint_base.hpp	/^    std::pair<uint32_t,uint16_t> map_tcp_udp(uint32_t prv_ip,$/;"	f	class:EndpointBase	typeref:typename:std::pair<uint32_t,uint16_t>
+mutex_	common/logger.h	/^    std::mutex mutex_;$/;"	m	class:Logger	typeref:typename:std::mutex
+name	include/icmp.h	/^    static constexpr const char* name = "ICMP";$/;"	m	struct:ICMPHeader	typeref:typename:const char *
+name	include/ipv4.h	/^    static constexpr const char* name = "IP";$/;"	m	struct:IPv4Header	typeref:typename:const char *
+name	include/tcp.h	/^    static constexpr const char* name = "TCP";$/;"	m	struct:TCPHeader	typeref:typename:const char *
+name	include/udp.h	/^    static constexpr const char* name = "UDP";$/;"	m	struct:UDPHeader	typeref:typename:const char *
+nat/nat_icmp.cpp.i	build/Makefile	/^nat\/nat_icmp.cpp.i:$/;"	t
+nat/nat_icmp.cpp.o	build/Makefile	/^nat\/nat_icmp.cpp.o:$/;"	t
+nat/nat_icmp.cpp.s	build/Makefile	/^nat\/nat_icmp.cpp.s:$/;"	t
+nat/nat_icmp.i	build/Makefile	/^nat\/nat_icmp.i: nat\/nat_icmp.cpp.i$/;"	t
+nat/nat_icmp.o	build/Makefile	/^nat\/nat_icmp.o: nat\/nat_icmp.cpp.o$/;"	t
+nat/nat_icmp.s	build/Makefile	/^nat\/nat_icmp.s: nat\/nat_icmp.cpp.s$/;"	t
+nat/nat_ipv4.cpp.i	build/Makefile	/^nat\/nat_ipv4.cpp.i:$/;"	t
+nat/nat_ipv4.cpp.o	build/Makefile	/^nat\/nat_ipv4.cpp.o:$/;"	t
+nat/nat_ipv4.cpp.s	build/Makefile	/^nat\/nat_ipv4.cpp.s:$/;"	t
+nat/nat_ipv4.i	build/Makefile	/^nat\/nat_ipv4.i: nat\/nat_ipv4.cpp.i$/;"	t
+nat/nat_ipv4.o	build/Makefile	/^nat\/nat_ipv4.o: nat\/nat_ipv4.cpp.o$/;"	t
+nat/nat_ipv4.s	build/Makefile	/^nat\/nat_ipv4.s: nat\/nat_ipv4.cpp.s$/;"	t
+nat/nat_tcp.cpp.i	build/Makefile	/^nat\/nat_tcp.cpp.i:$/;"	t
+nat/nat_tcp.cpp.o	build/Makefile	/^nat\/nat_tcp.cpp.o:$/;"	t
+nat/nat_tcp.cpp.s	build/Makefile	/^nat\/nat_tcp.cpp.s:$/;"	t
+nat/nat_tcp.i	build/Makefile	/^nat\/nat_tcp.i: nat\/nat_tcp.cpp.i$/;"	t
+nat/nat_tcp.o	build/Makefile	/^nat\/nat_tcp.o: nat\/nat_tcp.cpp.o$/;"	t
+nat/nat_tcp.s	build/Makefile	/^nat\/nat_tcp.s: nat\/nat_tcp.cpp.s$/;"	t
+nat/nat_udp.cpp.i	build/Makefile	/^nat\/nat_udp.cpp.i:$/;"	t
+nat/nat_udp.cpp.o	build/Makefile	/^nat\/nat_udp.cpp.o:$/;"	t
+nat/nat_udp.cpp.s	build/Makefile	/^nat\/nat_udp.cpp.s:$/;"	t
+nat/nat_udp.i	build/Makefile	/^nat\/nat_udp.i: nat\/nat_udp.cpp.i$/;"	t
+nat/nat_udp.o	build/Makefile	/^nat\/nat_udp.o: nat\/nat_udp.cpp.o$/;"	t
+nat/nat_udp.s	build/Makefile	/^nat\/nat_udp.s: nat\/nat_udp.cpp.s$/;"	t
+netset_ip_at	nat/endpoint_base.hpp	/^    static uint32_t netset_ip_at(const Netset& ns, uint32_t idx) {$/;"	f	class:EndpointBase	typeref:typename:uint32_t
+next	common/netset.hpp	/^        std::shared_ptr<Range> next;$/;"	m	struct:Netset::Range	typeref:typename:std::shared_ptr<Range>
+ofs_	common/logger.h	/^    std::ofstream ofs_;$/;"	m	class:Logger	typeref:typename:std::ofstream
 operator ()	filters/filter.h	/^struct Filter { bool operator()(const Header&) { return true; } };$/;"	f	struct:Filter	typeref:typename:bool
-operator ()	filters/filter_icmp.cpp	/^    bool operator()(const ICMPHeader& icmp) { return (icmp.type == 0 || icmp.type == 8); }$/;"	f	struct:Filter	typeref:typename:bool	file:
-operator ()	filters/filter_ipv4.cpp	/^    bool operator()(const IPv4Header& ip) { return (ip.protocol == 1 || ip.protocol == 6 || ip.p/;"	f	struct:Filter	typeref:typename:bool	file:
-operator ()	filters/filter_tcp.cpp	/^    bool operator()(const TCPHeader& tcp) { return ntohs(tcp.dst_port) != 22; }$/;"	f	struct:Filter	typeref:typename:bool	file:
+operator ()	filters/filter_icmp.cpp	/^    bool operator()(const ICMPHeader& icmp) { return true; }$/;"	f	struct:Filter	typeref:typename:bool	file:
+operator ()	filters/filter_ipv4.cpp	/^    bool operator()(const IPv4Header& ip) {$/;"	f	struct:Filter	typeref:typename:bool	file:
+operator ()	filters/filter_tcp.cpp	/^    bool operator()(const TCPHeader& tcp) { return true; }$/;"	f	struct:Filter	typeref:typename:bool	file:
 operator ()	filters/filter_udp.cpp	/^    bool operator()(const UDPHeader&) { return true; }$/;"	f	struct:Filter	typeref:typename:bool	file:
 operator ()	nat/nat.h	/^struct Nat { void operator()(Header&) {} };$/;"	f	struct:Nat	typeref:typename:void
 operator ()	nat/nat_icmp.cpp	/^struct Nat<ICMPHeader> { void operator()(ICMPHeader&) {} };$/;"	f	struct:Nat	typeref:typename:void	file:
-operator ()	nat/nat_ipv4.cpp	/^    void operator()(IPv4Header& ip) { ip.saddr = htonl(0x0A000001); }$/;"	f	struct:Nat	typeref:typename:void	file:
-operator ()	nat/nat_tcp.cpp	/^    void operator()(TCPHeader& tcp) { if (ntohs(tcp.src_port) == 0) tcp.src_port = htons(40000);/;"	f	struct:Nat	typeref:typename:void	file:
-operator ()	nat/nat_udp.cpp	/^    void operator()(UDPHeader& udp) { if (ntohs(udp.src_port) == 0) udp.src_port = htons(40000);/;"	f	struct:Nat	typeref:typename:void	file:
-operator ()	parsers/parser.h	/^    bool operator()(Header* hdr, const uint8_t* data, size_t len) {$/;"	f	struct:Parser	typeref:typename:bool
-operator ()	parsers/parser_icmp.cpp	/^    bool operator()(ICMPHeader* hdr, const uint8_t* data, size_t len) {$/;"	f	struct:Parser	typeref:typename:bool	file:
-operator ()	parsers/parser_ipv4.cpp	/^    bool operator()(IPv4Header* hdr, const uint8_t* data, size_t len) {$/;"	f	struct:Parser	typeref:typename:bool	file:
-operator ()	parsers/parser_tcp.cpp	/^    bool operator()(TCPHeader* hdr, const uint8_t* data, size_t len) {$/;"	f	struct:Parser	typeref:typename:bool	file:
-operator ()	parsers/parser_udp.cpp	/^    bool operator()(UDPHeader* hdr, const uint8_t* data, size_t len) {$/;"	f	struct:Parser	typeref:typename:bool	file:
+operator ()	nat/nat_ipv4.cpp	/^    void operator()(IPv4Header& ip) { };$/;"	f	struct:Nat	typeref:typename:void	file:
+operator ()	nat/nat_tcp.cpp	/^    void operator()(TCPHeader& tcp) { $/;"	f	struct:Nat	typeref:typename:void	file:
+operator ()	nat/nat_udp.cpp	/^    void operator()(UDPHeader& udp) { };$/;"	f	struct:Nat	typeref:typename:void	file:
+operator ()	parsers/parser.h	/^    bool operator()(Header* hdr, const uint8_t* data, size_t len,$/;"	f	struct:Parser	typeref:typename:bool
+operator ()	parsers/parser_icmp.cpp	/^bool Parser<ICMPHeader>::operator()(ICMPHeader* hdr, const uint8_t* data, size_t len,$/;"	f	class:Parser	typeref:typename:bool
+operator ()	parsers/parser_ipv4.cpp	/^bool Parser<IPv4Header>::operator()(IPv4Header* hdr, const uint8_t* data, size_t len,$/;"	f	class:Parser	typeref:typename:bool
+operator ()	parsers/parser_tcp.cpp	/^bool Parser<TCPHeader>::operator()(TCPHeader* hdr, const uint8_t* data, size_t len, size_t& offs/;"	f	class:Parser	typeref:typename:bool
+operator ()	parsers/parser_udp.cpp	/^bool Parser<UDPHeader>::operator()(UDPHeader* hdr, const uint8_t* data, size_t len, size_t& offs/;"	f	class:Parser	typeref:typename:bool
+output	build/compile_commands.json	/^  "output": "CMakeFiles\/PacketProcessor.dir\/filters\/filter_icmp.cpp.o"$/;"	s	object:0
+output	build/compile_commands.json	/^  "output": "CMakeFiles\/PacketProcessor.dir\/filters\/filter_ipv4.cpp.o"$/;"	s	object:1
+output	build/compile_commands.json	/^  "output": "CMakeFiles\/PacketProcessor.dir\/filters\/filter_tcp.cpp.o"$/;"	s	object:2
+output	build/compile_commands.json	/^  "output": "CMakeFiles\/PacketProcessor.dir\/filters\/filter_udp.cpp.o"$/;"	s	object:3
+output	build/compile_commands.json	/^  "output": "CMakeFiles\/PacketProcessor.dir\/main.cpp.o"$/;"	s	object:4
+output	build/compile_commands.json	/^  "output": "CMakeFiles\/PacketProcessor.dir\/nat\/nat_icmp.cpp.o"$/;"	s	object:5
+output	build/compile_commands.json	/^  "output": "CMakeFiles\/PacketProcessor.dir\/nat\/nat_ipv4.cpp.o"$/;"	s	object:6
+output	build/compile_commands.json	/^  "output": "CMakeFiles\/PacketProcessor.dir\/nat\/nat_tcp.cpp.o"$/;"	s	object:7
+output	build/compile_commands.json	/^  "output": "CMakeFiles\/PacketProcessor.dir\/nat\/nat_udp.cpp.o"$/;"	s	object:8
+output	build/compile_commands.json	/^  "output": "CMakeFiles\/PacketProcessor.dir\/parsers\/parser_icmp.cpp.o"$/;"	s	object:9
+output	build/compile_commands.json	/^  "output": "CMakeFiles\/PacketProcessor.dir\/parsers\/parser_ipv4.cpp.o"$/;"	s	object:10
+output	build/compile_commands.json	/^  "output": "CMakeFiles\/PacketProcessor.dir\/parsers\/parser_tcp.cpp.o"$/;"	s	object:11
+output	build/compile_commands.json	/^  "output": "CMakeFiles\/PacketProcessor.dir\/parsers\/parser_udp.cpp.o"$/;"	s	object:12
 parse	chain/header_chain.h	/^    bool parse(const uint8_t* data, size_t len) {$/;"	f	class:HeaderChainTuple	typeref:typename:bool
-parse_all	chain/header_chain.h	/^    bool parse_all(const uint8_t* data, size_t len, size_t& offset) {$/;"	f	class:HeaderChainTuple	typeref:typename:bool
-parse_one	chain/header_chain.h	/^    bool parse_one(const uint8_t* data, size_t len, size_t& offset) {$/;"	f	class:HeaderChainTuple	typeref:typename:bool
-protocol	include/ipv4.h	/^struct IPv4Header { uint8_t ver_ihl, tos; uint16_t tot_len; uint32_t saddr, daddr; uint8_t proto/;"	m	struct:IPv4Header	typeref:typename:uint8_t
-saddr	include/ipv4.h	/^struct IPv4Header { uint8_t ver_ihl, tos; uint16_t tot_len; uint32_t saddr, daddr; uint8_t proto/;"	m	struct:IPv4Header	typeref:typename:uint32_t
+parse_ip	common/netset.cpp	/^uint32_t Netset::parse_ip(const std::string& ip_str) {$/;"	f	class:Netset	typeref:typename:uint32_t
+parse_one	chain/header_chain.h	/^    bool parse_one(const uint8_t* data, size_t len, size_t& offset,$/;"	f	class:HeaderChainTuple	typeref:typename:bool
+parse_packet	chain/header_chain.h	/^    bool parse_packet(const uint8_t* data, size_t len, size_t& offset) {$/;"	f	class:HeaderChainTuple	typeref:typename:bool
+parsers/parser_icmp.cpp.i	build/Makefile	/^parsers\/parser_icmp.cpp.i:$/;"	t
+parsers/parser_icmp.cpp.o	build/Makefile	/^parsers\/parser_icmp.cpp.o:$/;"	t
+parsers/parser_icmp.cpp.s	build/Makefile	/^parsers\/parser_icmp.cpp.s:$/;"	t
+parsers/parser_icmp.i	build/Makefile	/^parsers\/parser_icmp.i: parsers\/parser_icmp.cpp.i$/;"	t
+parsers/parser_icmp.o	build/Makefile	/^parsers\/parser_icmp.o: parsers\/parser_icmp.cpp.o$/;"	t
+parsers/parser_icmp.s	build/Makefile	/^parsers\/parser_icmp.s: parsers\/parser_icmp.cpp.s$/;"	t
+parsers/parser_ipv4.cpp.i	build/Makefile	/^parsers\/parser_ipv4.cpp.i:$/;"	t
+parsers/parser_ipv4.cpp.o	build/Makefile	/^parsers\/parser_ipv4.cpp.o:$/;"	t
+parsers/parser_ipv4.cpp.s	build/Makefile	/^parsers\/parser_ipv4.cpp.s:$/;"	t
+parsers/parser_ipv4.i	build/Makefile	/^parsers\/parser_ipv4.i: parsers\/parser_ipv4.cpp.i$/;"	t
+parsers/parser_ipv4.o	build/Makefile	/^parsers\/parser_ipv4.o: parsers\/parser_ipv4.cpp.o$/;"	t
+parsers/parser_ipv4.s	build/Makefile	/^parsers\/parser_ipv4.s: parsers\/parser_ipv4.cpp.s$/;"	t
+parsers/parser_tcp.cpp.i	build/Makefile	/^parsers\/parser_tcp.cpp.i:$/;"	t
+parsers/parser_tcp.cpp.o	build/Makefile	/^parsers\/parser_tcp.cpp.o:$/;"	t
+parsers/parser_tcp.cpp.s	build/Makefile	/^parsers\/parser_tcp.cpp.s:$/;"	t
+parsers/parser_tcp.i	build/Makefile	/^parsers\/parser_tcp.i: parsers\/parser_tcp.cpp.i$/;"	t
+parsers/parser_tcp.o	build/Makefile	/^parsers\/parser_tcp.o: parsers\/parser_tcp.cpp.o$/;"	t
+parsers/parser_tcp.s	build/Makefile	/^parsers\/parser_tcp.s: parsers\/parser_tcp.cpp.s$/;"	t
+parsers/parser_udp.cpp.i	build/Makefile	/^parsers\/parser_udp.cpp.i:$/;"	t
+parsers/parser_udp.cpp.o	build/Makefile	/^parsers\/parser_udp.cpp.o:$/;"	t
+parsers/parser_udp.cpp.s	build/Makefile	/^parsers\/parser_udp.cpp.s:$/;"	t
+parsers/parser_udp.i	build/Makefile	/^parsers\/parser_udp.i: parsers\/parser_udp.cpp.i$/;"	t
+parsers/parser_udp.o	build/Makefile	/^parsers\/parser_udp.o: parsers\/parser_udp.cpp.o$/;"	t
+parsers/parser_udp.s	build/Makefile	/^parsers\/parser_udp.s: parsers\/parser_udp.cpp.s$/;"	t
+pick_cpu	nat/endpoint_base.hpp	/^    inline uint32_t pick_cpu(uint32_t hash) const {$/;"	f	class:EndpointBase	typeref:typename:uint32_t
+ports_per_private	nat/endpoint_base.hpp	/^    uint32_t ports_per_private(uint16_t port_min, uint16_t port_max) const {$/;"	f	class:EndpointBase	typeref:typename:uint32_t
+preinstall	build/Makefile	/^preinstall: all$/;"	t
+preinstall/fast	build/Makefile	/^preinstall\/fast:$/;"	t
+pretty	common/netset.cpp	/^std::string Netset::pretty() const {$/;"	f	class:Netset	typeref:typename:std::string
+private_ip_count	nat/nat_config.hpp	/^    uint32_t private_ip_count() const {$/;"	f	struct:NatConfig	typeref:typename:uint32_t
+private_netset	nat/nat_config.hpp	/^    std::shared_ptr<Netset> private_netset;$/;"	m	struct:NatConfig	typeref:typename:std::shared_ptr<Netset>
+processQueue	common/logger.h	/^    void processQueue() {$/;"	f	class:Logger	typeref:typename:void
+protocol	include/icmp.h	/^        uint8_t  protocol;$/;"	m	struct:ICMPHeader::Flow	typeref:typename:uint8_t
+protocol	include/ipv4.h	/^        uint8_t protocol;$/;"	m	struct:IPv4Header::Flow	typeref:typename:uint8_t
+protocol	include/tcp.h	/^        uint8_t  protocol;$/;"	m	struct:TCPHeader::Flow	typeref:typename:uint8_t
+protocol	include/udp.h	/^        uint8_t  protocol;$/;"	m	struct:UDPHeader::Flow	typeref:typename:uint8_t
+public_ip_count	nat/nat_config.hpp	/^    uint32_t public_ip_count() const {$/;"	f	struct:NatConfig	typeref:typename:uint32_t
+public_netset	nat/nat_config.hpp	/^    std::shared_ptr<Netset> public_netset;$/;"	m	struct:NatConfig	typeref:typename:std::shared_ptr<Netset>
+qnxnto	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^char const* qnxnto = "INFO" ":" "qnxnto[]";$/;"	v	typeref:typename:char const *
+queue_	common/logger.h	/^    std::queue<std::pair<uint32_t,std::string>> queue_;$/;"	m	class:Logger	typeref:typename:std::queue<std::pair<uint32_t,std::string>>
+rebuild_cache	build/Makefile	/^rebuild_cache:$/;"	t
+rebuild_cache/fast	build/Makefile	/^rebuild_cache\/fast: rebuild_cache$/;"	t
+running_	common/logger.h	/^    std::atomic<bool> running_;$/;"	m	class:Logger	typeref:typename:std::atomic<bool>
+select_cpu	common/jenkins_hash.hpp	/^    static uint32_t select_cpu(uint32_t hash_value, uint32_t cpu_count) {$/;"	f	class:CPUFanoutHash	typeref:typename:uint32_t
+select_port_in_range	common/jenkins_hash.hpp	/^    static uint16_t select_port_in_range(uint32_t hash_value, uint16_t port_min, uint16_t port_m/;"	f	class:CPUFanoutHash	typeref:typename:uint16_t
+select_public_ip	nat/endpoint_base.hpp	/^    uint32_t select_public_ip(uint32_t hash) const {$/;"	f	class:EndpointBase	typeref:typename:uint32_t
+seq	include/icmp.h	/^        uint16_t seq;$/;"	m	struct:ICMPHeader::Flow	typeref:typename:uint16_t
+setFlags	common/logger.h	/^    static void setFlags(uint32_t flags) {$/;"	f	class:Logger	typeref:typename:void
+setOutputFile	common/logger.h	/^    static void setOutputFile(const std::string& filename) {$/;"	f	class:Logger	typeref:typename:void
+shutdown	common/logger.h	/^    static void shutdown() {$/;"	f	class:Logger	typeref:typename:void
+size	common/netset.cpp	/^uint32_t Netset::size() const {$/;"	f	class:Netset	typeref:typename:uint32_t
 src	include/ethernet.h	/^struct EthernetHeader { uint8_t dst[6]; uint8_t src[6]; uint16_t ethertype; };$/;"	m	struct:EthernetHeader	typeref:typename:uint8_t[6]
-src_port	include/tcp.h	/^struct TCPHeader { uint16_t src_port, dst_port; };$/;"	m	struct:TCPHeader	typeref:typename:uint16_t
-src_port	include/udp.h	/^struct UDPHeader { uint16_t src_port, dst_port; };$/;"	m	struct:UDPHeader	typeref:typename:uint16_t
-tos	include/ipv4.h	/^struct IPv4Header { uint8_t ver_ihl, tos; uint16_t tot_len; uint32_t saddr, daddr; uint8_t proto/;"	m	struct:IPv4Header	typeref:typename:uint8_t
-tot_len	include/ipv4.h	/^struct IPv4Header { uint8_t ver_ihl, tos; uint16_t tot_len; uint32_t saddr, daddr; uint8_t proto/;"	m	struct:IPv4Header	typeref:typename:uint16_t
-type	include/icmp.h	/^struct ICMPHeader { uint8_t type, code; uint16_t checksum; };$/;"	m	struct:ICMPHeader	typeref:typename:uint8_t
-ver_ihl	include/ipv4.h	/^struct IPv4Header { uint8_t ver_ihl, tos; uint16_t tot_len; uint32_t saddr, daddr; uint8_t proto/;"	m	struct:IPv4Header	typeref:typename:uint8_t
+src_ip	include/icmp.h	/^        uint32_t src_ip;$/;"	m	struct:ICMPHeader::Flow	typeref:typename:uint32_t
+src_ip	include/ipv4.h	/^        uint32_t src_ip;$/;"	m	struct:IPv4Header::Flow	typeref:typename:uint32_t
+src_ip	include/tcp.h	/^        uint32_t src_ip;$/;"	m	struct:TCPHeader::Flow	typeref:typename:uint32_t
+src_ip	include/udp.h	/^        uint32_t src_ip;$/;"	m	struct:UDPHeader::Flow	typeref:typename:uint32_t
+src_port	include/tcp.h	/^        uint16_t src_port;$/;"	m	struct:TCPHeader::Flow	typeref:typename:uint16_t
+src_port	include/udp.h	/^        uint16_t src_port;$/;"	m	struct:UDPHeader::Flow	typeref:typename:uint16_t
+tcp_port_max	nat/nat_config.hpp	/^    uint16_t tcp_port_max = 20000;$/;"	m	struct:NatConfig	typeref:typename:uint16_t
+tcp_port_min	nat/nat_config.hpp	/^    uint16_t tcp_port_min = 10000;$/;"	m	struct:NatConfig	typeref:typename:uint16_t
+tcph	include/tcp.h	/^    struct tcphdr tcph;$/;"	m	struct:TCPHeader	typeref:struct:tcphdr
+to_tuple	include/icmp.h	/^        auto to_tuple() const {$/;"	f	struct:ICMPHeader::Flow	typeref:typename:auto
+to_tuple	include/ipv4.h	/^        auto to_tuple() const {$/;"	f	struct:IPv4Header::Flow	typeref:typename:auto
+to_tuple	include/tcp.h	/^        auto to_tuple() const {$/;"	f	struct:TCPHeader::Flow	typeref:typename:auto
+to_tuple	include/udp.h	/^        auto to_tuple() const {$/;"	f	struct:UDPHeader::Flow	typeref:typename:auto
+udp_port_max	nat/nat_config.hpp	/^    uint16_t udp_port_max = 20000;$/;"	m	struct:NatConfig	typeref:typename:uint16_t
+udp_port_min	nat/nat_config.hpp	/^    uint16_t udp_port_min = 10000;$/;"	m	struct:NatConfig	typeref:typename:uint16_t
+udph	include/udp.h	/^    struct udphdr udph;$/;"	m	struct:UDPHeader	typeref:struct:udphdr
+useFile_	common/logger.h	/^    bool useFile_ = false;$/;"	m	class:Logger	typeref:typename:bool
+uses_ports	include/icmp.h	/^    static constexpr bool uses_ports = false; \/\/ используется идентифика/;"	m	struct:ICMPHeader	typeref:typename:bool
+uses_ports	include/ipv4.h	/^    static constexpr bool uses_ports = false;$/;"	m	struct:IPv4Header	typeref:typename:bool
+uses_ports	include/tcp.h	/^    static constexpr bool uses_ports = true;$/;"	m	struct:TCPHeader	typeref:typename:bool
+uses_ports	include/udp.h	/^    static constexpr bool uses_ports = true;$/;"	m	struct:UDPHeader	typeref:typename:bool
+worker_	common/logger.h	/^    std::thread worker_;$/;"	m	class:Logger	typeref:typename:std::thread
+~Logger	common/logger.h	/^    ~Logger() { shutdown(); }$/;"	f	class:Logger
+~Netset	common/netset.hpp	/^    ~Netset() { destroy(); }$/;"	f	class:Netset

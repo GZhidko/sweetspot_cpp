@@ -3,6 +3,6 @@
 #include <arpa/inet.h>
 template<>
 struct Nat<UDPHeader> {
-    void operator()(UDPHeader& udp) { if (ntohs(udp.src_port) == 0) udp.src_port = htons(40000); }
+    void operator()(UDPHeader& udp) { };
 };
 static int _nat_udp_cpp_anchor = 0;
