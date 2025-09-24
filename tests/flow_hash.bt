@@ -1,0 +1,39 @@
+#include <linux/skbuff.h>
+#include <linux/ip.h>
+#include <linux/tcp.h>
+#include <linux/udp.h>
+
+kprobe:__skb_get_hash {
+    $skb = (struct sk_buff *)arg0;
+    $iph = (struct iphdr *)($skb->data + 14); // Смещение Ethernet заголовка (14 байт)
+    $proto = $iph->protocol;
+    $saddr = $iph->saddr;
+    $daddr = $iph->daddr;
+    $sport = 0;
+    $dport = 0;
+
+    if ($proto == 6) { // TCP
+        $tcph = (struct tcphdr *)($skb->data + 14 + ($iph->ihl * 4));
+        $sport = $tcph->source;
+        $dport = $tcph->dest;
+    } else if ($proto == 17) { // UDP
+        $udph = (struct udphdr *)($skb->data + 14 + ($iph->ihl * 4));
+        $sport = $udph->source;
+        $dport = $udph->dest;
+    }
+
+    @saddr = $saddr;
+    @daddr = $daddr;
+    @sport = $sport;
+    @dport = $dport;
+    @proto = $proto;
+}
+
+kretprobe:__skb_get_hash {
+    // Преобразование sport и dport из big-endian в host-endian
+    $sport_host = ((@sport & 0xFF) << 8) | ((@sport >> 8) & 0xFF);
+    $dport_host = ((@dport & 0xFF) << 8) | ((@dport >> 8) & 0xFF);
+
+    printf("skb_hash=0x%x saddr=%pI4 daddr=%pI4 sport=%d dport=%d proto=%d\n",
+           retval, @saddr, @daddr, $sport_host, $dport_host, @proto);
+}
