@@ -22,10 +22,6 @@ int to_native_protocol(int protocol) {
     return htons(protocol);
 }
 
-int ring_opt(Direction dir) {
-    return dir == Direction::Rx ? PACKET_RX_RING : PACKET_TX_RING;
-}
-
 } // namespace
 
 PacketSocket::PacketSocket() = default;
@@ -111,13 +107,18 @@ void PacketSocket::enable_qdisc_bypass(bool enable) {
 
 void PacketSocket::configure_ring(Direction dir, const RingConfig& cfg) {
     ensure_open();
-    if (dir == Direction::Rx) {
-        munmap_ring(Direction::Rx);
-    } else {
-        munmap_ring(Direction::Tx);
+    if (cfg.block_size == 0 || cfg.block_count == 0 || cfg.frame_size == 0) {
+        munmap_ring(dir);
+        return;
     }
 
-    mmap_ring(dir, cfg);
+    if (dir != Direction::Rx) {
+        munmap_ring(dir);
+        return;
+    }
+
+    munmap_ring(Direction::Rx);
+    mmap_ring(Direction::Rx, cfg);
 }
 
 void PacketSocket::configure_fanout(const FanoutConfig& cfg) {
@@ -148,33 +149,34 @@ void PacketSocket::munmap_ring(Direction dir) {
 }
 
 void PacketSocket::mmap_ring(Direction dir, const RingConfig& cfg) {
+    if (dir != Direction::Rx) {
+        return;
+    }
+
+    constexpr off_t mmap_offset = 0;
     tpacket_req3 req{};
     req.tp_block_size = cfg.block_size;
     req.tp_block_nr = cfg.block_count;
     req.tp_frame_size = cfg.frame_size;
     req.tp_frame_nr = cfg.frame_count ? cfg.frame_count
                                       : (cfg.block_size / cfg.frame_size) * cfg.block_count;
-    req.tp_retire_blk_tov = static_cast<unsigned int>(cfg.timeout_ns / 1000); // microseconds
+    req.tp_retire_blk_tov = cfg.timeout_ns ? static_cast<unsigned int>(cfg.timeout_ns / 1000)
+                                           : 60U;
     req.tp_feature_req_word = TP_FT_REQ_FILL_RXHASH;
 
-    if (::setsockopt(fd_, SOL_PACKET, ring_opt(dir), &req, sizeof(req)) < 0) {
-        throw make_sys_error("setsockopt(PACKET_*_RING)");
+    if (::setsockopt(fd_, SOL_PACKET, PACKET_RX_RING, &req, sizeof(req)) < 0) {
+        throw make_sys_error("setsockopt(PACKET_RX_RING)");
     }
 
     size_t map_length = static_cast<size_t>(req.tp_block_size) * req.tp_block_nr;
-    void* area = ::mmap(nullptr, map_length, PROT_READ | PROT_WRITE, MAP_SHARED, fd_,
-                        dir == Direction::Rx ? PACKET_RX_RING : PACKET_TX_RING);
+    void* area = ::mmap(nullptr, map_length, PROT_READ | PROT_WRITE,
+                        MAP_SHARED, fd_, mmap_offset);
     if (area == MAP_FAILED) {
         throw make_sys_error("mmap(PACKET_RING)");
     }
 
-    if (dir == Direction::Rx) {
-        rx_map_ = area;
-        rx_map_len_ = map_length;
-    } else {
-        tx_map_ = area;
-        tx_map_len_ = map_length;
-    }
+    rx_map_ = area;
+    rx_map_len_ = map_length;
 }
 
 std::system_error make_sys_error(const std::string& what) {
@@ -182,4 +184,3 @@ std::system_error make_sys_error(const std::string& what) {
 }
 
 } // namespace af_packet_io
-

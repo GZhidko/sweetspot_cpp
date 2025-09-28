@@ -6,6 +6,7 @@
 #include "../parsers/parser.h"
 #include "../chain/header_chain.h"
 #include <atomic>
+#include <cstddef>
 #include <deque>
 #include <functional>
 #include <memory>
@@ -28,6 +29,11 @@ struct WorkerPipelineConfig {
 
 class Worker {
   public:
+    struct FramePayload {
+        std::vector<uint8_t> buffer;
+        size_t net_offset = 0;
+    };
+
     explicit Worker(const WorkerPipelineConfig& cfg);
     ~Worker();
 
@@ -38,8 +44,8 @@ class Worker {
   private:
     void run();
     void process_rx_block(tpacket_block_desc* block_desc);
-    void handle_frame(uint8_t* data, size_t len);
-    void enqueue_tx(std::vector<uint8_t>&& frame);
+    void handle_frame(uint8_t* data, size_t len, size_t net_offset);
+    void enqueue_tx(std::vector<uint8_t>&& frame, size_t net_offset);
     void transmit_pending();
     void process_remote_frames();
 
@@ -50,30 +56,31 @@ class Worker {
     std::thread thread_;
     std::atomic<bool> running_{false};
 
-    std::function<void(uint32_t, std::vector<uint8_t>&&)> forward_fn_;
+    std::function<void(uint32_t, FramePayload&&)> forward_fn_;
 
     using Chain = HeaderChainTuple<IPv4Header, TCPHeader, UDPHeader, ICMPHeader>;
     Chain chain_;
 
     struct TxFrame {
         std::vector<uint8_t> buffer;
+        size_t net_offset = 0;
     };
     std::vector<TxFrame> tx_queue_;
     size_t tx_ring_index_ = 0;
 
     std::mutex remote_mutex_;
-    std::deque<std::vector<uint8_t>> remote_queue_;
+    std::deque<FramePayload> remote_queue_;
 
   public:
-    void set_forward_callback(std::function<void(uint32_t, std::vector<uint8_t>&&)> fn) {
+    void set_forward_callback(std::function<void(uint32_t, FramePayload&&)> fn) {
         forward_fn_ = std::move(fn);
     }
 
-    void submit_remote_frame(std::vector<uint8_t>&& frame);
+    void submit_remote_frame(FramePayload&& frame);
     void process_remote_frames_for_tests() { process_remote_frames(); }
     std::vector<std::vector<uint8_t>> collect_tx_frames();
-    void process_frame_for_tests(std::vector<uint8_t>& frame) {
-        handle_frame(frame.data(), frame.size());
+    void process_frame_for_tests(std::vector<uint8_t>& frame, size_t net_offset = 0) {
+        handle_frame(frame.data(), frame.size(), net_offset);
     }
     Nat& nat_for_tests() { return nat_; }
 };

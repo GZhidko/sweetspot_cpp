@@ -115,6 +115,15 @@ Nat::Translation Nat::ensure_ip_mapping(uint32_t prv_ip, uint32_t dst_ip, uint8_
     return make_translation(entry);
 }
 
+uint32_t Nat::map_ip(uint32_t prv_ip, uint32_t dst_ip, uint8_t protocol,
+                     uint32_t thread_index) const {
+    (void)thread_index;
+    auto tuple = std::make_tuple(htonl(prv_ip), htonl(dst_ip), static_cast<uint16_t>(0),
+                                 static_cast<uint16_t>(0), protocol);
+    uint32_t hash = CPUFanoutHash::hash_tuple(tuple);
+    return select_public_ip(hash);
+}
+
 Nat::Translation Nat::ensure_tcp_mapping(uint32_t prv_ip, uint32_t dst_ip, uint16_t src_port,
                                          uint16_t dst_port) {
     if (auto stat = maybe_static_translation(prv_ip, dst_ip, src_port, dst_port, IPPROTO_TCP)) {
@@ -131,9 +140,9 @@ Nat::Translation Nat::ensure_tcp_mapping(uint32_t prv_ip, uint32_t dst_ip, uint1
         return make_translation(it->second);
     }
 
-    auto [pub_ip, pub_port] = map_tcp_udp(prv_ip, dst_ip, src_port, dst_port, IPPROTO_TCP,
-                                          config_->tcp_port_min, config_->tcp_port_max,
-                                          thread_index_);
+    auto [pub_ip, pub_port] =
+        map_tcp_udp(prv_ip, dst_ip, src_port, dst_port, IPPROTO_TCP, config_->tcp_port_min,
+                    config_->tcp_port_max);
     PubKey pub{pub_ip, dst_ip, pub_port, dst_port, static_cast<uint8_t>(IPPROTO_TCP)};
     MappingEntry& entry = insert_entry(tcp_table_, flow, pub);
     LOG(DEBUG_NAT, "Nat new TCP mapping thread=", static_cast<int>(thread_index_),
@@ -157,9 +166,9 @@ Nat::Translation Nat::ensure_udp_mapping(uint32_t prv_ip, uint32_t dst_ip, uint1
         return make_translation(it->second);
     }
 
-    auto [pub_ip, pub_port] = map_tcp_udp(prv_ip, dst_ip, src_port, dst_port, IPPROTO_UDP,
-                                          config_->udp_port_min, config_->udp_port_max,
-                                          thread_index_);
+    auto [pub_ip, pub_port] =
+        map_tcp_udp(prv_ip, dst_ip, src_port, dst_port, IPPROTO_UDP, config_->udp_port_min,
+                    config_->udp_port_max);
     PubKey pub{pub_ip, dst_ip, pub_port, dst_port, static_cast<uint8_t>(IPPROTO_UDP)};
     MappingEntry& entry = insert_entry(udp_table_, flow, pub);
     LOG(DEBUG_NAT, "Nat new UDP mapping thread=", static_cast<int>(thread_index_),
@@ -183,7 +192,7 @@ Nat::Translation Nat::ensure_icmp_mapping(uint32_t prv_ip, uint32_t dst_ip, uint
         return make_translation(it->second);
     }
 
-    auto [pub_ip, new_id] = map_icmp(prv_ip, dst_ip, ident, seq, thread_index_);
+    auto [pub_ip, new_id] = map_icmp(prv_ip, dst_ip, ident, seq);
     PubKey pub{pub_ip, dst_ip, new_id, seq, static_cast<uint8_t>(IPPROTO_ICMP)};
     MappingEntry& entry = insert_entry(icmp_table_, flow, pub);
     LOG(DEBUG_NAT, "Nat new ICMP mapping thread=", static_cast<int>(thread_index_),

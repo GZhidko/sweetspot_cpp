@@ -4,7 +4,6 @@
 
 #include "chain/header_chain.h"
 #include "filters/filter.h"
-#include "nat/nat.h"
 #include "common/logger.h"
 #include "include/ethernet.h"
 #include "include/ipv4.h"
@@ -19,13 +18,6 @@ bool apply_filters(const Chain& chain) {
         if (!Filter<std::decay_t<decltype(hdr)>>{}(hdr)) ok = false;
     });
     return ok;
-}
-
-template<typename Chain>
-void apply_nat(Chain& chain) {
-    chain.for_each([&](auto& hdr) {
-        Nat<std::decay_t<decltype(hdr)>>{}(hdr);
-    });
 }
 
 using MyChain = HeaderChainTuple< IPv4Header, TCPHeader, UDPHeader, ICMPHeader >;

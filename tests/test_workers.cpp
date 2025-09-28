@@ -1,6 +1,7 @@
 #include "../common/worker.hpp"
 #include "../common/netset.hpp"
 #include "jenkins_hash.hpp"
+#include <array>
 #include <arpa/inet.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
@@ -67,11 +68,11 @@ int main() {
     Worker workerB(cfgB);
 
     std::array<Worker*, 2> workers{&workerA, &workerB};
-    std::vector<std::vector<uint8_t>> forwarded[2];
+    std::array<size_t, 2> forwarded_count{0, 0};
 
-    auto forward_cb = [&](uint32_t target, std::vector<uint8_t>&& frame) {
+    auto forward_cb = [&](uint32_t target, Worker::FramePayload&& frame) {
         if (target < workers.size()) {
-            forwarded[target].push_back(frame);
+            ++forwarded_count[target];
             workers[target]->submit_remote_frame(std::move(frame));
         }
     };
@@ -109,7 +110,7 @@ int main() {
     auto reply = make_tcp_packet(remote_ip, remote_port, pub_ip, pub_port);
     other->process_frame_for_tests(reply);
 
-    assert(forwarded[owner_thread].size() == 1);
+    assert(forwarded_count[owner_thread] == 1);
     assert(other->collect_tx_frames().empty());
 
     owner->process_remote_frames_for_tests();

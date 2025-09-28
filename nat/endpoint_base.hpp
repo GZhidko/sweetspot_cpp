@@ -4,15 +4,20 @@
 #include "nat_config.hpp"
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <stdexcept>
 #include <utility>
 
 class EndpointBase {
   protected:
-    EndpointBase(const NatConfig& config, uint32_t cpu_count = 1)
-        : config_(config), cpu_count_(cpu_count) {}
+    EndpointBase(std::shared_ptr<NatConfig> config, uint32_t cpu_count = 1)
+        : config_(std::move(config)), cpu_count_(cpu_count) {
+        if (!config_) {
+            throw std::invalid_argument("EndpointBase requires non-null config");
+        }
+    }
 
-    const NatConfig& config_;
+    std::shared_ptr<NatConfig> config_;
     uint32_t cpu_count_;
 
     // ---------- УТИЛИТЫ ----------
@@ -23,8 +28,8 @@ class EndpointBase {
 
     // ports_per_prv = max(1, pub_size * ports_total / prv_size)
     uint32_t ports_per_private(uint16_t port_min, uint16_t port_max) const {
-        const uint32_t prv = config_.private_ip_count();
-        const uint32_t pub = config_.public_ip_count();
+        const uint32_t prv = config_->private_ip_count();
+        const uint32_t pub = config_->public_ip_count();
         if (prv == 0 || pub == 0) {
             throw std::runtime_error("Netsets are not configured");
         }
@@ -38,10 +43,10 @@ class EndpointBase {
     // Поддиапазон для конкретного prv_ip
     std::pair<uint16_t, uint16_t> get_port_range(uint32_t prv_ip, uint16_t port_min,
                                                  uint16_t port_max) const {
-        if (!config_.private_netset) {
+        if (!config_->private_netset) {
             throw std::runtime_error("No private netset configured");
         }
-        const uint32_t prv_idx = config_.private_netset->idx(prv_ip);
+        const uint32_t prv_idx = config_->private_netset->idx(prv_ip);
         const uint32_t total = full_range_size(port_min, port_max);
         const uint32_t per = ports_per_private(port_min, port_max);
 
@@ -73,12 +78,12 @@ class EndpointBase {
 
     // Выбор pub IP по хэшу
     uint32_t select_public_ip(uint32_t hash) const {
-        const uint32_t pub_cnt = config_.public_ip_count();
-        if (!config_.public_netset || pub_cnt == 0) {
+        const uint32_t pub_cnt = config_->public_ip_count();
+        if (!config_->public_netset || pub_cnt == 0) {
             throw std::runtime_error("No public netset configured");
         }
         const uint32_t idx = hash % pub_cnt;
-        return netset_ip_at(*config_.public_netset, idx);
+        return netset_ip_at(*config_->public_netset, idx);
     }
   public:
     inline uint32_t pick_cpu(uint32_t hash) const {
@@ -89,23 +94,17 @@ class EndpointBase {
     template <typename TupleBuilder>
     uint16_t choose_port_for_cpu(uint32_t desired_cpu, uint16_t rmin, uint16_t rmax,
                                  TupleBuilder build_tuple) const {
-        uint32_t best_hash = 0;
-        uint16_t best_port = rmin;
+        uint32_t span = static_cast<uint32_t>(rmax - rmin + 1);
+        uint32_t slots = (span + cpu_count_ - 1) / cpu_count_; // ceil(span / cpu_count)
 
-        for (uint16_t port = rmin; port <= rmax; ++port) {
-            auto tuple = build_tuple(port);
-            uint32_t h = CPUFanoutHash::hash_tuple(tuple);
-            uint32_t cpu = pick_cpu(h);
-            if (cpu == desired_cpu) {
-                return port; // нашли идеальный
-            }
-            // fallback: запомним лучший
-            if (h > best_hash) {
-                best_hash = h;
-                best_port = port;
-            }
+        uint32_t h = CPUFanoutHash::hash_tuple(build_tuple(rmin));
+        uint32_t offset = (h / cpu_count_) % slots;
+
+        uint32_t candidate = static_cast<uint32_t>(rmin) + desired_cpu + offset * cpu_count_;
+        if (candidate > rmax) {
+            candidate = static_cast<uint32_t>(rmin) + (candidate - rmin) % span;
         }
-        return best_port;
+        return static_cast<uint16_t>(candidate);
     }
 
     // ---------- TCP/UDP ----------
@@ -133,8 +132,8 @@ class EndpointBase {
     // ---------- ICMP ----------
     std::pair<uint32_t, uint16_t> map_icmp(uint32_t prv_ip, uint32_t dst_ip, uint16_t icmp_id_val,
                                            uint16_t icmp_seq_val) const {
-        uint16_t id_min = config_.icmp_id_min;
-        uint16_t id_max = config_.icmp_id_max;
+        uint16_t id_min = config_->icmp_id_min;
+        uint16_t id_max = config_->icmp_id_max;
 
         auto fwd_tuple = std::make_tuple(prv_ip, dst_ip, icmp_id_val, icmp_seq_val, (uint8_t)1);
         uint32_t desired_cpu = pick_cpu(CPUFanoutHash::hash_tuple(fwd_tuple));
@@ -153,4 +152,3 @@ class EndpointBase {
         return {pub_ip, new_id};
     }
 };
-

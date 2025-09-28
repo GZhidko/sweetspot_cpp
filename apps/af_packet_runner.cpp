@@ -124,10 +124,15 @@ int main(int argc, char** argv) {
     af_packet_io::IoConfig io_cfg;
     io_cfg.interface = ifname;
     io_cfg.protocol = ETH_P_ALL;
-    io_cfg.rx_ring.block_size = 1 << 20;
-    io_cfg.rx_ring.block_count = 8;
-    io_cfg.rx_ring.frame_size = 2048;
-    io_cfg.tx_ring = io_cfg.rx_ring;
+    io_cfg.rx_ring.block_size = 1 << 22;   // 4 MiB blocks as in tpacket_v3 example
+    io_cfg.rx_ring.block_count = 64;
+    io_cfg.rx_ring.frame_size = 1 << 11;   // 2048-byte frames
+    io_cfg.rx_ring.timeout_ns = 60ULL * 1000ULL * 1000ULL; // 60 ms
+    io_cfg.tx_ring.block_size = 0;
+    io_cfg.tx_ring.block_count = 0;
+    io_cfg.tx_ring.frame_size = 0;
+    io_cfg.tx_ring.frame_count = 0;
+    io_cfg.tx_ring.timeout_ns = 0;
     uint16_t fanout_group = static_cast<uint16_t>(getpid() & 0xffff);
     io_cfg.fanout = {fanout_group, PACKET_FANOUT_HASH, 0};
 
@@ -160,7 +165,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    auto forward = [&workers](uint32_t target, std::vector<uint8_t>&& frame) {
+    auto forward = [&workers](uint32_t target, Worker::FramePayload&& frame) {
         if (target < workers.size()) {
             workers[target]->submit_remote_frame(std::move(frame));
         }

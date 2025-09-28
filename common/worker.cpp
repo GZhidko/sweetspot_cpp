@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstring>
 #include <netinet/in.h>
+#include <netinet/ip.h>
 #include <vector>
 #include <linux/if_packet.h>
 #include <sys/socket.h>
@@ -89,13 +90,29 @@ void Worker::process_rx_block(tpacket_block_desc* block_desc) {
     for (uint32_t i = 0; i < block_desc->hdr.bh1.num_pkts; ++i) {
         uint8_t* data = reinterpret_cast<uint8_t*>(hdr) + hdr->tp_mac;
         size_t len = hdr->tp_snaplen;
-        handle_frame(data, len);
+        size_t net_offset = 0;
+        if (hdr->tp_net >= hdr->tp_mac && hdr->tp_net != 0) {
+            net_offset = static_cast<size_t>(hdr->tp_net - hdr->tp_mac);
+            if (net_offset > len) {
+                net_offset = 0;
+            }
+        }
+        handle_frame(data, len, net_offset);
         hdr = reinterpret_cast<tpacket3_hdr*>(reinterpret_cast<uint8_t*>(hdr) + hdr->tp_next_offset);
     }
 }
 
-void Worker::handle_frame(uint8_t* data, size_t len) {
-    if (!chain_.parse(data, len)) {
+void Worker::handle_frame(uint8_t* data, size_t len, size_t net_offset) {
+    if (net_offset > len) {
+        net_offset = 0;
+    }
+    uint8_t* l3_data = data + net_offset;
+    size_t l3_len = len - net_offset;
+    if (l3_len == 0) {
+        return;
+    }
+
+    if (!chain_.parse(l3_data, l3_len)) {
         LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": parse failed");
         return;
     }
@@ -147,19 +164,23 @@ void Worker::handle_frame(uint8_t* data, size_t len) {
         uint32_t target = CPUFanoutHash::select_cpu(CPUFanoutHash::hash_tuple(tuple),
                                                     cfg_.thread_count);
         if (target != cfg_.thread_index) {
-            forward_fn_(target, std::vector<uint8_t>(data, data + len));
+            FramePayload payload;
+            payload.buffer.assign(data, data + len);
+            payload.net_offset = net_offset;
+            forward_fn_(target, std::move(payload));
             return;
         }
     }
 
     chain_.for_each([&](auto& hdr) { nat_.process(hdr); });
 
-    enqueue_tx(std::vector<uint8_t>(data, data + len));
+    enqueue_tx(std::vector<uint8_t>(data, data + len), net_offset);
 }
 
-void Worker::enqueue_tx(std::vector<uint8_t>&& frame) {
+void Worker::enqueue_tx(std::vector<uint8_t>&& frame, size_t net_offset) {
     tx_queue_.push_back({});
     tx_queue_.back().buffer = std::move(frame);
+    tx_queue_.back().net_offset = net_offset;
 }
 
 void Worker::transmit_pending() {
@@ -200,10 +221,10 @@ void Worker::transmit_pending() {
             auto* hdr = reinterpret_cast<tpacket3_hdr*>(base + idx * frame_size);
             if ((hdr->tp_status & TP_STATUS_AVAILABLE) == TP_STATUS_AVAILABLE) {
                 size_t copy_len = std::min(frame.buffer.size(), frame_size - hdr_size);
-        std::memcpy(reinterpret_cast<uint8_t*>(hdr) + hdr_size, frame.buffer.data(), copy_len);
-        hdr->tp_len = copy_len;
-        hdr->tp_snaplen = copy_len;
-        hdr->tp_status = TP_STATUS_SEND_REQUEST;
+                std::memcpy(reinterpret_cast<uint8_t*>(hdr) + hdr_size, frame.buffer.data(), copy_len);
+                hdr->tp_len = copy_len;
+                hdr->tp_snaplen = copy_len;
+                hdr->tp_status = TP_STATUS_SEND_REQUEST;
                 tx_ring_index_ = idx + 1;
                 written = true;
                 break;
@@ -221,17 +242,17 @@ void Worker::transmit_pending() {
 }
 
 void Worker::process_remote_frames() {
-    std::deque<std::vector<uint8_t>> local;
+    std::deque<FramePayload> local;
     {
         std::lock_guard<std::mutex> lock(remote_mutex_);
         local.swap(remote_queue_);
     }
     for (auto& frame : local) {
-        handle_frame(frame.data(), frame.size());
+        handle_frame(frame.buffer.data(), frame.buffer.size(), frame.net_offset);
     }
 }
 
-void Worker::submit_remote_frame(std::vector<uint8_t>&& frame) {
+void Worker::submit_remote_frame(FramePayload&& frame) {
     std::lock_guard<std::mutex> lock(remote_mutex_);
     remote_queue_.emplace_back(std::move(frame));
 }

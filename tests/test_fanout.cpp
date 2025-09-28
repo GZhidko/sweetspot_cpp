@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <vector>
 #include <unordered_map>
+#include <memory>
 
 #include "common/logger.h"
 #include "nat/endpoint_base.hpp"
@@ -46,7 +47,8 @@ std::mutex table_mtx;
 // ===============================
 class TestEndpoint : public EndpointBase {
   public:
-    TestEndpoint(const NatConfig& cfg, uint32_t cpu_count) : EndpointBase(cfg, cpu_count) {}
+    TestEndpoint(const NatConfig& cfg, uint32_t cpu_count)
+        : EndpointBase(std::make_shared<NatConfig>(cfg), cpu_count) {}
     using EndpointBase::map_tcp_udp;
 
     // slot = hash % cpu_count
@@ -210,4 +212,3 @@ int main(int argc, char** argv) {
     }
     return 0;
 }
-
