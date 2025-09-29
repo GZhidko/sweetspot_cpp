@@ -19,12 +19,12 @@ IoContext::IoContext(const IoConfig& cfg) : cfg_(cfg) {
 
 RingView IoContext::rx_ring() const noexcept {
     return RingView(sock_.mapped_area(Direction::Rx), sock_.mapped_length(Direction::Rx),
-                    applied_rx_.frame_size);
+                    applied_rx_.block_size, applied_rx_.block_count, applied_rx_.frame_size);
 }
 
 RingView IoContext::tx_ring() const noexcept {
     return RingView(sock_.mapped_area(Direction::Tx), sock_.mapped_length(Direction::Tx),
-                    applied_tx_.frame_size);
+                    applied_tx_.block_size, applied_tx_.block_count, applied_tx_.frame_size);
 }
 
 } // namespace af_packet_io

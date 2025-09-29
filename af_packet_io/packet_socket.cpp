@@ -90,8 +90,11 @@ void PacketSocket::bind_interface(const std::string& ifname, uint16_t protocol) 
 
     sockaddr_ll sll{};
     sll.sll_family = AF_PACKET;
-    sll.sll_protocol = to_native_protocol(protocol);
+    sll.sll_protocol = to_native_protocol(protocol ? protocol : ETH_P_ALL);
     sll.sll_ifindex = static_cast<int>(ifindex);
+    sll.sll_pkttype = 0; // accept HOST, OUTGOING, BROADCAST, etc.
+    sll.sll_hatype = 0;
+    sll.sll_halen = 0;
     if (::bind(fd_, reinterpret_cast<sockaddr*>(&sll), sizeof(sll)) < 0) {
         throw make_sys_error("bind(AF_PACKET)");
     }
@@ -160,8 +163,16 @@ void PacketSocket::mmap_ring(Direction dir, const RingConfig& cfg) {
     req.tp_frame_size = cfg.frame_size;
     req.tp_frame_nr = cfg.frame_count ? cfg.frame_count
                                       : (cfg.block_size / cfg.frame_size) * cfg.block_count;
-    req.tp_retire_blk_tov = cfg.timeout_ns ? static_cast<unsigned int>(cfg.timeout_ns / 1000)
-                                           : 60U;
+    if (cfg.timeout_ns == 0) {
+        req.tp_retire_blk_tov = 60U;
+    } else {
+        // tp_retire_blk_tov expects milliseconds; convert from nanoseconds with ceiling
+        unsigned long long ms = (cfg.timeout_ns + 999999ULL) / 1000000ULL;
+        if (ms == 0) {
+            ms = 1;
+        }
+        req.tp_retire_blk_tov = static_cast<unsigned int>(ms);
+    }
     req.tp_feature_req_word = TP_FT_REQ_FILL_RXHASH;
 
     if (::setsockopt(fd_, SOL_PACKET, PACKET_RX_RING, &req, sizeof(req)) < 0) {

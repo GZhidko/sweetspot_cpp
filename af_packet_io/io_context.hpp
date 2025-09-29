@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <linux/if_ether.h> // For ETH_P_IP
 
 namespace af_packet_io {
 
@@ -16,7 +17,7 @@ struct FanoutParams {
 
 struct IoConfig {
     std::string interface;
-    uint16_t protocol = 0; // ETH_P_ALL
+    uint16_t protocol = ETH_P_IP; // ETH_P_ALL
     RingConfig rx_ring{};
     RingConfig tx_ring{};
     FanoutParams fanout{0, PACKET_FANOUT_HASH, 0};

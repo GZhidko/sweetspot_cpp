@@ -112,6 +112,9 @@ void Worker::handle_frame(uint8_t* data, size_t len, size_t net_offset) {
         return;
     }
 
+    LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": received frame len=", len,
+        " net_offset=", net_offset);
+
     if (!chain_.parse(l3_data, l3_len)) {
         LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": parse failed");
         return;

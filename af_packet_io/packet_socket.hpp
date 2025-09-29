@@ -68,4 +68,3 @@ class PacketSocket {
 std::system_error make_sys_error(const std::string& what);
 
 } // namespace af_packet_io
-
