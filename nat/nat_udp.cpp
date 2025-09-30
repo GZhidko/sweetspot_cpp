@@ -20,6 +20,10 @@ auto checksum_after_port_change(uint16_t checksum_net, uint16_t old_port, uint16
     return htons(host);
 }
 
+std::string to_string_host(uint32_t host_ip) {
+    return IPv4Header::ip_to_string(htonl(host_ip));
+}
+
 } // namespace
 
 void Nat::process(UDPHeader& udp) {
@@ -39,11 +43,15 @@ void Nat::process(UDPHeader& udp, Clock::time_point) {
     const bool checksum_present = udp.udph.check != 0;
 
     if (is_private(src_ip) && !is_private(dst_ip)) {
+        LOG(DEBUG_NAT, "UDP outbound before NAT src=", to_string_host(src_ip), ":", src_port,
+            " dst=", to_string_host(dst_ip), ":", dst_port);
         Translation tr = ensure_udp_mapping(src_ip, dst_ip, src_port, dst_port);
         const uint32_t new_ip = tr.pub.pub_ip;
         const uint16_t new_port = tr.pub.pub_port;
 
         if (new_ip != src_ip) {
+            LOG(DEBUG_NAT, "UDP outbound IP translate ", to_string_host(src_ip), " -> ",
+                to_string_host(new_ip));
             ip.iph.saddr = htonl(new_ip);
             ip.iph.check = checksum_after_ip_change(ip.iph.check, src_ip, new_ip);
         }
@@ -53,6 +61,9 @@ void Nat::process(UDPHeader& udp, Clock::time_point) {
             if (checksum_present) {
                 udp.udph.check = checksum_after_port_change(udp.udph.check, src_port, new_port);
             }
+        }
+        if (new_port != src_port) {
+            LOG(DEBUG_NAT, "UDP outbound port translate ", src_port, " -> ", new_port);
         }
 
         if (checksum_present && new_ip != src_ip) {
@@ -68,7 +79,12 @@ void Nat::process(UDPHeader& udp, Clock::time_point) {
         const uint16_t new_port = tr->flow.src_port;
         const uint16_t old_dest_port = dst_port;
 
+        LOG(DEBUG_NAT, "UDP inbound before NAT src=", to_string_host(src_ip), ":", src_port,
+            " dst=", to_string_host(dst_ip), ":", dst_port);
+
         if (new_ip != dst_ip) {
+            LOG(DEBUG_NAT, "UDP inbound IP translate ", to_string_host(dst_ip), " -> ",
+                to_string_host(new_ip));
             ip.iph.daddr = htonl(new_ip);
             ip.iph.check = checksum_after_ip_change(ip.iph.check, dst_ip, new_ip);
         }
@@ -78,6 +94,7 @@ void Nat::process(UDPHeader& udp, Clock::time_point) {
             if (checksum_present) {
                 udp.udph.check = checksum_after_port_change(udp.udph.check, old_dest_port, new_port);
             }
+            LOG(DEBUG_NAT, "UDP inbound port translate ", old_dest_port, " -> ", new_port);
         }
 
         if (checksum_present && new_ip != dst_ip) {
@@ -85,4 +102,3 @@ void Nat::process(UDPHeader& udp, Clock::time_point) {
         }
     }
 }
-

@@ -49,6 +49,7 @@ class PacketSocket {
     void configure_fanout(const FanoutConfig& cfg);
 
     int fd() const noexcept { return fd_; }
+    int ifindex() const noexcept { return ifindex_; }
 
     void* mapped_area(Direction dir) const noexcept;
     size_t mapped_length(Direction dir) const noexcept;
@@ -59,6 +60,7 @@ class PacketSocket {
     void munmap_ring(Direction dir);
 
     int fd_ = -1;
+    int ifindex_ = -1;
     void* rx_map_ = nullptr;
     size_t rx_map_len_ = 0;
     void* tx_map_ = nullptr;

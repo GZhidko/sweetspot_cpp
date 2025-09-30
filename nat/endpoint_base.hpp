@@ -2,6 +2,9 @@
 #include "jenkins_hash.hpp"
 #include "logger.h"
 #include "nat_config.hpp"
+#include "../include/ipv4.h"
+
+#include <arpa/inet.h>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -22,6 +25,10 @@ class EndpointBase {
 
     // ---------- УТИЛИТЫ ----------
 
+    static std::string ip_to_string(uint32_t ip_host_order) {
+        return IPv4Header::ip_to_string(htonl(ip_host_order));
+    }
+
     static inline uint32_t full_range_size(uint16_t port_min, uint16_t port_max) {
         return static_cast<uint32_t>(port_max) - static_cast<uint32_t>(port_min) + 1u;
     }
@@ -37,6 +44,8 @@ class EndpointBase {
         uint32_t per = (pub * total) / prv;
         if (per == 0)
             per = 1;
+        LOG(DEBUG_NAT, "ports_per_private range=[", port_min, "-", port_max, "] prv_count=", prv,
+            " pub_count=", pub, " total_ports=", total, " per=", per);
         return per;
     }
 
@@ -55,9 +64,13 @@ class EndpointBase {
         uint16_t end = static_cast<uint16_t>(port_min + ((start_off + per - 1) % total));
 
         if (end >= start) {
+            LOG(DEBUG_NAT, "get_port_range prv=", ip_to_string(prv_ip), " -> [", start, "-",
+                end, "] (per=", per, ")");
             return {start, end};
         } else {
             // wrap через верх
+            LOG(DEBUG_NAT, "get_port_range prv=", ip_to_string(prv_ip), " -> [", start, "-",
+                port_max, "] wrap (per=", per, ")");
             return {start, port_max};
         }
     }
@@ -83,7 +96,10 @@ class EndpointBase {
             throw std::runtime_error("No public netset configured");
         }
         const uint32_t idx = hash % pub_cnt;
-        return netset_ip_at(*config_->public_netset, idx);
+        uint32_t ip = netset_ip_at(*config_->public_netset, idx);
+        LOG(DEBUG_NAT, "select_public_ip hash=", hash, " idx=", idx,
+            " pub_ip=", ip_to_string(ip));
+        return ip;
     }
   public:
     inline uint32_t pick_cpu(uint32_t hash) const {
@@ -104,6 +120,9 @@ class EndpointBase {
         if (candidate > rmax) {
             candidate = static_cast<uint32_t>(rmin) + (candidate - rmin) % span;
         }
+        LOG(DEBUG_NAT, "choose_port_for_cpu desired_cpu=", desired_cpu, " range=[", rmin, "-",
+            rmax, "] span=", span, " slots=", slots, " offset=", offset,
+            " candidate=", candidate);
         return static_cast<uint16_t>(candidate);
     }
 
@@ -124,8 +143,9 @@ class EndpointBase {
         };
         uint16_t pub_port = choose_port_for_cpu(desired_cpu, rmin, rmax, builder);
 
-        LOG(DEBUG_NETSET, "NAT map TCP/UDP: prv=", prv_ip, " dst=", dst_ip, " -> pub_ip=", pub_ip,
-            " pub_port=", pub_port, " cpu=", (int)desired_cpu, " range=[", rmin, "-", rmax, "]");
+        LOG(DEBUG_NETSET, "NAT map TCP/UDP: prv=", ip_to_string(prv_ip), " dst=",
+            ip_to_string(dst_ip), " -> pub_ip=", ip_to_string(pub_ip), " pub_port=", pub_port,
+            " cpu=", (int)desired_cpu, " range=[", rmin, "-", rmax, "]");
         return {pub_ip, pub_port};
     }
 
@@ -147,8 +167,9 @@ class EndpointBase {
         };
         uint16_t new_id = choose_port_for_cpu(desired_cpu, rmin, rmax, builder);
 
-        LOG(DEBUG_NETSET, "NAT map ICMP: prv=", prv_ip, " dst=", dst_ip, " -> pub_ip=", pub_ip,
-            " new_id=", new_id, " cpu=", (int)desired_cpu, " range=[", rmin, "-", rmax, "]");
+        LOG(DEBUG_NETSET, "NAT map ICMP: prv=", ip_to_string(prv_ip), " dst=",
+            ip_to_string(dst_ip), " -> pub_ip=", ip_to_string(pub_ip), " new_id=", new_id,
+            " cpu=", (int)desired_cpu, " range=[", rmin, "-", rmax, "]");
         return {pub_ip, new_id};
     }
 };

@@ -26,6 +26,10 @@ bool supports_id_translation(const icmphdr& hdr) {
            hdr.type == ICMP_TIMESTAMPREPLY;
 }
 
+std::string to_string_host(uint32_t host_ip) {
+    return IPv4Header::ip_to_string(htonl(host_ip));
+}
+
 } // namespace
 
 void Nat::process(ICMPHeader& icmp) {
@@ -48,11 +52,15 @@ void Nat::process(ICMPHeader& icmp, Clock::time_point) {
     const uint16_t seq = ntohs(icmp.icmph.un.echo.sequence);
 
     if (is_private(src_ip) && !is_private(dst_ip)) {
+        LOG(DEBUG_NAT, "ICMP outbound before NAT src=", to_string_host(src_ip),
+            " dst=", to_string_host(dst_ip), " id=", ident, " seq=", seq);
         Translation tr = ensure_icmp_mapping(src_ip, dst_ip, ident, seq);
         const uint32_t new_ip = tr.pub.pub_ip;
         const uint16_t new_id = tr.pub.pub_port;
 
         if (new_ip != src_ip) {
+            LOG(DEBUG_NAT, "ICMP outbound IP translate ", to_string_host(src_ip), " -> ",
+                to_string_host(new_ip));
             ip.iph.saddr = htonl(new_ip);
             ip.iph.check = checksum_after_ip_change(ip.iph.check, src_ip, new_ip);
         }
@@ -75,7 +83,12 @@ void Nat::process(ICMPHeader& icmp, Clock::time_point) {
         const uint16_t new_id = tr->flow.src_port;
         const uint16_t old_id = ident;
 
+        LOG(DEBUG_NAT, "ICMP inbound before NAT src=", to_string_host(src_ip),
+            " dst=", to_string_host(dst_ip), " id=", ident, " seq=", seq);
+
         if (new_ip != dst_ip) {
+            LOG(DEBUG_NAT, "ICMP inbound IP translate ", to_string_host(dst_ip), " -> ",
+                to_string_host(new_ip));
             ip.iph.daddr = htonl(new_ip);
             ip.iph.check = checksum_after_ip_change(ip.iph.check, dst_ip, new_ip);
         }
@@ -83,6 +96,7 @@ void Nat::process(ICMPHeader& icmp, Clock::time_point) {
         if (new_id != old_id) {
             icmp.icmph.un.echo.id = htons(new_id);
             icmp.icmph.checksum = checksum_after_id_change(icmp.icmph.checksum, old_id, new_id);
+            LOG(DEBUG_NAT, "ICMP id translate ", old_id, " -> ", new_id);
         }
 
         if (new_ip != dst_ip) {

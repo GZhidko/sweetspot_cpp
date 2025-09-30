@@ -19,6 +19,10 @@ size_t hash_mix(uint64_t value, uint64_t salt) noexcept {
 
 constexpr uint8_t proto_ip_only = 0; // используется для IP NAT без портов
 
+std::string ip_to_string(uint32_t ip_host_order) {
+    return IPv4Header::ip_to_string(htonl(ip_host_order));
+}
+
 } // namespace
 
 bool Nat::FlowKey::operator==(const FlowKey& other) const noexcept {
@@ -103,7 +107,8 @@ Nat::Translation Nat::ensure_ip_mapping(uint32_t prv_ip, uint32_t dst_ip, uint8_
     if (it != ip_table_.forward.end()) {
         touch_entry(ip_table_, it->second);
         LOG(DEBUG_NAT, "Nat reuse IP mapping thread=", static_cast<int>(thread_index_),
-            " prv=", prv_ip, " -> pub=", it->second.pub.pub_ip);
+            " prv=", ip_to_string(prv_ip), " -> pub=",
+            ip_to_string(it->second.pub.pub_ip));
         return make_translation(it->second);
     }
 
@@ -111,7 +116,7 @@ Nat::Translation Nat::ensure_ip_mapping(uint32_t prv_ip, uint32_t dst_ip, uint8_
     PubKey pub{pub_ip, dst_ip, 0, 0, protocol};
     MappingEntry& entry = insert_entry(ip_table_, flow, pub);
     LOG(DEBUG_NAT, "Nat new IP mapping thread=", static_cast<int>(thread_index_),
-        " prv=", prv_ip, " -> pub=", pub_ip);
+        " prv=", ip_to_string(prv_ip), " -> pub=", ip_to_string(pub_ip));
     return make_translation(entry);
 }
 
@@ -135,8 +140,8 @@ Nat::Translation Nat::ensure_tcp_mapping(uint32_t prv_ip, uint32_t dst_ip, uint1
     if (it != tcp_table_.forward.end()) {
         touch_entry(tcp_table_, it->second);
         LOG(DEBUG_NAT, "Nat reuse TCP mapping thread=", static_cast<int>(thread_index_),
-            " prv=", prv_ip, ":", src_port, " -> pub=", it->second.pub.pub_ip, ":",
-            it->second.pub.pub_port);
+            " prv=", ip_to_string(prv_ip), ":", src_port, " -> pub=",
+            ip_to_string(it->second.pub.pub_ip), ":", it->second.pub.pub_port);
         return make_translation(it->second);
     }
 
@@ -146,7 +151,8 @@ Nat::Translation Nat::ensure_tcp_mapping(uint32_t prv_ip, uint32_t dst_ip, uint1
     PubKey pub{pub_ip, dst_ip, pub_port, dst_port, static_cast<uint8_t>(IPPROTO_TCP)};
     MappingEntry& entry = insert_entry(tcp_table_, flow, pub);
     LOG(DEBUG_NAT, "Nat new TCP mapping thread=", static_cast<int>(thread_index_),
-        " prv=", prv_ip, ":", src_port, " -> pub=", pub_ip, ":", pub_port);
+        " prv=", ip_to_string(prv_ip), ":", src_port, " -> pub=",
+        ip_to_string(pub_ip), ":", pub_port);
     return make_translation(entry);
 }
 
@@ -161,8 +167,8 @@ Nat::Translation Nat::ensure_udp_mapping(uint32_t prv_ip, uint32_t dst_ip, uint1
     if (it != udp_table_.forward.end()) {
         touch_entry(udp_table_, it->second);
         LOG(DEBUG_NAT, "Nat reuse UDP mapping thread=", static_cast<int>(thread_index_),
-            " prv=", prv_ip, ":", src_port, " -> pub=", it->second.pub.pub_ip, ":",
-            it->second.pub.pub_port);
+            " prv=", ip_to_string(prv_ip), ":", src_port, " -> pub=",
+            ip_to_string(it->second.pub.pub_ip), ":", it->second.pub.pub_port);
         return make_translation(it->second);
     }
 
@@ -172,7 +178,8 @@ Nat::Translation Nat::ensure_udp_mapping(uint32_t prv_ip, uint32_t dst_ip, uint1
     PubKey pub{pub_ip, dst_ip, pub_port, dst_port, static_cast<uint8_t>(IPPROTO_UDP)};
     MappingEntry& entry = insert_entry(udp_table_, flow, pub);
     LOG(DEBUG_NAT, "Nat new UDP mapping thread=", static_cast<int>(thread_index_),
-        " prv=", prv_ip, ":", src_port, " -> pub=", pub_ip, ":", pub_port);
+        " prv=", ip_to_string(prv_ip), ":", src_port, " -> pub=",
+        ip_to_string(pub_ip), ":", pub_port);
     return make_translation(entry);
 }
 
@@ -187,7 +194,8 @@ Nat::Translation Nat::ensure_icmp_mapping(uint32_t prv_ip, uint32_t dst_ip, uint
     if (it != icmp_table_.forward.end()) {
         touch_entry(icmp_table_, it->second);
         LOG(DEBUG_NAT, "Nat reuse ICMP mapping thread=", static_cast<int>(thread_index_),
-            " prv=", prv_ip, " id=", ident, " -> pub=", it->second.pub.pub_ip,
+            " prv=", ip_to_string(prv_ip), " id=", ident, " -> pub=",
+            ip_to_string(it->second.pub.pub_ip),
             " new_id=", it->second.pub.pub_port);
         return make_translation(it->second);
     }
@@ -196,7 +204,8 @@ Nat::Translation Nat::ensure_icmp_mapping(uint32_t prv_ip, uint32_t dst_ip, uint
     PubKey pub{pub_ip, dst_ip, new_id, seq, static_cast<uint8_t>(IPPROTO_ICMP)};
     MappingEntry& entry = insert_entry(icmp_table_, flow, pub);
     LOG(DEBUG_NAT, "Nat new ICMP mapping thread=", static_cast<int>(thread_index_),
-        " prv=", prv_ip, " id=", ident, " -> pub=", pub_ip, " new_id=", new_id);
+        " prv=", ip_to_string(prv_ip), " id=", ident, " -> pub=",
+        ip_to_string(pub_ip), " new_id=", new_id);
     return make_translation(entry);
 }
 
@@ -260,7 +269,8 @@ std::optional<Nat::Translation> Nat::maybe_static_translation(uint32_t prv_ip, u
     PubKey pub{pub_key.pub_ip, dst_ip, pub_key.pub_port, dst_port, protocol};
     FlowKey flow{prv_ip, dst_ip, src_port, dst_port, protocol};
     LOG(DEBUG_NAT, "Nat static mapping outbound thread=", static_cast<int>(thread_index_),
-        " prv=", prv_ip, ":", src_port, " -> pub=", pub_key.pub_ip, ":", pub_key.pub_port);
+        " prv=", ip_to_string(prv_ip), ":", src_port, " -> pub=",
+        ip_to_string(pub_key.pub_ip), ":", pub_key.pub_port);
     return Translation{flow, pub, thread_index_};
 }
 
@@ -281,7 +291,8 @@ std::optional<Nat::Translation> Nat::maybe_static_inbound(uint32_t pub_ip, uint3
     FlowKey flow{priv.prv_ip, remote_ip, priv.src_port, remote_port, protocol};
     PubKey pub{pub_ip, remote_ip, pub_port, remote_port, protocol};
     LOG(DEBUG_NAT, "Nat static mapping inbound thread=", static_cast<int>(thread_index_),
-        " pub=", pub_ip, ":", pub_port, " -> prv=", priv.prv_ip, ":", priv.src_port);
+        " pub=", ip_to_string(pub_ip), ":", pub_port, " -> prv=",
+        ip_to_string(priv.prv_ip), ":", priv.src_port);
     return Translation{flow, pub, thread_index_};
 }
 
@@ -293,7 +304,7 @@ std::optional<Nat::Translation> Nat::find_inbound(MappingTable& table, const Pub
     auto rev_it = table.reverse.find(key);
     if (rev_it == table.reverse.end()) {
         LOG(DEBUG_NAT, "Nat inbound miss thread=", static_cast<int>(thread_index_),
-            " pub=", key.pub_ip, ":", key.pub_port);
+            " pub=", ip_to_string(key.pub_ip), ":", key.pub_port);
         return std::nullopt;
     }
 
@@ -301,14 +312,14 @@ std::optional<Nat::Translation> Nat::find_inbound(MappingTable& table, const Pub
     if (fwd_it == table.forward.end()) {
         table.reverse.erase(rev_it);
         LOG(DEBUG_NAT, "Nat stale inbound mapping thread=", static_cast<int>(thread_index_),
-            " pub=", key.pub_ip, ":", key.pub_port);
+            " pub=", ip_to_string(key.pub_ip), ":", key.pub_port);
         return std::nullopt;
     }
 
     touch_entry(table, fwd_it->second);
     LOG(DEBUG_NAT, "Nat inbound hit thread=", static_cast<int>(thread_index_),
-        " pub=", key.pub_ip, ":", key.pub_port, " -> prv=", fwd_it->second.flow.prv_ip,
-        ":", fwd_it->second.flow.src_port);
+        " pub=", ip_to_string(key.pub_ip), ":", key.pub_port, " -> prv=",
+        ip_to_string(fwd_it->second.flow.prv_ip), ":", fwd_it->second.flow.src_port);
     return make_translation(fwd_it->second);
 }
 
@@ -330,8 +341,8 @@ void Nat::evict_if_needed(MappingTable& table) {
     auto it = table.forward.find(victim_key);
     if (it != table.forward.end()) {
         LOG(DEBUG_NAT, "Nat evict mapping thread=", static_cast<int>(thread_index_),
-            " prv=", it->second.flow.prv_ip, ":", it->second.flow.src_port,
-            " pub=", it->second.pub.pub_ip, ":", it->second.pub.pub_port);
+            " prv=", ip_to_string(it->second.flow.prv_ip), ":", it->second.flow.src_port,
+            " pub=", ip_to_string(it->second.pub.pub_ip), ":", it->second.pub.pub_port);
         table.reverse.erase(it->second.pub);
         table.forward.erase(it);
     }
@@ -381,7 +392,8 @@ void Nat::add_static_mapping(uint32_t prv_ip, uint16_t private_port, uint8_t pro
     static_forward_[priv] = pub;
     static_reverse_[pub] = priv;
     LOG(DEBUG_NAT, "Nat add static mapping thread=", static_cast<int>(thread_index_),
-        " prv=", prv_ip, ":", private_port, " -> pub=", pub_ip, ":", public_port,
+        " prv=", ip_to_string(prv_ip), ":", private_port, " -> pub=",
+        ip_to_string(pub_ip), ":", public_port,
         " proto=", static_cast<int>(protocol));
 }
 

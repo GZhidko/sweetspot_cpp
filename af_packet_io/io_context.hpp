@@ -26,7 +26,7 @@ struct IoConfig {
 class IoContext {
   public:
     explicit IoContext(const IoConfig& cfg);
-    ~IoContext() = default;
+    ~IoContext();
 
     PacketSocket& socket() noexcept { return sock_; }
     const PacketSocket& socket() const noexcept { return sock_; }
@@ -34,12 +34,17 @@ class IoContext {
     RingView rx_ring() const noexcept;
     RingView tx_ring() const noexcept;
 
+    bool send_frame(const uint8_t* data, size_t length, size_t net_offset,
+                    const char* reason = nullptr);
+
   private:
     IoConfig cfg_;
     PacketSocket sock_;
     RingConfig applied_rx_{};
     RingConfig applied_tx_{};
+    int ip_tx_fd_ = -1;
+
+    void init_raw_ip_socket();
 };
 
 } // namespace af_packet_io
-

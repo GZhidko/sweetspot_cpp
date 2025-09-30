@@ -157,7 +157,7 @@ uint32_t Netset::size() const {
         total_size += current->ip_max - current->ip_min + 1;
         current = current->next;
     }
-    
+    LOG(DEBUG_NETSET, "Netset size computed: ", total_size);
     return total_size;
 }
 
@@ -168,6 +168,8 @@ uint32_t Netset::idx(uint32_t ip) const {
     
     while (current) {
         if (ip >= current->ip_min && ip <= current->ip_max) {
+            LOG(DEBUG_NETSET, "Netset idx for ", ip_to_string(ip), " = ",
+                index + (ip - current->ip_min));
             return index + (ip - current->ip_min);
         } else if (ip > current->ip_max) {
             index += current->ip_max - current->ip_min + 1;
@@ -206,10 +208,11 @@ bool Netset::contains(uint32_t ip) const {
     
     while (current) {
         if (ip >= current->ip_min && ip <= current->ip_max) {
+            LOG(DEBUG_NETSET, "Netset contains ", ip_to_string(ip), " -> true");
             return true;
         }
         current = current->next;
     }
-    
+    LOG(DEBUG_NETSET, "Netset contains ", ip_to_string(ip), " -> false");
     return false;
 };

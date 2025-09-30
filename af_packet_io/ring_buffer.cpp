@@ -1,5 +1,7 @@
 #include "ring_buffer.hpp"
 
+#include "../common/logger.h"
+
 #include <sys/mman.h>
 
 namespace af_packet_io {
@@ -17,6 +19,9 @@ RingView::RingView(void* area, size_t length, size_t block_size, size_t block_co
         return;
     }
     frame_count_ = length_ / frame_size_;
+    LOG(DEBUG_IO, "RingView init area=", area_, " length=", length_,
+        " block_size=", block_size_, " block_count=", block_count_,
+        " frame_size=", frame_size_, " frame_count=", frame_count_);
 }
 
 tpacket_block_desc* RingView::block_at(size_t index) const {

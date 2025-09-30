@@ -1,5 +1,7 @@
 #include "packet_socket.hpp"
 
+#include "../common/logger.h"
+
 #include <cerrno>
 #include <cstring>
 #include <linux/if_ether.h>
@@ -53,18 +55,29 @@ void PacketSocket::open(int protocol) {
         throw std::runtime_error("PacketSocket already open");
     }
 
-    fd_ = ::socket(AF_PACKET, SOCK_RAW, to_native_protocol(protocol));
+    fd_ = ::socket(AF_PACKET, SOCK_DGRAM, to_native_protocol(protocol));
     if (fd_ < 0) {
         throw make_sys_error("socket(AF_PACKET)");
     }
+    int ignore_outgoing = 1;
+#ifdef PACKET_IGNORE_OUTGOING
+    if (::setsockopt(fd_, SOL_PACKET, PACKET_IGNORE_OUTGOING, &ignore_outgoing,
+                     sizeof(ignore_outgoing)) < 0) {
+        LOG(DEBUG_ERROR, "PacketSocket fd=", fd_,
+            " PACKET_IGNORE_OUTGOING failed errno=", errno);
+    }
+#endif
+    LOG(DEBUG_IO, "PacketSocket opened fd=", fd_, " protocol=", protocol);
 }
 
 void PacketSocket::close() {
     if (fd_ >= 0) {
         munmap_ring(Direction::Rx);
         munmap_ring(Direction::Tx);
+        LOG(DEBUG_IO, "PacketSocket closing fd=", fd_);
         ::close(fd_);
         fd_ = -1;
+        ifindex_ = -1;
     }
 }
 
@@ -79,6 +92,7 @@ void PacketSocket::set_tpacket_version(int version) {
     if (::setsockopt(fd_, SOL_PACKET, PACKET_VERSION, &version, sizeof(version)) < 0) {
         throw make_sys_error("setsockopt(PACKET_VERSION)");
     }
+    LOG(DEBUG_IO, "PacketSocket fd=", fd_, " set TPACKET version=", version);
 }
 
 void PacketSocket::bind_interface(const std::string& ifname, uint16_t protocol) {
@@ -92,12 +106,15 @@ void PacketSocket::bind_interface(const std::string& ifname, uint16_t protocol) 
     sll.sll_family = AF_PACKET;
     sll.sll_protocol = to_native_protocol(protocol ? protocol : ETH_P_ALL);
     sll.sll_ifindex = static_cast<int>(ifindex);
-    sll.sll_pkttype = 0; // accept HOST, OUTGOING, BROADCAST, etc.
+    sll.sll_pkttype = PACKET_HOST;
     sll.sll_hatype = 0;
     sll.sll_halen = 0;
     if (::bind(fd_, reinterpret_cast<sockaddr*>(&sll), sizeof(sll)) < 0) {
         throw make_sys_error("bind(AF_PACKET)");
     }
+    ifindex_ = static_cast<int>(ifindex);
+    LOG(DEBUG_IO, "PacketSocket fd=", fd_, " bind interface=", ifname, " ifindex=", ifindex,
+        " protocol=", protocol);
 }
 
 void PacketSocket::enable_qdisc_bypass(bool enable) {
@@ -106,17 +123,21 @@ void PacketSocket::enable_qdisc_bypass(bool enable) {
     if (::setsockopt(fd_, SOL_PACKET, PACKET_QDISC_BYPASS, &value, sizeof(value)) < 0) {
         throw make_sys_error("setsockopt(PACKET_QDISC_BYPASS)");
     }
+    LOG(DEBUG_IO, "PacketSocket fd=", fd_, " qdisc_bypass=", enable);
 }
 
 void PacketSocket::configure_ring(Direction dir, const RingConfig& cfg) {
     ensure_open();
     if (cfg.block_size == 0 || cfg.block_count == 0 || cfg.frame_size == 0) {
         munmap_ring(dir);
+        LOG(DEBUG_IO, "PacketSocket fd=", fd_, " configure_ring dir=",
+            (dir == Direction::Rx ? "Rx" : "Tx"), " disabled");
         return;
     }
 
     if (dir != Direction::Rx) {
         munmap_ring(dir);
+        LOG(DEBUG_IO, "PacketSocket fd=", fd_, " configure_ring unsupported dir -> noop");
         return;
     }
 
@@ -131,6 +152,8 @@ void PacketSocket::configure_fanout(const FanoutConfig& cfg) {
     if (::setsockopt(fd_, SOL_PACKET, PACKET_FANOUT, &value, sizeof(value)) < 0) {
         throw make_sys_error("setsockopt(PACKET_FANOUT)");
     }
+    LOG(DEBUG_IO, "PacketSocket fd=", fd_, " fanout group=", cfg.group_id,
+        " mode=", cfg.mode, " flags=", cfg.flags);
 }
 
 void* PacketSocket::mapped_area(Direction dir) const noexcept {
@@ -145,6 +168,8 @@ void PacketSocket::munmap_ring(Direction dir) {
     void*& map = (dir == Direction::Rx) ? rx_map_ : tx_map_;
     size_t& len = (dir == Direction::Rx) ? rx_map_len_ : tx_map_len_;
     if (map && len) {
+        LOG(DEBUG_IO, "PacketSocket fd=", fd_, " munmap dir=",
+            (dir == Direction::Rx ? "Rx" : "Tx"), " len=", len);
         ::munmap(map, len);
     }
     map = nullptr;
@@ -188,6 +213,9 @@ void PacketSocket::mmap_ring(Direction dir, const RingConfig& cfg) {
 
     rx_map_ = area;
     rx_map_len_ = map_length;
+    LOG(DEBUG_IO, "PacketSocket fd=", fd_, " RX ring configured block_size=", req.tp_block_size,
+        " block_nr=", req.tp_block_nr, " frame_size=", req.tp_frame_size,
+        " timeout_ms=", req.tp_retire_blk_tov);
 }
 
 std::system_error make_sys_error(const std::string& what) {
