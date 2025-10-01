@@ -12,11 +12,13 @@
 #include <netinet/ip.h>
 #include <sys/socket.h>
 #include <unistd.h>
-
+#include "../include/ipv4.h"
 namespace af_packet_io {
 
 IoContext::IoContext(const IoConfig& cfg) : cfg_(cfg) {
-    LOG(DEBUG_IO, "IoContext init iface=", cfg.interface, " protocol=", cfg.protocol,
+    LOG(DEBUG_IO, "IoContext init rx_iface=", cfg.rx_interface,
+        " tx_iface=", cfg.tx_interface.empty() ? cfg.rx_interface : cfg.tx_interface,
+        " protocol=", cfg.protocol,
         " rx(blocks=", cfg.rx_ring.block_count, " size=", cfg.rx_ring.block_size,
         " frame=", cfg.rx_ring.frame_size, " timeout_ns=", cfg.rx_ring.timeout_ns,
         ") tx(blocks=", cfg.tx_ring.block_count, " size=", cfg.tx_ring.block_size,
@@ -27,10 +29,12 @@ IoContext::IoContext(const IoConfig& cfg) : cfg_(cfg) {
     applied_rx_ = cfg.rx_ring;
     applied_tx_ = {};
 
-    sock_.bind_interface(cfg.interface, cfg.protocol);
-    FanoutConfig fanout_cfg{cfg.fanout.group_id, cfg.fanout.mode, cfg.fanout.flags};
-    sock_.configure_fanout(fanout_cfg);
-    init_raw_ip_socket();
+    sock_.bind_interface(cfg.rx_interface, cfg.protocol);
+    if (cfg.fanout.group_id != 0 || cfg.fanout.mode != 0 || cfg.fanout.flags != 0) {
+        FanoutConfig fanout_cfg{cfg.fanout.group_id, cfg.fanout.mode, cfg.fanout.flags};
+        sock_.configure_fanout(fanout_cfg);
+    }
+    init_tx_socket();
 }
 
 IoContext::~IoContext() {
@@ -42,19 +46,13 @@ IoContext::~IoContext() {
 }
 
 RingView IoContext::rx_ring() const noexcept {
-    auto view = RingView(sock_.mapped_area(Direction::Rx), sock_.mapped_length(Direction::Rx),
-                         applied_rx_.block_size, applied_rx_.block_count, applied_rx_.frame_size);
-    LOG(DEBUG_IO, "IoContext rx_ring view valid=", view.valid(), " blocks=", view.block_count(),
-        " block_size=", view.block_size(), " frame_size=", view.frame_size());
-    return view;
+    return RingView(sock_.mapped_area(Direction::Rx), sock_.mapped_length(Direction::Rx),
+                    applied_rx_.block_size, applied_rx_.block_count, applied_rx_.frame_size);
 }
 
 RingView IoContext::tx_ring() const noexcept {
-    auto view = RingView(sock_.mapped_area(Direction::Tx), sock_.mapped_length(Direction::Tx),
-                         applied_tx_.block_size, applied_tx_.block_count, applied_tx_.frame_size);
-    LOG(DEBUG_IO, "IoContext tx_ring view valid=", view.valid(), " blocks=", view.block_count(),
-        " block_size=", view.block_size(), " frame_size=", view.frame_size());
-    return view;
+    return RingView(sock_.mapped_area(Direction::Tx), sock_.mapped_length(Direction::Tx),
+                    applied_tx_.block_size, applied_tx_.block_count, applied_tx_.frame_size);
 }
 
 bool IoContext::send_frame(const uint8_t* data, size_t length, size_t net_offset,
@@ -111,13 +109,14 @@ bool IoContext::send_frame(const uint8_t* data, size_t length, size_t net_offset
             if (tot_len >= iph->ihl * 4 && tot_len <= ip_len) {
                 sockaddr_in dst{};
                 dst.sin_family = AF_INET;
-                dst.sin_addr.s_addr = 0;//iph->daddr;
+                dst.sin_addr.s_addr = iph->daddr;
 
                 ssize_t sent = ::sendto(ip_tx_fd_, data + net_offset, tot_len, 0,
                                         reinterpret_cast<const sockaddr*>(&dst), sizeof(dst));
                 if (sent == static_cast<ssize_t>(tot_len)) {
+                    uint32_t d_addr = (iph->daddr);
                     LOG(DEBUG_IO, "IoContext", ": RAW IP send ok (", tag,
-                        ") bytes=", tot_len, " dst=", inet_ntoa(dst.sin_addr));
+                        ") bytes=", tot_len, " dst=", IPv4Header::ip_to_string(d_addr));
                     return true;
                 }
                 int err = errno;
@@ -144,7 +143,7 @@ bool IoContext::send_frame(const uint8_t* data, size_t length, size_t net_offset
     return false;
 }
 
-void IoContext::init_raw_ip_socket() {
+void IoContext::init_tx_socket() {
     ip_tx_fd_ = ::socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
     if (ip_tx_fd_ < 0) {
         LOG(DEBUG_ERROR, "IoContext", ": socket(AF_INET,SOCK_RAW) failed errno=", errno);
@@ -159,19 +158,21 @@ void IoContext::init_raw_ip_socket() {
         return;
     }
 
-    if (!cfg_.interface.empty()) {
+    const std::string& iface = cfg_.tx_interface.empty() ? cfg_.rx_interface : cfg_.tx_interface;
+    if (!iface.empty()) {
         struct ifreq ifr{};
-        std::strncpy(ifr.ifr_name, cfg_.interface.c_str(), sizeof(ifr.ifr_name) - 1);
+        std::strncpy(ifr.ifr_name, iface.c_str(), sizeof(ifr.ifr_name) - 1);
         if (::setsockopt(ip_tx_fd_, SOL_SOCKET, SO_BINDTODEVICE,
                          reinterpret_cast<void*>(&ifr), sizeof(ifr)) < 0) {
             LOG(DEBUG_ERROR, "IoContext", ": SO_BINDTODEVICE failed errno=", errno,
-                " iface=", cfg_.interface);
+                " iface=", iface);
         }
     }
 
     int sndbuf = 65536 * 8;
     ::setsockopt(ip_tx_fd_, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf));
-    LOG(DEBUG_IO, "IoContext", ": raw IP TX socket opened fd=", ip_tx_fd_);
+    LOG(DEBUG_IO, "IoContext", ": raw IP TX socket opened fd=", ip_tx_fd_,
+        " iface=", (cfg_.tx_interface.empty() ? cfg_.rx_interface : cfg_.tx_interface));
 }
 
 } // namespace af_packet_io

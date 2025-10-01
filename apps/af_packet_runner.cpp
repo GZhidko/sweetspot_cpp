@@ -52,16 +52,18 @@ NatConfig build_nat_config(const std::string& priv, const std::string& pub) {
 } // namespace
 
 int main(int argc, char** argv) {
-    if (argc < 5) {
+    if (argc < 6) {
         std::cerr << "Usage: " << argv[0]
-                  << " <interface> <private_net> <public_net> <worker_count>" << std::endl;
+                  << " <priv_iface> <pub_iface> <private_net> <public_net> <worker_count>"
+                  << std::endl;
         return 1;
     }
 
-    std::string ifname = argv[1];
-    std::string priv_net = argv[2];
-    std::string pub_net = argv[3];
-    uint32_t worker_count = static_cast<uint32_t>(std::stoul(argv[4]));
+    std::string priv_iface = argv[1];
+    std::string pub_iface = argv[2];
+    std::string priv_net = argv[3];
+    std::string pub_net = argv[4];
+    uint32_t worker_count = static_cast<uint32_t>(std::stoul(argv[5]));
     if (worker_count == 0) {
         std::cerr << "worker_count must be > 0" << std::endl;
         return 1;
@@ -82,7 +84,7 @@ int main(int argc, char** argv) {
     std::vector<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>> static_icmp;
     std::vector<std::pair<uint32_t, uint32_t>> static_ip;
 
-    for (int i = 5; i < argc;) {
+    for (int i = 6; i < argc;) {
         std::string opt = argv[i];
         try {
             if (opt == "--static-tcp" && i + 4 < argc) {
@@ -121,27 +123,48 @@ int main(int argc, char** argv) {
         }
     }
 
-    af_packet_io::IoConfig io_cfg;
-    io_cfg.interface = ifname;
-    io_cfg.protocol = ETH_P_ALL;
-    io_cfg.rx_ring.block_size = 1 << 22;   // 4 MiB blocks as in tpacket_v3 example
-    io_cfg.rx_ring.block_count = 64;
-    io_cfg.rx_ring.frame_size = 1 << 11;   // 2048-byte frames
-    io_cfg.rx_ring.timeout_ns = 60ULL * 1000ULL * 1000ULL; // 60 ms
-    io_cfg.tx_ring.block_size = 0;
-    io_cfg.tx_ring.block_count = 0;
-    io_cfg.tx_ring.frame_size = 0;
-    io_cfg.tx_ring.frame_count = 0;
-    io_cfg.tx_ring.timeout_ns = 0;
-    uint16_t fanout_group = static_cast<uint16_t>(getpid() & 0xffff);
-    io_cfg.fanout = {fanout_group, PACKET_FANOUT_HASH, 0};
+    uint32_t pid = static_cast<uint32_t>(getpid());
+    uint16_t priv_group = static_cast<uint16_t>(pid & 0xffff);
+    if (priv_group == 0) {
+        priv_group = 1;
+    }
+    uint16_t pub_group = static_cast<uint16_t>((priv_group + 1) & 0xffff);
+    if (pub_group == 0) {
+        pub_group = 2;
+    }
+    af_packet_io::FanoutParams priv_fanout{priv_group, PACKET_FANOUT_HASH, 0};
+    af_packet_io::FanoutParams pub_fanout{pub_group, PACKET_FANOUT_HASH, 0};
+
+    auto configure_io = [](af_packet_io::IoConfig& cfg, const std::string& rx_iface,
+                           const std::string& tx_iface,
+                           const af_packet_io::FanoutParams& fanout) {
+        cfg.rx_interface = rx_iface;
+        cfg.tx_interface = tx_iface;
+        cfg.protocol = ETH_P_ALL;
+        cfg.rx_ring.block_size = 1 << 22;
+        cfg.rx_ring.block_count = 64;
+        cfg.rx_ring.frame_size = 1 << 11;
+        cfg.rx_ring.timeout_ns = 60ULL * 1000ULL * 1000ULL;
+        cfg.tx_ring.block_size = 0;
+        cfg.tx_ring.block_count = 0;
+        cfg.tx_ring.frame_size = 0;
+        cfg.tx_ring.frame_count = 0;
+        cfg.tx_ring.timeout_ns = 0;
+        cfg.fanout = fanout;
+    };
+
+    af_packet_io::IoConfig io_priv;
+    af_packet_io::IoConfig io_pub;
+    configure_io(io_priv, priv_iface, pub_iface, priv_fanout);
+    configure_io(io_pub, pub_iface, priv_iface, pub_fanout);
 
     std::vector<std::unique_ptr<Worker>> workers;
     workers.reserve(worker_count);
 
     for (uint32_t i = 0; i < worker_count; ++i) {
         WorkerPipelineConfig cfg;
-        cfg.io = io_cfg;
+        cfg.io_priv = io_priv;
+        cfg.io_pub = io_pub;
         cfg.nat = nat_cfg;
         cfg.thread_index = i;
         cfg.thread_count = worker_count;
@@ -180,8 +203,10 @@ int main(int argc, char** argv) {
     }
 
     install_signal_handlers();
-    std::cout << "af_packet_runner started on " << ifname << " with " << workers.size()
-              << " workers, fanout group " << fanout_group << std::endl;
+    std::cout << "af_packet_runner started on priv=" << priv_iface
+              << " pub=" << pub_iface << " with " << workers.size()
+              << " workers, fanout groups priv=" << priv_group
+              << " pub=" << pub_group << std::endl;
 
     while (!g_stop.load()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(200));

@@ -18,11 +18,24 @@
 #define TP_STATUS_OUTGOING 0x20000000
 #endif
 
+#ifndef TP_STATUS_AVAILABLE
+#define TP_STATUS_AVAILABLE 0
+#endif
+
+#ifndef TPACKET_ALIGN
+#define TPACKET_ALIGN(x) (((x) + TPACKET_ALIGNMENT - 1) & ~(TPACKET_ALIGNMENT - 1))
+#endif
+
 Worker::Worker(const WorkerPipelineConfig& cfg)
     : cfg_(cfg), nat_(cfg.nat, cfg.thread_index, cfg.thread_count) {
     io_enabled_ = cfg.enable_io;
     if (io_enabled_) {
-        io_ = std::make_unique<af_packet_io::IoContext>(cfg.io);
+        if (!cfg.io_priv.rx_interface.empty()) {
+            priv_ctx_.io = std::make_unique<af_packet_io::IoContext>(cfg.io_priv);
+        }
+        if (!cfg.io_pub.rx_interface.empty()) {
+            pub_ctx_.io = std::make_unique<af_packet_io::IoContext>(cfg.io_pub);
+        }
     }
     for (const auto& [priv_ip, priv_port, pub_ip, pub_port] : cfg_.static_tcp) {
         nat_.add_static_tcp_mapping(priv_ip, priv_port, pub_ip, pub_port);
@@ -36,7 +49,6 @@ Worker::Worker(const WorkerPipelineConfig& cfg)
     for (const auto& [priv_ip, pub_ip] : cfg_.static_ip) {
         nat_.add_static_ip_mapping(priv_ip, pub_ip);
     }
-    tx_queue_.reserve(1024);
 }
 
 Worker::~Worker() { stop(); }
@@ -64,34 +76,49 @@ void Worker::join() {
 }
 
 void Worker::run() {
-    if (!io_) {
-        while (running_) {
-            process_remote_frames();
-            transmit_pending();
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
-        return;
+    af_packet_io::RingView priv_view;
+    af_packet_io::RingView pub_view;
+    if (priv_ctx_.io) {
+        priv_view = priv_ctx_.io->rx_ring();
+    }
+    if (pub_ctx_.io) {
+        pub_view = pub_ctx_.io->rx_ring();
     }
 
-    af_packet_io::RingView rx = io_->rx_ring();
     while (running_) {
         process_remote_frames();
-        for (size_t i = 0; i < rx.block_count(); ++i) {
-            auto* block = rx.block_at(i);
-            if (!block) {
-                continue;
-            }
-            if (block->hdr.bh1.block_status & TP_STATUS_USER) {
-                process_rx_block(block);
-                block->hdr.bh1.block_status = TP_STATUS_KERNEL;
-            }
+        if (priv_ctx_.io) {
+            process_interface(priv_ctx_, priv_view, FramePayload::Origin::Private);
         }
-        transmit_pending();
+        if (pub_ctx_.io) {
+            process_interface(pub_ctx_, pub_view, FramePayload::Origin::Public);
+        }
+        transmit_pending(priv_ctx_);
+        transmit_pending(pub_ctx_);
+        if (!priv_ctx_.io && !pub_ctx_.io) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
     }
 }
 
-void Worker::process_rx_block(tpacket_block_desc* block_desc) {
-    auto* hdr = reinterpret_cast<tpacket3_hdr*>(reinterpret_cast<char*>(block_desc) + block_desc->hdr.bh1.offset_to_first_pkt);
+void Worker::process_interface(InterfaceContext& src_ctx, af_packet_io::RingView& view,
+                               FramePayload::Origin origin) {
+    for (size_t i = 0; i < view.block_count(); ++i) {
+        auto* block = view.block_at(i);
+        if (!block) {
+            continue;
+        }
+        if (block->hdr.bh1.block_status & TP_STATUS_USER) {
+            process_rx_block(src_ctx, origin, block);
+            block->hdr.bh1.block_status = TP_STATUS_KERNEL;
+        }
+    }
+}
+
+void Worker::process_rx_block(InterfaceContext& src_ctx, FramePayload::Origin origin,
+                              tpacket_block_desc* block_desc) {
+    auto* hdr = reinterpret_cast<tpacket3_hdr*>(reinterpret_cast<char*>(block_desc) +
+                                                 block_desc->hdr.bh1.offset_to_first_pkt);
     for (uint32_t i = 0; i < block_desc->hdr.bh1.num_pkts; ++i) {
         uint8_t* data = reinterpret_cast<uint8_t*>(hdr) + hdr->tp_mac;
         size_t len = hdr->tp_snaplen;
@@ -102,12 +129,14 @@ void Worker::process_rx_block(tpacket_block_desc* block_desc) {
                 net_offset = 0;
             }
         }
-        handle_frame(data, len, net_offset);
-        hdr = reinterpret_cast<tpacket3_hdr*>(reinterpret_cast<uint8_t*>(hdr) + hdr->tp_next_offset);
+        handle_frame(origin, data, len, net_offset);
+        hdr = reinterpret_cast<tpacket3_hdr*>(reinterpret_cast<uint8_t*>(hdr) +
+                                              hdr->tp_next_offset);
     }
 }
 
-void Worker::handle_frame(uint8_t* data, size_t len, size_t net_offset) {
+void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len,
+                          size_t net_offset) {
     if (net_offset > len) {
         net_offset = 0;
     }
@@ -178,6 +207,7 @@ void Worker::handle_frame(uint8_t* data, size_t len, size_t net_offset) {
                                                     cfg_.thread_count);
         if (target != cfg_.thread_index) {
             FramePayload payload;
+            payload.origin = origin;
             payload.buffer.assign(data, data + len);
             payload.net_offset = net_offset;
             forward_fn_(target, std::move(payload));
@@ -191,33 +221,41 @@ void Worker::handle_frame(uint8_t* data, size_t len, size_t net_offset) {
         ": frame after NAT src=", IPv4Header::ip_to_string(ip->iph.saddr),
         " dst=", IPv4Header::ip_to_string(ip->iph.daddr));
 
-    enqueue_tx(std::vector<uint8_t>(data, data + len), net_offset);
+    InterfaceContext* dest_ctx = (origin == FramePayload::Origin::Private) ? &pub_ctx_ : &priv_ctx_;
+    if (!dest_ctx->io) {
+        LOG(DEBUG_IO, "Worker", cfg_.thread_index,
+            ": destination interface missing, queuing only origin=",
+            origin == FramePayload::Origin::Private ? "private" : "public");
+    }
+    enqueue_tx(*dest_ctx, std::vector<uint8_t>(data, data + len), net_offset, "direct");
 }
 
-void Worker::enqueue_tx(std::vector<uint8_t>&& frame, size_t net_offset) {
-    tx_queue_.push_back({});
-    tx_queue_.back().buffer = std::move(frame);
-    tx_queue_.back().net_offset = net_offset;
+void Worker::enqueue_tx(InterfaceContext& ctx, std::vector<uint8_t>&& frame, size_t net_offset,
+                        const char* reason) {
+    ctx.tx_queue.push_back({});
+    ctx.tx_queue.back().buffer = std::move(frame);
+    ctx.tx_queue.back().net_offset = net_offset;
+    ctx.tx_queue.back().reason = reason;
     LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": enqueue TX frame bytes=",
-        tx_queue_.back().buffer.size(), " net_offset=", net_offset,
-        " queue_size=", tx_queue_.size());
+        ctx.tx_queue.back().buffer.size(), " net_offset=", net_offset,
+        " reason=", reason, " queue_size=", ctx.tx_queue.size());
 }
 
-void Worker::transmit_pending() {
-    if (tx_queue_.empty()) {
+void Worker::transmit_pending(InterfaceContext& ctx) {
+    if (ctx.tx_queue.empty()) {
         return;
     }
 
-    if (!io_) {
-        tx_queue_.clear();
+    if (!ctx.io) {
+        ctx.tx_queue.clear();
         return;
     }
 
-    auto tx_view = io_->tx_ring();
-    int fd = io_->socket().fd();
+    auto tx_view = ctx.io->tx_ring();
+    int fd = ctx.io->socket().fd();
 
     auto send_frame = [&](const TxFrame& frame, const char* reason) {
-        if (!io_->send_frame(frame.buffer.data(), frame.buffer.size(), frame.net_offset, reason)) {
+        if (!ctx.io->send_frame(frame.buffer.data(), frame.buffer.size(), frame.net_offset, reason)) {
             LOG(DEBUG_ERROR, "Worker", cfg_.thread_index,
                 ": TX fallback failed reason=", reason,
                 " frame_len=", frame.buffer.size());
@@ -225,34 +263,38 @@ void Worker::transmit_pending() {
     };
 
     if (!tx_view.valid()) {
-        LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
-            ": TX ring not mapped, using send() fallback for ", tx_queue_.size(), " frames");
-        for (auto& frame : tx_queue_) {
-            send_frame(frame, "no_tx_ring_mapping");
+        LOG(DEBUG_IO, "Worker", cfg_.thread_index,
+            ": TX ring not mapped origin=",
+            (&ctx == &priv_ctx_) ? "priv" : "pub",
+            " fallback for ", ctx.tx_queue.size(), " frames");
+        for (auto& frame : ctx.tx_queue) {
+            send_frame(frame, frame.reason);
         }
-        tx_queue_.clear();
+        ctx.tx_queue.clear();
         return;
     }
 
     size_t frame_count = tx_view.frame_count();
-        if (frame_count == 0) {
-            LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
-                ": TX ring unavailable, using send() fallback for ", tx_queue_.size(), " frames");
-            for (auto& frame : tx_queue_) {
-                send_frame(frame, "zero_frame_count");
-            }
-            tx_queue_.clear();
-            return;
+    if (frame_count == 0) {
+        LOG(DEBUG_IO, "Worker", cfg_.thread_index,
+            ": TX ring empty origin=",
+            (&ctx == &priv_ctx_) ? "priv" : "pub",
+            " fallback for ", ctx.tx_queue.size(), " frames");
+        for (auto& frame : ctx.tx_queue) {
+            send_frame(frame, frame.reason);
         }
+        ctx.tx_queue.clear();
+        return;
+    }
 
-    auto* base = static_cast<uint8_t*>(io_->socket().mapped_area(af_packet_io::Direction::Tx));
+    auto* base = static_cast<uint8_t*>(ctx.io->socket().mapped_area(af_packet_io::Direction::Tx));
     size_t frame_size = tx_view.frame_size();
     constexpr size_t hdr_size = TPACKET_ALIGN(sizeof(tpacket3_hdr));
 
-    for (auto& frame : tx_queue_) {
+    for (auto& frame : ctx.tx_queue) {
         bool written = false;
         for (size_t attempt = 0; attempt < frame_count; ++attempt) {
-            size_t idx = tx_ring_index_ % frame_count;
+            size_t idx = ctx.tx_ring_index % frame_count;
             auto* hdr = reinterpret_cast<tpacket3_hdr*>(base + idx * frame_size);
             if ((hdr->tp_status & TP_STATUS_AVAILABLE) == TP_STATUS_AVAILABLE) {
                 size_t copy_len = std::min(frame.buffer.size(), frame_size - hdr_size);
@@ -260,23 +302,23 @@ void Worker::transmit_pending() {
                 hdr->tp_len = copy_len;
                 hdr->tp_snaplen = copy_len;
                 hdr->tp_status = TP_STATUS_SEND_REQUEST;
-                tx_ring_index_ = idx + 1;
+                ctx.tx_ring_index = idx + 1;
                 written = true;
                 LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
                     ": TX via ring idx=", idx, " bytes=", copy_len);
                 break;
             } else {
                 ::sendto(fd, nullptr, 0, 0, nullptr, 0);
-                tx_ring_index_ = idx + 1;
+                ctx.tx_ring_index = idx + 1;
             }
         }
         if (!written) {
-            send_frame(frame, "ring_full");
+            send_frame(frame, frame.reason);
         }
     }
     ::sendto(fd, nullptr, 0, 0, nullptr, 0);
     LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": TX batch complete");
-    tx_queue_.clear();
+    ctx.tx_queue.clear();
 }
 
 void Worker::process_remote_frames() {
@@ -288,8 +330,9 @@ void Worker::process_remote_frames() {
     for (auto& frame : local) {
         LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
             ": processing forwarded frame bytes=", frame.buffer.size(),
-            " net_offset=", frame.net_offset);
-        handle_frame(frame.buffer.data(), frame.buffer.size(), frame.net_offset);
+            " net_offset=", frame.net_offset,
+            " origin=", frame.origin == FramePayload::Origin::Private ? "private" : "public");
+        handle_frame(frame.origin, frame.buffer.data(), frame.buffer.size(), frame.net_offset);
     }
 }
 
@@ -300,10 +343,13 @@ void Worker::submit_remote_frame(FramePayload&& frame) {
 
 std::vector<std::vector<uint8_t>> Worker::collect_tx_frames() {
     std::vector<std::vector<uint8_t>> out;
-    out.reserve(tx_queue_.size());
-    for (auto& frame : tx_queue_) {
-        out.push_back(std::move(frame.buffer));
-    }
-    tx_queue_.clear();
+    auto collect = [&](InterfaceContext& ctx) {
+        for (auto& frame : ctx.tx_queue) {
+            out.push_back(std::move(frame.buffer));
+        }
+        ctx.tx_queue.clear();
+    };
+    collect(priv_ctx_);
+    collect(pub_ctx_);
     return out;
 }

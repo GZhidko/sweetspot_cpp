@@ -79,3 +79,13 @@ target_include_directories(test_fanout PRIVATE
     ${CMAKE_SOURCE_DIR}/af_packet_io
 )
 add_test(NAME FanoutTest COMMAND test_fanout)
+
+add_executable(test_checksum
+    tests/test_checksum.cpp
+    af_packet_io/checksum_utils.cpp
+)
+target_include_directories(test_checksum PRIVATE
+    ${CMAKE_SOURCE_DIR}/af_packet_io
+    ${CMAKE_SOURCE_DIR}/include
+)
+add_test(NAME ChecksumTest COMMAND test_checksum)

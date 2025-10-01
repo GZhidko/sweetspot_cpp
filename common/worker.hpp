@@ -16,7 +16,8 @@
 #include <vector>
 
 struct WorkerPipelineConfig {
-    af_packet_io::IoConfig io;
+    af_packet_io::IoConfig io_priv;
+    af_packet_io::IoConfig io_pub;
     NatConfig nat;
     uint32_t thread_index = 0;
     uint32_t thread_count = 1;
@@ -30,8 +31,21 @@ struct WorkerPipelineConfig {
 class Worker {
   public:
     struct FramePayload {
+        enum class Origin { Private, Public } origin = Origin::Private;
         std::vector<uint8_t> buffer;
         size_t net_offset = 0;
+    };
+
+    struct TxFrame {
+        std::vector<uint8_t> buffer;
+        size_t net_offset = 0;
+        const char* reason = "direct";
+    };
+
+    struct InterfaceContext {
+        std::unique_ptr<af_packet_io::IoContext> io;
+        std::vector<TxFrame> tx_queue;
+        size_t tx_ring_index = 0;
     };
 
     explicit Worker(const WorkerPipelineConfig& cfg);
@@ -43,14 +57,19 @@ class Worker {
 
   private:
     void run();
-    void process_rx_block(tpacket_block_desc* block_desc);
-    void handle_frame(uint8_t* data, size_t len, size_t net_offset);
-    void enqueue_tx(std::vector<uint8_t>&& frame, size_t net_offset);
-    void transmit_pending();
+    void process_interface(InterfaceContext& src_ctx, af_packet_io::RingView& view,
+                           FramePayload::Origin origin);
+    void process_rx_block(InterfaceContext& src_ctx, FramePayload::Origin origin,
+                          tpacket_block_desc* block_desc);
+    void handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len, size_t net_offset);
+    void enqueue_tx(InterfaceContext& ctx, std::vector<uint8_t>&& frame, size_t net_offset,
+                    const char* reason);
+    void transmit_pending(InterfaceContext& ctx);
     void process_remote_frames();
 
     WorkerPipelineConfig cfg_;
-    std::unique_ptr<af_packet_io::IoContext> io_;
+    InterfaceContext priv_ctx_;
+    InterfaceContext pub_ctx_;
     bool io_enabled_ = true;
     Nat nat_;
     std::thread thread_;
@@ -60,13 +79,6 @@ class Worker {
 
     using Chain = HeaderChainTuple<IPv4Header, TCPHeader, UDPHeader, ICMPHeader>;
     Chain chain_;
-
-    struct TxFrame {
-        std::vector<uint8_t> buffer;
-        size_t net_offset = 0;
-    };
-    std::vector<TxFrame> tx_queue_;
-    size_t tx_ring_index_ = 0;
 
     std::mutex remote_mutex_;
     std::deque<FramePayload> remote_queue_;
@@ -79,8 +91,10 @@ class Worker {
     void submit_remote_frame(FramePayload&& frame);
     void process_remote_frames_for_tests() { process_remote_frames(); }
     std::vector<std::vector<uint8_t>> collect_tx_frames();
-    void process_frame_for_tests(std::vector<uint8_t>& frame, size_t net_offset = 0) {
-        handle_frame(frame.data(), frame.size(), net_offset);
+    void process_frame_for_tests(std::vector<uint8_t>& frame,
+                                 FramePayload::Origin origin = FramePayload::Origin::Private,
+                                 size_t net_offset = 0) {
+        handle_frame(origin, frame.data(), frame.size(), net_offset);
     }
     Nat& nat_for_tests() { return nat_; }
 };

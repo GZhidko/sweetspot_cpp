@@ -1,10 +1,10 @@
 #pragma once
 #include "jenkins_hash.hpp"
+#include <arpa/inet.h>
 #include <cstdint>
 #include <netinet/ip.h>
-#include <tuple>
 #include <string>
-#include <arpa/inet.h>
+#include <tuple>
 struct IPv4Header {
 
     struct iphdr iph;
@@ -34,7 +34,9 @@ struct IPv4Header {
         char buf[INET_ADDRSTRLEN];
         struct in_addr addr;
         addr.s_addr = ip;
-        inet_ntop(AF_INET, &addr, buf, sizeof(buf));
+        if (inet_ntop(AF_INET, &addr, buf, sizeof(buf)) == nullptr) {
+            return "invalid_ip";
+        }
         return buf;
     }
 };

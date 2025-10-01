@@ -16,8 +16,9 @@ struct FanoutParams {
 };
 
 struct IoConfig {
-    std::string interface;
-    uint16_t protocol = ETH_P_IP; // ETH_P_ALL
+    std::string rx_interface;
+    std::string tx_interface;
+    uint16_t protocol =  ETH_P_ALL;
     RingConfig rx_ring{};
     RingConfig tx_ring{};
     FanoutParams fanout{0, PACKET_FANOUT_HASH, 0};
@@ -44,7 +45,7 @@ class IoContext {
     RingConfig applied_tx_{};
     int ip_tx_fd_ = -1;
 
-    void init_raw_ip_socket();
+    void init_tx_socket();
 };
 
 } // namespace af_packet_io
