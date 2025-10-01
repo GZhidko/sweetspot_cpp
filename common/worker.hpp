@@ -78,7 +78,6 @@ class Worker {
     std::function<void(uint32_t, FramePayload&&)> forward_fn_;
 
     using Chain = HeaderChainTuple<IPv4Header, TCPHeader, UDPHeader, ICMPHeader>;
-    Chain chain_;
 
     std::mutex remote_mutex_;
     std::deque<FramePayload> remote_queue_;

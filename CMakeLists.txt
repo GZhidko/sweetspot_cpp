@@ -10,6 +10,7 @@ find_package(Threads REQUIRED)
 # исходники основной программы
 file(GLOB SRC
     main.cpp
+    committer/*.cpp
     parsers/*.cpp
     filters/*.cpp
     nat/*.cpp
@@ -20,6 +21,7 @@ file(GLOB SRC
 add_executable(PacketProcessor ${SRC})
 target_include_directories(PacketProcessor PRIVATE
     include
+    committer
     common
     parsers
     filters
@@ -32,6 +34,7 @@ target_include_directories(PacketProcessor PRIVATE
 # af_packet runner (uses raw socket + NAT pipeline)
 file(GLOB AF_PACKET_RUNNER_SRC
     apps/af_packet_runner.cpp
+    committer/*.cpp
     parsers/*.cpp
     filters/*.cpp
     nat/*.cpp
@@ -42,6 +45,7 @@ file(GLOB AF_PACKET_RUNNER_SRC
 add_executable(af_packet_runner ${AF_PACKET_RUNNER_SRC})
 target_include_directories(af_packet_runner PRIVATE
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/committer
     ${CMAKE_SOURCE_DIR}/common
     ${CMAKE_SOURCE_DIR}/parsers
     ${CMAKE_SOURCE_DIR}/filters
@@ -59,6 +63,7 @@ enable_testing()
 # фан-аут тест
 file(GLOB TEST_SRC
     tests/test_fanout.cpp
+    committer/*.cpp
     parsers/*.cpp
     filters/*.cpp
     nat/*.cpp
@@ -71,6 +76,7 @@ add_executable(test_fanout ${TEST_SRC})
 target_include_directories(test_fanout PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/committer
     ${CMAKE_SOURCE_DIR}/common
     ${CMAKE_SOURCE_DIR}/parsers
     ${CMAKE_SOURCE_DIR}/filters

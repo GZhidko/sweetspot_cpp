@@ -2,6 +2,7 @@
 
 #include "../common/logger.h"
 #include "../filters/filter.h"
+#include "../committer/committer.h"
 #include "jenkins_hash.hpp"
 #include <algorithm>
 #include <chrono>
@@ -146,6 +147,7 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
         return;
     }
 
+    Chain chain_;
     LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": received frame len=", len,
         " net_offset=", net_offset);
 
@@ -217,10 +219,27 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
 
     chain_.for_each([&](auto& hdr) { nat_.process(hdr); });
 
+    size_t offset = 0;
+    const auto* ipv4 = chain_.template get<IPv4Header>();
+    if (!ipv4 || !Committer<IPv4Header>{}(ipv4, l3_data, l3_len, offset)) {
+        return;
+    }
+
+    chain_.for_each([&](auto& hdr) {
+        using Header = std::decay_t<decltype(hdr)>;
+        if constexpr (!std::is_same_v<Header, IPv4Header>) {
+LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
+               ": committed ", typeid(Header).name(), " offset=", offset);
+
+            Committer<Header>{}(&hdr, l3_data, l3_len, offset, ipv4);
+                   }
+    });
+
     LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
         ": frame after NAT src=", IPv4Header::ip_to_string(ip->iph.saddr),
         " dst=", IPv4Header::ip_to_string(ip->iph.daddr));
 
+    
     InterfaceContext* dest_ctx = (origin == FramePayload::Origin::Private) ? &pub_ctx_ : &priv_ctx_;
     if (!dest_ctx->io) {
         LOG(DEBUG_IO, "Worker", cfg_.thread_index,

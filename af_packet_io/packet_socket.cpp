@@ -120,9 +120,9 @@ void PacketSocket::bind_interface(const std::string& ifname, uint16_t protocol) 
 void PacketSocket::enable_qdisc_bypass(bool enable) {
     ensure_open();
     int value = enable ? 1 : 0;
-    if (::setsockopt(fd_, SOL_PACKET, PACKET_QDISC_BYPASS, &value, sizeof(value)) < 0) {
-        throw make_sys_error("setsockopt(PACKET_QDISC_BYPASS)");
-    }
+    //if (::setsockopt(fd_, SOL_PACKET, PACKET_QDISC_BYPASS, &value, sizeof(value)) < 0) {
+    //    throw make_sys_error("setsockopt(PACKET_QDISC_BYPASS)");
+    //}
     LOG(DEBUG_IO, "PacketSocket fd=", fd_, " qdisc_bypass=", enable);
 }
 
