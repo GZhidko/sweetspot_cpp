@@ -60,66 +60,88 @@ RingView IoContext::tx_ring() const noexcept {
 bool IoContext::send_frame(const uint8_t* data, size_t length, size_t net_offset,
                            const char* reason) {
     const char* tag = reason ? reason : "fallback";
-    if (!data || length < sizeof(ethhdr)) {
-        LOG(DEBUG_ERROR, "IoContext", ": TX drop (", tag, ") frame too short: ", length);
+
+    if (!data) {
+        LOG(DEBUG_ERROR, "IoContext", ": TX drop (", tag, ") null data ptr");
         return false;
     }
 
-    const auto* eth = reinterpret_cast<const ethhdr*>(data);
-    uint16_t eth_proto = ntohs(eth->h_proto);
+    // === 1. Если длина позволяет прочитать Ethernet-заголовок, пробуем как Ethernet ===
+    if (length >= sizeof(ethhdr)) {
+        const auto* eth = reinterpret_cast<const ethhdr*>(data);
+        uint16_t eth_proto = ntohs(eth->h_proto);
 
-    if (eth_proto == ETH_P_IP && net_offset < length && ip_tx_fd_ >= 0) {
-        const uint8_t* ip_payload = data + net_offset;
-        size_t ip_len = length - net_offset;
-        if (ip_len >= sizeof(iphdr)) {
-            const auto* iph = reinterpret_cast<const iphdr*>(ip_payload);
+        // небольшой sanity-check: если тип знакомый, считаем, что это Ethernet frame
+        if (eth_proto == ETH_P_IP || eth_proto == ETH_P_ARP || eth_proto == ETH_P_IPV6) {
+            sockaddr_ll sa{};
+            sa.sll_family   = AF_PACKET;
+            sa.sll_protocol = htons(eth_proto);
+            sa.sll_ifindex  = sock_.ifindex();
+            sa.sll_halen    = ETH_ALEN;
+            std::memcpy(sa.sll_addr, eth->h_dest, ETH_ALEN);
+
+            ssize_t sent = ::sendto(sock_.fd(), data, length, 0,
+                                    reinterpret_cast<sockaddr*>(&sa), sizeof(sa));
+            if (sent == static_cast<ssize_t>(length)) {
+                LOG(DEBUG_IO, "IoContext", ": AF_PACKET send ok (", tag,
+                    ") bytes=", length, " ifindex=", sock_.ifindex());
+                return true;
+            }
+            int err = errno;
+            if (err == EACCES) {
+                LOG(DEBUG_IO, "IoContext", ": AF_PACKET send (", tag,
+                    ") broadcast ignored length=", length, " errno=", err);
+                return true;
+            }
+            LOG(DEBUG_ERROR, "IoContext", ": AF_PACKET send (", tag,
+                ") error length=", length, " errno=", err);
+            return false;
+        }
+        // Если EtherType не распознали, то будем пробовать как IP (fallthrough).
+    }
+
+    // === 2. Иначе трактуем как raw IPv4 пакет и отправляем через RAW сокет ===
+    if (ip_tx_fd_ >= 0 && net_offset < length && (length - net_offset) >= sizeof(iphdr)) {
+        const auto* iph = reinterpret_cast<const iphdr*>(data + net_offset);
+
+        if (iph->version == 4 && iph->ihl >= 5) {
             uint16_t tot_len = ntohs(iph->tot_len);
-            if (tot_len >= sizeof(iphdr) && tot_len <= ip_len) {
+            size_t ip_len = length - net_offset;
+
+            if (tot_len >= iph->ihl * 4 && tot_len <= ip_len) {
                 sockaddr_in dst{};
                 dst.sin_family = AF_INET;
-                dst.sin_addr.s_addr = iph->daddr;
-                ssize_t sent = ::sendto(ip_tx_fd_, ip_payload, tot_len, 0,
+                dst.sin_addr.s_addr = 0;//iph->daddr;
+
+                ssize_t sent = ::sendto(ip_tx_fd_, data + net_offset, tot_len, 0,
                                         reinterpret_cast<const sockaddr*>(&dst), sizeof(dst));
                 if (sent == static_cast<ssize_t>(tot_len)) {
-                    LOG(DEBUG_IO, "IoContext", ": raw IP send (", tag, ") bytes=", tot_len);
+                    LOG(DEBUG_IO, "IoContext", ": RAW IP send ok (", tag,
+                        ") bytes=", tot_len, " dst=", inet_ntoa(dst.sin_addr));
                     return true;
                 }
                 int err = errno;
                 if (err == EACCES) {
-                    LOG(DEBUG_IO, "IoContext", ": raw IP send (", tag,
+                    LOG(DEBUG_IO, "IoContext", ": RAW IP send (", tag,
                         ") ignored length=", tot_len, " errno=", err);
                     return true;
                 }
-                LOG(DEBUG_ERROR, "IoContext", ": raw IP send (", tag, ") error length=", tot_len,
-                    " errno=", err);
+                LOG(DEBUG_ERROR, "IoContext", ": RAW IP send (", tag,
+                    ") error length=", tot_len, " errno=", err);
+            } else {
+                LOG(DEBUG_ERROR, "IoContext", ": RAW IP bad tot_len=", tot_len,
+                    " ip_len=", ip_len);
             }
+        } else {
+            LOG(DEBUG_ERROR, "IoContext", ": RAW IP invalid version/ihl ver=",
+                (int)iph->version, " ihl=", (int)iph->ihl);
         }
+    } else {
+        LOG(DEBUG_ERROR, "IoContext", ": RAW IP no valid header, length=", length,
+            " net_offset=", net_offset);
     }
 
-    sockaddr_ll sa{};
-    sa.sll_family = AF_PACKET;
-    sa.sll_protocol = htons(eth_proto);
-    sa.sll_ifindex = sock_.ifindex();
-    sa.sll_halen = ETH_ALEN;
-    std::memcpy(sa.sll_addr, eth->h_dest, ETH_ALEN);
-
-    ssize_t sent = ::sendto(sock_.fd(), data, length, 0,
-                            reinterpret_cast<sockaddr*>(&sa), sizeof(sa));
-    if (sent != static_cast<ssize_t>(length)) {
-        int err = errno;
-        if (err == EACCES) {
-            LOG(DEBUG_IO, "IoContext", ": TX sendto (", tag, ") broadcast ignored length=",
-                length, " errno=", err);
-            return true;
-        }
-        LOG(DEBUG_ERROR, "IoContext", ": TX sendto (", tag, ") error length=", length,
-            " errno=", err);
-        return false;
-    }
-
-    LOG(DEBUG_IO, "IoContext", ": TX sendto (", tag, ") bytes=", length,
-        " ifindex=", sock_.ifindex());
-    return true;
+    return false;
 }
 
 void IoContext::init_raw_ip_socket() {
