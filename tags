@@ -180,6 +180,11 @@ CXX_STD	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#    defi
 CXX_STD	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#  define CXX_STD /;"	d	file:
 Chain	common/worker.hpp	/^    using Chain = HeaderChainTuple<IPv4Header, TCPHeader, UDPHeader, ICMPHeader>;$/;"	t	class:Worker	typeref:typename:HeaderChainTuple<IPv4Header,TCPHeader,UDPHeader,ICMPHeader>
 Clock	nat/nat.h	/^    using Clock = std::chrono::steady_clock;$/;"	t	class:Nat	typeref:typename:std::chrono::steady_clock
+Committer	committer/committer.h	/^template <> struct Committer<ICMPHeader> {$/;"	s
+Committer	committer/committer.h	/^template <> struct Committer<IPv4Header> {$/;"	s
+Committer	committer/committer.h	/^template <> struct Committer<TCPHeader> {$/;"	s
+Committer	committer/committer.h	/^template <> struct Committer<UDPHeader> {$/;"	s
+Committer	committer/committer.h	/^template <typename Header> struct Committer {$/;"	s
 DEBUG_ALL	common/logger.h	/^    DEBUG_ALL    = 0xFFFFFFFF$/;"	e	enum:DebugFlags
 DEBUG_ERROR	common/logger.h	/^    DEBUG_ERROR  = 1 << 3,$/;"	e	enum:DebugFlags
 DEBUG_IO	common/logger.h	/^    DEBUG_IO     = 1 << 4,$/;"	e	enum:DebugFlags
@@ -215,6 +220,7 @@ FlowKey	nat/nat.h	/^    struct FlowKey {$/;"	s	class:Nat
 FlowKeyHash	nat/nat.h	/^    struct FlowKeyHash {$/;"	s	class:Nat
 FramePayload	common/worker.hpp	/^    struct FramePayload {$/;"	s	class:Worker
 HEX	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#define HEX(/;"	d	file:
+Header	common/worker.cpp	/^        using Header = std::decay_t<decltype(hdr)>;$/;"	t	function:Worker::handle_frame::__anonf3a181e80302	file:
 HeaderChainTuple	chain/header_chain.h	/^template <typename... Headers> class HeaderChainTuple {$/;"	c
 ICMPHeader	include/icmp.h	/^struct ICMPHeader {$/;"	s
 IPv4Header	include/ipv4.h	/^struct IPv4Header {$/;"	s
@@ -310,7 +316,10 @@ __anon3b5b11db0102	main.cpp	/^    chain.for_each([&](auto& hdr) {$/;"	f	function
 __anon43ea9b910111	nat/nat_tcp.cpp	/^namespace {$/;"	n	file:
 __anon45c0227a0111	af_packet_io/packet_socket.cpp	/^namespace {$/;"	n	namespace:af_packet_io	file:
 __anon547d934d0108	tests/siphash.h	/^typedef struct {$/;"	s
-__anon69381a4a0111	tests/test_checksum.cpp	/^namespace {$/;"	n	file:
+__anon69381a4a0102	tests/test_checksum.cpp	/^    auto check_ip = [&](uint32_t old_src, uint32_t new_src) {$/;"	f	function:main	file:
+__anon69381a4a0202	tests/test_checksum.cpp	/^auto check_icmp = [&]() {$/;"	f	function:main	file:
+__anon69381a4a0302	tests/test_checksum.cpp	/^    auto check_tcp = [&]() {\/\/$/;"	f	function:main	file:
+__anon69381a4a0402	tests/test_checksum.cpp	/^    auto check_udp = [&]() {$/;"	f	function:main	file:
 __anon7613369d0111	af_packet_io/checksum_utils.cpp	/^namespace {$/;"	n	namespace:af_packet_io	file:
 __anon82bf5cc40111	tests/test_workers.cpp	/^namespace {$/;"	n	file:
 __anon82bf5cc40202	tests/test_workers.cpp	/^    auto forward_cb = [&](uint32_t target, Worker::FramePayload&& frame) {$/;"	f	function:main	file:
@@ -323,8 +332,9 @@ __anone7d278eb0111	nat/nat.cpp	/^namespace {$/;"	n	file:
 __anone8b2175a0111	tests/test_nat.cpp	/^namespace {$/;"	n	file:
 __anonf3a181e80102	common/worker.cpp	/^    chain_.for_each([&](auto& hdr) {$/;"	f	function:Worker::handle_frame	file:
 __anonf3a181e80202	common/worker.cpp	/^    chain_.for_each([&](auto& hdr) { nat_.process(hdr); });$/;"	f	function:Worker::handle_frame	file:
-__anonf3a181e80302	common/worker.cpp	/^    auto send_frame = [&](const TxFrame& frame, const char* reason) {$/;"	f	function:Worker::transmit_pending	file:
-__anonf3a181e80402	common/worker.cpp	/^    auto collect = [&](InterfaceContext& ctx) {$/;"	f	function:Worker::collect_tx_frames	file:
+__anonf3a181e80302	common/worker.cpp	/^    chain_.for_each([&](auto& hdr) {$/;"	f	function:Worker::handle_frame	file:
+__anonf3a181e80402	common/worker.cpp	/^    auto send_frame = [&](const TxFrame& frame, const char* reason) {$/;"	f	function:Worker::transmit_pending	file:
+__anonf3a181e80502	common/worker.cpp	/^    auto collect = [&](InterfaceContext& ctx) {$/;"	f	function:Worker::collect_tx_frames	file:
 __flow_hash_from_keys	tests/flow_dissector.c	/^uint32_t __flow_hash_from_keys(const struct flow_keys *keys,$/;"	f	typeref:typename:uint32_t
 __has_include	build/CMakeFiles/3.28.3/CompilerIdCXX/CMakeCXXCompilerId.cpp	/^#  define __has_include(/;"	d	file:
 _fields_	tests/log_skb_hash_with_key.py	/^    _fields_ = [$/;"	v	class:Ev
@@ -340,8 +350,8 @@ add_static_tcp_mapping	nat/nat.cpp	/^void Nat::add_static_tcp_mapping(uint32_t p
 add_static_udp_mapping	nat/nat.cpp	/^void Nat::add_static_udp_mapping(uint32_t prv_ip, uint16_t private_port, uint32_t pub_ip,$/;"	f	class:Nat	typeref:typename:void
 addr_type	tests/flow_dissector.h	/^    uint16_t addr_type;$/;"	m	struct:flow_dissector_key_control	typeref:typename:uint16_t
 addrs	tests/flow_dissector.h	/^    struct flow_dissector_key_addrs   addrs;$/;"	m	struct:flow_keys	typeref:struct:flow_dissector_key_addrs
-adjust_checksum16	nat/checksum_utils.hpp	/^inline uint16_t adjust_checksum16(uint16_t checksum_host, uint16_t old_host,$/;"	f	namespace:nat::detail	typeref:typename:uint16_t
-adjust_checksum32	nat/checksum_utils.hpp	/^inline uint16_t adjust_checksum32(uint16_t checksum_host, uint32_t old_host,$/;"	f	namespace:nat::detail	typeref:typename:uint16_t
+adjust_checksum16	nat/checksum_utils.hpp	/^inline uint16_t adjust_checksum16(uint16_t checksum_net, uint16_t old_host,$/;"	f	namespace:nat::detail	typeref:typename:uint16_t
+adjust_checksum32	nat/checksum_utils.hpp	/^inline uint16_t adjust_checksum32(uint16_t checksum_net, uint32_t old_host,$/;"	f	namespace:nat::detail	typeref:typename:uint16_t
 af_packet_io	af_packet_io/checksum_utils.cpp	/^namespace af_packet_io {$/;"	n	file:
 af_packet_io	af_packet_io/checksum_utils.h	/^namespace af_packet_io {$/;"	n
 af_packet_io	af_packet_io/io_context.cpp	/^namespace af_packet_io {$/;"	n	file:
@@ -407,13 +417,14 @@ calculate_netmask	common/netset.cpp	/^uint32_t Netset::calculate_netmask(int pre
 capacity	nat/nat.h	/^        uint32_t capacity = 0;$/;"	m	struct:Nat::MappingTable	typeref:typename:uint32_t
 cfg_	af_packet_io/io_context.hpp	/^    IoConfig cfg_;$/;"	m	class:af_packet_io::IoContext	typeref:typename:IoConfig
 cfg_	common/worker.hpp	/^    WorkerPipelineConfig cfg_;$/;"	m	class:Worker	typeref:typename:WorkerPipelineConfig
-chain_	common/worker.hpp	/^    Chain chain_;$/;"	m	class:Worker	typeref:typename:Chain
 checksum_after_id_change	nat/nat_icmp.cpp	/^auto checksum_after_id_change(uint16_t checksum_net, uint16_t old_id, uint16_t new_id) {$/;"	f	namespace:__anon97f778730111	typeref:typename:auto
 checksum_after_ip_change	nat/nat_icmp.cpp	/^auto checksum_after_ip_change(uint16_t checksum_net, uint32_t old_ip, uint32_t new_ip) {$/;"	f	namespace:__anon97f778730111	typeref:typename:auto
 checksum_after_ip_change	nat/nat_tcp.cpp	/^auto checksum_after_ip_change(uint16_t checksum_net, uint32_t old_ip, uint32_t new_ip) {$/;"	f	namespace:__anon43ea9b910111	typeref:typename:auto
 checksum_after_ip_change	nat/nat_udp.cpp	/^auto checksum_after_ip_change(uint16_t checksum_net, uint32_t old_ip, uint32_t new_ip) {$/;"	f	namespace:__anon933a00f30111	typeref:typename:auto
 checksum_after_port_change	nat/nat_tcp.cpp	/^auto checksum_after_port_change(uint16_t checksum_net, uint16_t old_port, uint16_t new_port) {$/;"	f	namespace:__anon43ea9b910111	typeref:typename:auto
 checksum_after_port_change	nat/nat_udp.cpp	/^auto checksum_after_port_change(uint16_t checksum_net, uint16_t old_port, uint16_t new_port) {$/;"	f	namespace:__anon933a00f30111	typeref:typename:auto
+checksum_block_decrement	nat/checksum_utils.hpp	/^inline bool checksum_block_decrement(uint16_t& partial, uint16_t checksum_host, bool initial,$/;"	f	namespace:nat::detail	typeref:typename:bool
+checksum_block_increment	nat/checksum_utils.hpp	/^inline bool checksum_block_increment(uint16_t& checksum_host, uint16_t partial, bool final,$/;"	f	namespace:nat::detail	typeref:typename:bool
 choose_port_for_cpu	nat/endpoint_base.hpp	/^    uint16_t choose_port_for_cpu(uint32_t desired_cpu, uint16_t rmin, uint16_t rmax,$/;"	f	class:EndpointBase	typeref:typename:uint16_t
 cidr_ip	scripts/setup_veth_env.sh	/^cidr_ip() {$/;"	f
 cidr_network	scripts/setup_veth_env.sh	/^cidr_network() {$/;"	f
@@ -438,6 +449,30 @@ command	build/compile_commands.json	/^  "command": "\/usr\/bin\/c++  -I\/home\/g
 command	build/compile_commands.json	/^  "command": "\/usr\/bin\/c++  -I\/home\/grigory\/sweetspot_cpp\/include -I\/home\/grigory\/swee/;"	s	object:7
 command	build/compile_commands.json	/^  "command": "\/usr\/bin\/c++  -I\/home\/grigory\/sweetspot_cpp\/include -I\/home\/grigory\/swee/;"	s	object:8
 command	build/compile_commands.json	/^  "command": "\/usr\/bin\/c++  -I\/home\/grigory\/sweetspot_cpp\/include -I\/home\/grigory\/swee/;"	s	object:9
+committer/committer_icmp.cpp.i	build/Makefile	/^committer\/committer_icmp.cpp.i:$/;"	t
+committer/committer_icmp.cpp.o	build/Makefile	/^committer\/committer_icmp.cpp.o:$/;"	t
+committer/committer_icmp.cpp.s	build/Makefile	/^committer\/committer_icmp.cpp.s:$/;"	t
+committer/committer_icmp.i	build/Makefile	/^committer\/committer_icmp.i: committer\/committer_icmp.cpp.i$/;"	t
+committer/committer_icmp.o	build/Makefile	/^committer\/committer_icmp.o: committer\/committer_icmp.cpp.o$/;"	t
+committer/committer_icmp.s	build/Makefile	/^committer\/committer_icmp.s: committer\/committer_icmp.cpp.s$/;"	t
+committer/committer_ipv4.cpp.i	build/Makefile	/^committer\/committer_ipv4.cpp.i:$/;"	t
+committer/committer_ipv4.cpp.o	build/Makefile	/^committer\/committer_ipv4.cpp.o:$/;"	t
+committer/committer_ipv4.cpp.s	build/Makefile	/^committer\/committer_ipv4.cpp.s:$/;"	t
+committer/committer_ipv4.i	build/Makefile	/^committer\/committer_ipv4.i: committer\/committer_ipv4.cpp.i$/;"	t
+committer/committer_ipv4.o	build/Makefile	/^committer\/committer_ipv4.o: committer\/committer_ipv4.cpp.o$/;"	t
+committer/committer_ipv4.s	build/Makefile	/^committer\/committer_ipv4.s: committer\/committer_ipv4.cpp.s$/;"	t
+committer/committer_tcp.cpp.i	build/Makefile	/^committer\/committer_tcp.cpp.i:$/;"	t
+committer/committer_tcp.cpp.o	build/Makefile	/^committer\/committer_tcp.cpp.o:$/;"	t
+committer/committer_tcp.cpp.s	build/Makefile	/^committer\/committer_tcp.cpp.s:$/;"	t
+committer/committer_tcp.i	build/Makefile	/^committer\/committer_tcp.i: committer\/committer_tcp.cpp.i$/;"	t
+committer/committer_tcp.o	build/Makefile	/^committer\/committer_tcp.o: committer\/committer_tcp.cpp.o$/;"	t
+committer/committer_tcp.s	build/Makefile	/^committer\/committer_tcp.s: committer\/committer_tcp.cpp.s$/;"	t
+committer/committer_udp.cpp.i	build/Makefile	/^committer\/committer_udp.cpp.i:$/;"	t
+committer/committer_udp.cpp.o	build/Makefile	/^committer\/committer_udp.cpp.o:$/;"	t
+committer/committer_udp.cpp.s	build/Makefile	/^committer\/committer_udp.cpp.s:$/;"	t
+committer/committer_udp.i	build/Makefile	/^committer\/committer_udp.i: committer\/committer_udp.cpp.i$/;"	t
+committer/committer_udp.o	build/Makefile	/^committer\/committer_udp.o: committer\/committer_udp.cpp.o$/;"	t
+committer/committer_udp.s	build/Makefile	/^committer\/committer_udp.s: committer\/committer_udp.cpp.s$/;"	t
 common/netset.cpp.i	build/Makefile	/^common\/netset.cpp.i:$/;"	t
 common/netset.cpp.o	build/Makefile	/^common\/netset.cpp.o:$/;"	t
 common/netset.cpp.s	build/Makefile	/^common\/netset.cpp.s:$/;"	t
@@ -751,7 +786,13 @@ net_offset	common/worker.hpp	/^        size_t net_offset = 0;$/;"	m	struct:Worke
 netset_ip_at	nat/endpoint_base.hpp	/^    static uint32_t netset_ip_at(const Netset& ns, uint32_t idx) {$/;"	f	class:EndpointBase	typeref:typename:uint32_t
 next	common/netset.hpp	/^        std::shared_ptr<Range> next;$/;"	m	struct:Netset::Range	typeref:typename:std::shared_ptr<Range>
 ofs_	common/logger.h	/^    std::ofstream ofs_;$/;"	m	class:Logger	typeref:typename:std::ofstream
+ones_complement_add	nat/checksum_utils.hpp	/^inline uint32_t ones_complement_add(uint32_t sum) {$/;"	f	namespace:nat::detail	typeref:typename:uint32_t
 open	af_packet_io/packet_socket.cpp	/^void PacketSocket::open(int protocol) {$/;"	f	class:af_packet_io::PacketSocket	typeref:typename:void
+operator ()	committer/committer.h	/^    bool operator()(const Header*, uint8_t*, size_t, size_t&, const IPv4Header* = nullptr) const/;"	f	struct:Committer	typeref:typename:bool
+operator ()	committer/committer_icmp.cpp	/^bool Committer<ICMPHeader>::operator()(const ICMPHeader* hdr, uint8_t* data, size_t len,$/;"	f	class:Committer	typeref:typename:bool
+operator ()	committer/committer_ipv4.cpp	/^bool Committer<IPv4Header>::operator()(const IPv4Header* hdr, uint8_t* data, size_t len,$/;"	f	class:Committer	typeref:typename:bool
+operator ()	committer/committer_tcp.cpp	/^bool Committer<TCPHeader>::operator()(const TCPHeader* hdr, uint8_t* data, size_t len,$/;"	f	class:Committer	typeref:typename:bool
+operator ()	committer/committer_udp.cpp	/^bool Committer<UDPHeader>::operator()(const UDPHeader* hdr, uint8_t* data, size_t len,$/;"	f	class:Committer	typeref:typename:bool
 operator ()	filters/filter.h	/^struct Filter { bool operator()(const Header&) { return true; } };$/;"	f	struct:Filter	typeref:typename:bool
 operator ()	filters/filter_icmp.cpp	/^    bool operator()(const ICMPHeader& icmp) { return true; }$/;"	f	struct:Filter	typeref:typename:bool	file:
 operator ()	filters/filter_ipv4.cpp	/^    bool operator()(const IPv4Header& ip) {$/;"	f	struct:Filter	typeref:typename:bool	file:
@@ -952,10 +993,6 @@ std	nat/nat.h	/^namespace std {$/;"	n
 stop	common/worker.cpp	/^void Worker::stop() {$/;"	f	class:Worker	typeref:typename:void
 submit_remote_frame	common/worker.cpp	/^void Worker::submit_remote_frame(FramePayload&& frame) {$/;"	f	class:Worker	typeref:typename:void
 supports_id_translation	nat/nat_icmp.cpp	/^bool supports_id_translation(const icmphdr& hdr) {$/;"	f	namespace:__anon97f778730111	typeref:typename:bool
-sw_checksum	tests/test_checksum.cpp	/^uint16_t sw_checksum(const std::vector<uint8_t>& data) {$/;"	f	namespace:__anon69381a4a0111	typeref:typename:uint16_t
-sw_l4_checksum	tests/test_checksum.cpp	/^uint16_t sw_l4_checksum(const iphdr* iph, const std::vector<uint8_t>& payload, uint8_t proto) {$/;"	f	namespace:__anon69381a4a0111	typeref:typename:uint16_t
-sw_tuple_checksum_decrement	tests/test_checksum.cpp	/^int sw_tuple_checksum_decrement(uint16_t* partial_csum, uint16_t csum,$/;"	f	namespace:__anon69381a4a0111	typeref:typename:int
-sw_tuple_checksum_increment	tests/test_checksum.cpp	/^int sw_tuple_checksum_increment(uint16_t* csum, uint16_t partial_csum,$/;"	f	namespace:__anon69381a4a0111	typeref:typename:int
 sweetspot_cpp	CMakeLists.txt	/^project(sweetspot_cpp LANGUAGES CXX)$/;"	p
 table_mtx	tests/test_fanout.cpp	/^std::mutex table_mtx;$/;"	v	typeref:typename:std::mutex
 tcp_port_max	nat/nat_config.hpp	/^    uint16_t tcp_port_max = 20000;$/;"	m	struct:NatConfig	typeref:typename:uint16_t

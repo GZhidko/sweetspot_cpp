@@ -93,5 +93,6 @@ add_executable(test_checksum
 target_include_directories(test_checksum PRIVATE
     ${CMAKE_SOURCE_DIR}/af_packet_io
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/common
 )
 add_test(NAME ChecksumTest COMMAND test_checksum)

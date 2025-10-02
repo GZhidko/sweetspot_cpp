@@ -147,10 +147,11 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
         return;
     }
 
-    Chain chain_;
     LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": received frame len=", len,
         " net_offset=", net_offset);
 
+    
+    Chain chain_;
     if (!chain_.parse(l3_data, l3_len)) {
         LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": parse failed");
         return;
@@ -220,7 +221,7 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
     chain_.for_each([&](auto& hdr) { nat_.process(hdr); });
 
     size_t offset = 0;
-    const auto* ipv4 = chain_.template get<IPv4Header>();
+    auto* ipv4 = chain_.template get<IPv4Header>();
     if (!ipv4 || !Committer<IPv4Header>{}(ipv4, l3_data, l3_len, offset)) {
         return;
     }
@@ -228,24 +229,57 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
     chain_.for_each([&](auto& hdr) {
         using Header = std::decay_t<decltype(hdr)>;
         if constexpr (!std::is_same_v<Header, IPv4Header>) {
-LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
-               ": committed ", typeid(Header).name(), " offset=", offset);
-
             Committer<Header>{}(&hdr, l3_data, l3_len, offset, ipv4);
-                   }
+        }
     });
 
     LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
         ": frame after NAT src=", IPv4Header::ip_to_string(ip->iph.saddr),
         " dst=", IPv4Header::ip_to_string(ip->iph.daddr));
 
-    
+    uint16_t log_src_port = 0;
+    uint16_t log_dst_port = 0;
+    uint16_t log_icmp_id = 0;
+
+    switch (ip->iph.protocol) {
+    case IPPROTO_TCP: {
+        if (auto* tcp_hdr = chain_.template get<TCPHeader>()) {
+            log_src_port = ntohs(tcp_hdr->tcph.source);
+            log_dst_port = ntohs(tcp_hdr->tcph.dest);
+        }
+        break;
+    }
+    case IPPROTO_UDP: {
+        if (auto* udp_hdr = chain_.template get<UDPHeader>()) {
+            log_src_port = ntohs(udp_hdr->udph.source);
+            log_dst_port = ntohs(udp_hdr->udph.dest);
+        }
+        break;
+    }
+    case IPPROTO_ICMP: {
+        if (auto* icmp_hdr = chain_.template get<ICMPHeader>()) {
+            log_icmp_id = ntohs(icmp_hdr->icmph.un.echo.id);
+        }
+        break;
+    }
+    default:
+        break;
+    }
+
     InterfaceContext* dest_ctx = (origin == FramePayload::Origin::Private) ? &pub_ctx_ : &priv_ctx_;
     if (!dest_ctx->io) {
         LOG(DEBUG_IO, "Worker", cfg_.thread_index,
             ": destination interface missing, queuing only origin=",
             origin == FramePayload::Origin::Private ? "private" : "public");
     }
+
+    LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
+        ": TX schedule proto=", static_cast<int>(ipv4->iph.protocol),
+        " src=", IPv4Header::ip_to_string(ipv4->iph.saddr), ":", log_src_port,
+        " dst=", IPv4Header::ip_to_string(ipv4->iph.daddr), ":", log_dst_port,
+        " icmp_id=", log_icmp_id,
+        " via=", (dest_ctx == &pub_ctx_ ? "pub" : "priv"));
+
     enqueue_tx(*dest_ctx, std::vector<uint8_t>(data, data + len), net_offset, "direct");
 }
 
