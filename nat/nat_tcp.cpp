@@ -1,10 +1,13 @@
 #include "nat.h"
 
 #include "checksum_utils.hpp"
+#include "../af_packet_io/checksum_utils.h"
 #include "../include/tcp.h"
 #include "../include/ipv4.h"
 
 #include <arpa/inet.h>
+#include <array>
+#include <cstring>
 
 namespace {
 
@@ -12,12 +15,31 @@ auto checksum_after_ip_change(uint16_t checksum_net, uint32_t old_ip, uint32_t n
     return nat::detail::adjust_checksum32(checksum_net, old_ip, new_ip);
 }
 
-auto checksum_after_port_change(uint16_t checksum_net, uint16_t old_port, uint16_t new_port) {
-    return nat::detail::adjust_checksum16(checksum_net, old_port, new_port);
-}
-
 std::string to_string_host(uint32_t host_ip) {
     return IPv4Header::ip_to_string(htonl(host_ip));
+}
+
+struct TcpPseudoHeader {
+    uint32_t saddr;
+    uint32_t daddr;
+    uint8_t zero;
+    uint8_t proto;
+    uint16_t length;
+};
+
+static_assert(sizeof(TcpPseudoHeader) == 12, "Unexpected TCP pseudo header size");
+
+std::array<uint8_t, sizeof(TcpPseudoHeader)> make_tcp_pseudo(uint32_t saddr_net,
+                                                            uint32_t daddr_net,
+                                                            uint16_t length_net) {
+    TcpPseudoHeader pseudo{.saddr = saddr_net,
+                           .daddr = daddr_net,
+                           .zero = 0,
+                           .proto = IPPROTO_TCP,
+                           .length = length_net};
+    std::array<uint8_t, sizeof(TcpPseudoHeader)> bytes{};
+    std::memcpy(bytes.data(), &pseudo, sizeof(pseudo));
+    return bytes;
 }
 
 } // namespace
@@ -36,6 +58,16 @@ void Nat::process(TCPHeader& tcp, Clock::time_point) {
     const uint32_t dst_ip = ntohl(ip.iph.daddr);
     const uint16_t src_port = ntohs(tcp.tcph.source);
     const uint16_t dst_port = ntohs(tcp.tcph.dest);
+    const uint16_t total_len = ntohs(ip.iph.tot_len);
+    const uint16_t header_len = static_cast<uint16_t>(ip.iph.ihl) * 4u;
+    const uint16_t tcp_len = total_len > header_len ? static_cast<uint16_t>(total_len - header_len) : 0u;
+    const uint16_t tcp_len_net = htons(tcp_len);
+
+    const uint16_t old_check_net = tcp.tcph.check;
+    const uint16_t old_src_port_net = tcp.tcph.source;
+    const uint16_t old_dst_port_net = tcp.tcph.dest;
+    const uint32_t old_src_ip_net = ip.iph.saddr;
+    const uint32_t old_dst_ip_net = ip.iph.daddr;
 
     if (is_private(src_ip) && !is_private(dst_ip)) {
         LOG(DEBUG_NAT, "TCP outbound before NAT src=", to_string_host(src_ip), ":", src_port,
@@ -53,14 +85,7 @@ void Nat::process(TCPHeader& tcp, Clock::time_point) {
 
         if (new_port != src_port) {
             tcp.tcph.source = htons(new_port);
-            if (tcp.tcph.check != 0) {
-                tcp.tcph.check = checksum_after_port_change(tcp.tcph.check, src_port, new_port);
-            }
             LOG(DEBUG_NAT, "TCP outbound port translate ", src_port, " -> ", new_port);
-        }
-
-        if (tcp.tcph.check != 0 && new_ip != src_ip) {
-            tcp.tcph.check = checksum_after_ip_change(tcp.tcph.check, src_ip, new_ip);
         }
     } else if (is_public(dst_ip)) {
         auto tr = find_tcp_reply(dst_ip, src_ip, dst_port, src_port);
@@ -84,14 +109,64 @@ void Nat::process(TCPHeader& tcp, Clock::time_point) {
 
         if (new_port != old_dest_port) {
             tcp.tcph.dest = htons(new_port);
-            if (tcp.tcph.check != 0) {
-                tcp.tcph.check = checksum_after_port_change(tcp.tcph.check, old_dest_port, new_port);
-            }
             LOG(DEBUG_NAT, "TCP inbound port translate ", old_dest_port, " -> ", new_port);
         }
-
-        if (tcp.tcph.check != 0 && new_ip != dst_ip) {
-            tcp.tcph.check = checksum_after_ip_change(tcp.tcph.check, dst_ip, new_ip);
-        }
     }
+
+    if (old_check_net != 0 && tcp_len >= sizeof(tcphdr)) {
+        uint16_t checksum_host = ntohs(old_check_net);
+        uint16_t partial = 0;
+
+        std::array<uint8_t, 2 * sizeof(uint16_t)> old_ports{};
+        std::memcpy(old_ports.data(), &old_src_port_net, sizeof(uint16_t));
+        std::memcpy(old_ports.data() + sizeof(uint16_t), &old_dst_port_net, sizeof(uint16_t));
+
+        if (!nat::detail::checksum_block_decrement(partial, checksum_host, true,
+                                                   old_ports.data(), old_ports.size())) {
+            goto recompute_tcp_full;
+        }
+        checksum_host = partial;
+
+        auto old_pseudo = make_tcp_pseudo(old_src_ip_net, old_dst_ip_net, tcp_len_net);
+        if (!nat::detail::checksum_block_decrement(partial, checksum_host, false,
+                                                   old_pseudo.data(), old_pseudo.size())) {
+            goto recompute_tcp_full;
+        }
+        checksum_host = partial;
+
+        auto new_pseudo = make_tcp_pseudo(ip.iph.saddr, ip.iph.daddr, tcp_len_net);
+        if (!nat::detail::checksum_block_increment(checksum_host, checksum_host, false,
+                                                   new_pseudo.data(), new_pseudo.size())) {
+            goto recompute_tcp_full;
+        }
+
+        partial = checksum_host;
+        std::array<uint8_t, 2 * sizeof(uint16_t)> new_ports{};
+        std::memcpy(new_ports.data(), &tcp.tcph.source, sizeof(uint16_t));
+        std::memcpy(new_ports.data() + sizeof(uint16_t), &tcp.tcph.dest, sizeof(uint16_t));
+        if (!nat::detail::checksum_block_increment(checksum_host, partial, true,
+                                                   new_ports.data(), new_ports.size())) {
+            goto recompute_tcp_full;
+        }
+
+        tcp.tcph.check = htons(checksum_host);
+        return;
+    }
+
+#ifdef NAT_FULL_CHECKSUM
+recompute_tcp_full:
+    if (tcp_len >= sizeof(tcphdr)) {
+        tcp.tcph.check = 0;
+        uint16_t full = af_packet_io::l4_checksum(&ip.iph,
+                                                  reinterpret_cast<const uint8_t*>(&tcp.tcph),
+                                                  tcp_len,
+                                                  IPPROTO_TCP);
+        tcp.tcph.check = htons(full);
+    } else {
+        tcp.tcph.check = 0;
+    }
+#else
+recompute_tcp_full:
+    tcp.tcph.check = 0;
+#endif
 }

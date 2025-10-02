@@ -1,10 +1,13 @@
 #include "nat.h"
 
 #include "checksum_utils.hpp"
+#include "../af_packet_io/checksum_utils.h"
 #include "../include/udp.h"
 #include "../include/ipv4.h"
 
 #include <arpa/inet.h>
+#include <array>
+#include <cstring>
 
 namespace {
 
@@ -12,12 +15,31 @@ auto checksum_after_ip_change(uint16_t checksum_net, uint32_t old_ip, uint32_t n
     return nat::detail::adjust_checksum32(checksum_net, old_ip, new_ip);
 }
 
-auto checksum_after_port_change(uint16_t checksum_net, uint16_t old_port, uint16_t new_port) {
-    return nat::detail::adjust_checksum16(checksum_net, old_port, new_port);
-}
-
 std::string to_string_host(uint32_t host_ip) {
     return IPv4Header::ip_to_string(htonl(host_ip));
+}
+
+struct UdpPseudoHeader {
+    uint32_t saddr;
+    uint32_t daddr;
+    uint8_t zero;
+    uint8_t proto;
+    uint16_t length;
+};
+
+static_assert(sizeof(UdpPseudoHeader) == 12, "Unexpected UDP pseudo header size");
+
+std::array<uint8_t, sizeof(UdpPseudoHeader)> make_udp_pseudo(uint32_t saddr_net,
+                                                            uint32_t daddr_net,
+                                                            uint16_t length_net) {
+    UdpPseudoHeader pseudo{.saddr = saddr_net,
+                           .daddr = daddr_net,
+                           .zero = 0,
+                           .proto = IPPROTO_UDP,
+                           .length = length_net};
+    std::array<uint8_t, sizeof(UdpPseudoHeader)> bytes{};
+    std::memcpy(bytes.data(), &pseudo, sizeof(pseudo));
+    return bytes;
 }
 
 } // namespace
@@ -37,6 +59,14 @@ void Nat::process(UDPHeader& udp, Clock::time_point) {
     const uint16_t src_port = ntohs(udp.udph.source);
     const uint16_t dst_port = ntohs(udp.udph.dest);
     const bool checksum_present = udp.udph.check != 0;
+    const uint16_t udp_length_host = ntohs(udp.udph.len);
+    const uint16_t udp_length_net = udp.udph.len;
+
+    const uint16_t old_check_net = udp.udph.check;
+    const uint16_t old_src_port_net = udp.udph.source;
+    const uint16_t old_dst_port_net = udp.udph.dest;
+    const uint32_t old_src_ip_net = ip.iph.saddr;
+    const uint32_t old_dst_ip_net = ip.iph.daddr;
 
     if (is_private(src_ip) && !is_private(dst_ip)) {
         LOG(DEBUG_NAT, "UDP outbound before NAT src=", to_string_host(src_ip), ":", src_port,
@@ -54,16 +84,9 @@ void Nat::process(UDPHeader& udp, Clock::time_point) {
 
         if (new_port != src_port) {
             udp.udph.source = htons(new_port);
-            if (checksum_present) {
-                udp.udph.check = checksum_after_port_change(udp.udph.check, src_port, new_port);
-            }
         }
         if (new_port != src_port) {
             LOG(DEBUG_NAT, "UDP outbound port translate ", src_port, " -> ", new_port);
-        }
-
-        if (checksum_present && new_ip != src_ip) {
-            udp.udph.check = checksum_after_ip_change(udp.udph.check, src_ip, new_ip);
         }
     } else if (is_public(dst_ip)) {
         auto tr = find_udp_reply(dst_ip, src_ip, dst_port, src_port);
@@ -87,14 +110,62 @@ void Nat::process(UDPHeader& udp, Clock::time_point) {
 
         if (new_port != old_dest_port) {
             udp.udph.dest = htons(new_port);
-            if (checksum_present) {
-                udp.udph.check = checksum_after_port_change(udp.udph.check, old_dest_port, new_port);
-            }
             LOG(DEBUG_NAT, "UDP inbound port translate ", old_dest_port, " -> ", new_port);
         }
-
-        if (checksum_present && new_ip != dst_ip) {
-            udp.udph.check = checksum_after_ip_change(udp.udph.check, dst_ip, new_ip);
-        }
     }
+
+    if (checksum_present && udp_length_host >= sizeof(udphdr)) {
+        uint16_t checksum_host = ntohs(old_check_net);
+        uint16_t partial = 0;
+
+        std::array<uint8_t, 2 * sizeof(uint16_t)> old_ports{};
+        std::memcpy(old_ports.data(), &old_src_port_net, sizeof(uint16_t));
+        std::memcpy(old_ports.data() + sizeof(uint16_t), &old_dst_port_net, sizeof(uint16_t));
+
+        if (!nat::detail::checksum_block_decrement(partial, checksum_host, true,
+                                                   old_ports.data(), old_ports.size())) {
+            goto recompute_udp_full;
+        }
+        checksum_host = partial;
+
+        auto old_pseudo = make_udp_pseudo(old_src_ip_net, old_dst_ip_net, udp_length_net);
+        if (!nat::detail::checksum_block_decrement(partial, checksum_host, false,
+                                                   old_pseudo.data(), old_pseudo.size())) {
+            goto recompute_udp_full;
+        }
+        checksum_host = partial;
+
+        auto new_pseudo = make_udp_pseudo(ip.iph.saddr, ip.iph.daddr, udp_length_net);
+        if (!nat::detail::checksum_block_increment(checksum_host, checksum_host, false,
+                                                   new_pseudo.data(), new_pseudo.size())) {
+            goto recompute_udp_full;
+        }
+
+        partial = checksum_host;
+        std::array<uint8_t, 2 * sizeof(uint16_t)> new_ports{};
+        std::memcpy(new_ports.data(), &udp.udph.source, sizeof(uint16_t));
+        std::memcpy(new_ports.data() + sizeof(uint16_t), &udp.udph.dest, sizeof(uint16_t));
+        if (!nat::detail::checksum_block_increment(checksum_host, partial, true,
+                                                   new_ports.data(), new_ports.size())) {
+            goto recompute_udp_full;
+        }
+
+        udp.udph.check = htons(checksum_host);
+        return;
+    }
+
+#ifdef NAT_FULL_CHECKSUM
+recompute_udp_full:
+    if (checksum_present && udp_length_host >= sizeof(udphdr)) {
+        udp.udph.check = 0;
+        uint16_t full = af_packet_io::l4_checksum(&ip.iph,
+                                                  reinterpret_cast<const uint8_t*>(&udp.udph),
+                                                  udp_length_host,
+                                                  IPPROTO_UDP);
+        udp.udph.check = htons(full);
+    }
+#else
+recompute_udp_full:
+    udp.udph.check = 0;
+#endif
 }

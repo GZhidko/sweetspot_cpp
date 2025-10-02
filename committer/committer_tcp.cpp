@@ -2,6 +2,7 @@
 
 #include "logger.h"
 #include "tcp.h"
+#include "../af_packet_io/checksum_utils.h"
 
 #include <algorithm>
 #include <cstring>
@@ -20,8 +21,34 @@ bool Committer<TCPHeader>::operator()(const TCPHeader* hdr, uint8_t* data, size_
             " offset=", offset, " len=", len);
         return false;
     }
+    const size_t header_start = offset;
     std::memcpy(data + offset, &hdr->tcph, sizeof(tcphdr));
     offset += header_len;
+
+    auto* tcp_data = reinterpret_cast<tcphdr*>(data + header_start);
+#ifdef NAT_FULL_CHECKSUM
+    if (!ip_hdr || ntohs(ip_hdr->iph.tot_len) < static_cast<uint16_t>(ip_hdr->iph.ihl) * 4u + sizeof(tcphdr)) {
+        tcp_data->check = 0;
+        return true;
+    }
+
+    uint16_t tcp_length = static_cast<uint16_t>(ntohs(ip_hdr->iph.tot_len) -
+                                                static_cast<uint16_t>(ip_hdr->iph.ihl) * 4u);
+    if (header_start + tcp_length > len) {
+        LOG(DEBUG_ERROR, "Commit TCP: segment length overflow tcp_length=", tcp_length,
+            " header_start=", header_start, " len=", len);
+        tcp_data->check = 0;
+        return false;
+    }
+    tcp_data->check = 0;
+    uint16_t checksum = af_packet_io::l4_checksum(&ip_hdr->iph,
+                                                  reinterpret_cast<const uint8_t*>(tcp_data),
+                                                  tcp_length,
+                                                  IPPROTO_TCP);
+    tcp_data->check = htons(checksum);
+#else
+    (void)ip_hdr;
+    (void)len;
+#endif
     return true;
 }
-

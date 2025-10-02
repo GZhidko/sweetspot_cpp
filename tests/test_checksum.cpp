@@ -9,6 +9,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <random>
 #include <vector>
@@ -210,7 +211,28 @@ int main() {
         tcp->doff = 5;
         tcp->check = 0;
         ip.tot_len = htons(static_cast<uint16_t>(ip.ihl * 4 + seg_len));
+        uint16_t seg_len_u16 = static_cast<uint16_t>(seg.size());
         uint16_t orig = af_packet_io::l4_checksum(&ip, seg.data(), seg.size(), IPPROTO_TCP);
+        struct {
+            uint32_t saddr;
+            uint32_t daddr;
+            uint8_t zero;
+            uint8_t proto;
+            uint16_t len;
+        } pseudo{};
+        pseudo.saddr = ip.saddr;
+        pseudo.daddr = ip.daddr;
+        pseudo.zero = 0;
+        pseudo.proto = IPPROTO_TCP;
+        pseudo.len = htons(seg_len_u16);
+        std::vector<uint8_t> buffer(sizeof(pseudo) + seg.size());
+        std::memcpy(buffer.data(), &pseudo, sizeof(pseudo));
+        std::memcpy(buffer.data() + sizeof(pseudo), seg.data(), seg.size());
+        uint16_t manual = af_packet_io::ip_checksum(buffer.data(), buffer.size());
+        if (manual != orig) {
+            std::cerr << "TCP pseudo checksum mismatch" << std::endl;
+            return false;
+        }
         tcp->check = htons(orig);
         uint16_t new_src_port = port_dist(rng);
         uint16_t checksum = nat::detail::adjust_checksum16(tcp->check, ntohs(tcp->source), new_src_port);
@@ -249,7 +271,28 @@ int main() {
         udp->len = htons(static_cast<uint16_t>(seg_len));
         udp->check = 0;
         ip.tot_len = htons(static_cast<uint16_t>(ip.ihl * 4 + seg_len));
+        uint16_t seg_len_u16 = static_cast<uint16_t>(seg.size());
         uint16_t orig = af_packet_io::l4_checksum(&ip, seg.data(), seg.size(), IPPROTO_UDP);
+        struct {
+            uint32_t saddr;
+            uint32_t daddr;
+            uint8_t zero;
+            uint8_t proto;
+            uint16_t len;
+        } pseudo{};
+        pseudo.saddr = ip.saddr;
+        pseudo.daddr = ip.daddr;
+        pseudo.zero = 0;
+        pseudo.proto = IPPROTO_UDP;
+        pseudo.len = htons(seg_len_u16);
+        std::vector<uint8_t> buffer(sizeof(pseudo) + seg.size());
+        std::memcpy(buffer.data(), &pseudo, sizeof(pseudo));
+        std::memcpy(buffer.data() + sizeof(pseudo), seg.data(), seg.size());
+        uint16_t manual = af_packet_io::ip_checksum(buffer.data(), buffer.size());
+        if (manual != orig) {
+            std::cerr << "UDP pseudo checksum mismatch" << std::endl;
+            return false;
+        }
         udp->check = htons(orig);
         if (orig == 0) return true;
         uint16_t new_src_port = port_dist(rng);
