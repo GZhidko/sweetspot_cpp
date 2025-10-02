@@ -2,7 +2,7 @@
 
 #include "logger.h"
 #include "udp.h"
-#include "../af_packet_io/checksum_utils.h"
+#include "checksum.hpp"
 
 #include <cstring>
 
@@ -37,16 +37,17 @@ bool Committer<UDPHeader>::operator()(const UDPHeader* hdr, uint8_t* data, size_
 
     if (udp_data->check != 0) {
         udp_data->check = 0;
-        uint16_t checksum = af_packet_io::l4_checksum(&ip_hdr->iph,
-                                                      reinterpret_cast<const uint8_t*>(udp_data),
-                                                      udp_length,
-                                                      IPPROTO_UDP);
+        uint16_t checksum = checksum::l4_checksum(&ip_hdr->iph,
+                                                  reinterpret_cast<const uint8_t*>(udp_data),
+                                                  udp_length,
+                                                  IPPROTO_UDP);
         udp_data->check = htons(checksum);
     }
 #else
     (void)ip_hdr;
     (void)udp_length;
     (void)len;
+    udp_data->check = hdr->udph.check;
 #endif
     return true;
 }

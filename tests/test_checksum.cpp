@@ -1,6 +1,5 @@
 
-#include "../af_packet_io/checksum_utils.h"
-#include "../nat/checksum_utils.hpp"
+#include "checksum.hpp"
 
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
@@ -31,12 +30,12 @@ int main() {
         ip.saddr = htonl(old_src);
         ip.daddr = htonl(ip_dist(rng));
         ip.check = 0;
-        uint16_t orig = af_packet_io::ip_checksum(reinterpret_cast<const uint8_t*>(&ip), ip.ihl * 4);
+        uint16_t orig = checksum::ip_checksum(reinterpret_cast<const uint8_t*>(&ip), ip.ihl * 4);
         ip.check = htons(orig);
-        uint16_t adjusted = ntohs(nat::detail::adjust_checksum32(ip.check, old_src, new_src));
+        uint16_t adjusted = ntohs(checksum::adjust_checksum32(ip.check, old_src, new_src));
         ip.saddr = htonl(new_src);
         ip.check = 0;
-        uint16_t recomputed = af_packet_io::ip_checksum(reinterpret_cast<const uint8_t*>(&ip), ip.ihl * 4);
+        uint16_t recomputed = checksum::ip_checksum(reinterpret_cast<const uint8_t*>(&ip), ip.ihl * 4);
         return adjusted == recomputed;
     };
 
@@ -71,13 +70,13 @@ int main() {
         icmp->checksum = 0;
         ip.tot_len = htons(static_cast<uint16_t>(ip.ihl * 4 + seg_len));
         ip.check = 0;
-        ip.check = htons(af_packet_io::ip_checksum(reinterpret_cast<const uint8_t*>(&ip), ip.ihl * 4));
-        uint16_t orig = af_packet_io::l4_checksum(&ip, seg.data(), seg.size(), IPPROTO_ICMP);
+        ip.check = htons(checksum::ip_checksum(reinterpret_cast<const uint8_t*>(&ip), ip.ihl * 4));
+        uint16_t orig = checksum::l4_checksum(&ip, seg.data(), seg.size(), IPPROTO_ICMP);
         icmp->checksum = htons(orig);
 
         uint16_t checksum_host = ntohs(icmp->checksum);
         uint16_t partial = 0;
-        if (!nat::detail::checksum_block_decrement(partial, checksum_host, true,
+        if (!checksum::checksum_block_decrement(partial, checksum_host, true,
                                                    reinterpret_cast<const uint8_t*>(&icmp->un),
                                                    sizeof(icmp->un))) {
             return false;
@@ -86,7 +85,7 @@ int main() {
         uint16_t new_id = port_dist(rng);
         icmp->un.echo.id = htons(new_id);
 
-        if (!nat::detail::checksum_block_increment(checksum_host, partial, true,
+        if (!checksum::checksum_block_increment(checksum_host, partial, true,
                                                    reinterpret_cast<const uint8_t*>(&icmp->un),
                                                    sizeof(icmp->un))) {
             return false;
@@ -94,7 +93,7 @@ int main() {
 
         uint16_t final_checksum = checksum_host;
         icmp->checksum = 0;
-        uint16_t recomputed = af_packet_io::l4_checksum(&ip, seg.data(), seg.size(), IPPROTO_ICMP);
+        uint16_t recomputed = checksum::l4_checksum(&ip, seg.data(), seg.size(), IPPROTO_ICMP);
         return final_checksum == recomputed;
     };
 
@@ -153,15 +152,15 @@ int main() {
 
         outer_ip.tot_len = htons(static_cast<uint16_t>(outer_ip.ihl * 4 + payload.size()));
         outer_ip.check = 0;
-        outer_ip.check = htons(af_packet_io::ip_checksum(reinterpret_cast<const uint8_t*>(&outer_ip),
+        outer_ip.check = htons(checksum::ip_checksum(reinterpret_cast<const uint8_t*>(&outer_ip),
                                                          outer_ip.ihl * 4));
 
-        uint16_t orig = af_packet_io::l4_checksum(&outer_ip, payload.data(), payload.size(), IPPROTO_ICMP);
+        uint16_t orig = checksum::l4_checksum(&outer_ip, payload.data(), payload.size(), IPPROTO_ICMP);
         outer_icmp->checksum = htons(orig);
 
         uint16_t checksum_host = ntohs(outer_icmp->checksum);
         uint16_t partial = 0;
-        if (!nat::detail::checksum_block_decrement(partial, checksum_host, true,
+        if (!checksum::checksum_block_decrement(partial, checksum_host, true,
                                                    payload.data() + sizeof(icmphdr), inner_block_len)) {
             return false;
         }
@@ -173,14 +172,14 @@ int main() {
         inner_icmp->un.echo.id = htons(new_inner_id);
         inner_icmp->un.echo.sequence = htons(new_inner_seq);
 
-        if (!nat::detail::checksum_block_increment(checksum_host, partial, true,
+        if (!checksum::checksum_block_increment(checksum_host, partial, true,
                                                    payload.data() + sizeof(icmphdr), inner_block_len)) {
             return false;
         }
 
         uint16_t final_checksum = checksum_host;
         outer_icmp->checksum = 0;
-        uint16_t recomputed = af_packet_io::l4_checksum(&outer_ip, payload.data(), payload.size(), IPPROTO_ICMP);
+        uint16_t recomputed = checksum::l4_checksum(&outer_ip, payload.data(), payload.size(), IPPROTO_ICMP);
         return final_checksum == recomputed;
     };
 
@@ -212,7 +211,7 @@ int main() {
         tcp->check = 0;
         ip.tot_len = htons(static_cast<uint16_t>(ip.ihl * 4 + seg_len));
         uint16_t seg_len_u16 = static_cast<uint16_t>(seg.size());
-        uint16_t orig = af_packet_io::l4_checksum(&ip, seg.data(), seg.size(), IPPROTO_TCP);
+        uint16_t orig = checksum::l4_checksum(&ip, seg.data(), seg.size(), IPPROTO_TCP);
         struct {
             uint32_t saddr;
             uint32_t daddr;
@@ -228,19 +227,19 @@ int main() {
         std::vector<uint8_t> buffer(sizeof(pseudo) + seg.size());
         std::memcpy(buffer.data(), &pseudo, sizeof(pseudo));
         std::memcpy(buffer.data() + sizeof(pseudo), seg.data(), seg.size());
-        uint16_t manual = af_packet_io::ip_checksum(buffer.data(), buffer.size());
+        uint16_t manual = checksum::ip_checksum(buffer.data(), buffer.size());
         if (manual != orig) {
             std::cerr << "TCP pseudo checksum mismatch" << std::endl;
             return false;
         }
         tcp->check = htons(orig);
         uint16_t new_src_port = port_dist(rng);
-        uint16_t checksum = nat::detail::adjust_checksum16(tcp->check, ntohs(tcp->source), new_src_port);
+        uint16_t checksum = checksum::adjust_checksum16(tcp->check, ntohs(tcp->source), new_src_port);
         tcp->source = htons(new_src_port);
         uint16_t final_checksum = ntohs(checksum);
         uint16_t saved = tcp->check;
         tcp->check = 0;
-        uint16_t recomputed = af_packet_io::l4_checksum(&ip, seg.data(), seg.size(), IPPROTO_TCP);
+        uint16_t recomputed = checksum::l4_checksum(&ip, seg.data(), seg.size(), IPPROTO_TCP);
         tcp->check = saved;
         return final_checksum == recomputed;
     };
@@ -272,7 +271,7 @@ int main() {
         udp->check = 0;
         ip.tot_len = htons(static_cast<uint16_t>(ip.ihl * 4 + seg_len));
         uint16_t seg_len_u16 = static_cast<uint16_t>(seg.size());
-        uint16_t orig = af_packet_io::l4_checksum(&ip, seg.data(), seg.size(), IPPROTO_UDP);
+        uint16_t orig = checksum::l4_checksum(&ip, seg.data(), seg.size(), IPPROTO_UDP);
         struct {
             uint32_t saddr;
             uint32_t daddr;
@@ -288,7 +287,7 @@ int main() {
         std::vector<uint8_t> buffer(sizeof(pseudo) + seg.size());
         std::memcpy(buffer.data(), &pseudo, sizeof(pseudo));
         std::memcpy(buffer.data() + sizeof(pseudo), seg.data(), seg.size());
-        uint16_t manual = af_packet_io::ip_checksum(buffer.data(), buffer.size());
+        uint16_t manual = checksum::ip_checksum(buffer.data(), buffer.size());
         if (manual != orig) {
             std::cerr << "UDP pseudo checksum mismatch" << std::endl;
             return false;
@@ -296,12 +295,12 @@ int main() {
         udp->check = htons(orig);
         if (orig == 0) return true;
         uint16_t new_src_port = port_dist(rng);
-        uint16_t checksum = nat::detail::adjust_checksum16(udp->check, ntohs(udp->source), new_src_port);
+        uint16_t checksum = checksum::adjust_checksum16(udp->check, ntohs(udp->source), new_src_port);
         udp->source = htons(new_src_port);
         uint16_t final_checksum = ntohs(checksum);
         uint16_t saved = udp->check;
         udp->check = 0;
-        uint16_t recomputed = af_packet_io::l4_checksum(&ip, seg.data(), seg.size(), IPPROTO_UDP);
+        uint16_t recomputed = checksum::l4_checksum(&ip, seg.data(), seg.size(), IPPROTO_UDP);
         udp->check = saved;
         return final_checksum == recomputed;
     };

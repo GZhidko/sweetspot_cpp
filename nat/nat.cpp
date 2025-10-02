@@ -1,7 +1,6 @@
 #include "nat.h"
 
 #include "logger.h"
-#include "checksum_utils.hpp"
 #include "../include/ipv4.h"
 #include <arpa/inet.h>
 #include <netinet/in.h>

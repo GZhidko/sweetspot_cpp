@@ -2,7 +2,7 @@
 
 #include "logger.h"
 #include "tcp.h"
-#include "../af_packet_io/checksum_utils.h"
+#include "checksum.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -41,14 +41,15 @@ bool Committer<TCPHeader>::operator()(const TCPHeader* hdr, uint8_t* data, size_
         return false;
     }
     tcp_data->check = 0;
-    uint16_t checksum = af_packet_io::l4_checksum(&ip_hdr->iph,
-                                                  reinterpret_cast<const uint8_t*>(tcp_data),
-                                                  tcp_length,
-                                                  IPPROTO_TCP);
+    uint16_t checksum = checksum::l4_checksum(&ip_hdr->iph,
+                                              reinterpret_cast<const uint8_t*>(tcp_data),
+                                              tcp_length,
+                                              IPPROTO_TCP);
     tcp_data->check = htons(checksum);
 #else
     (void)ip_hdr;
     (void)len;
+    tcp_data->check = hdr->tcph.check;
 #endif
     return true;
 }

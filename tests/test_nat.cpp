@@ -9,7 +9,7 @@
 #include "ipv4.h"
 #include "tcp.h"
 #include "udp.h"
-#include "nat/checksum_utils.hpp"
+#include "checksum.hpp"
 #include "nat.h"
 #include "nat_config.hpp"
 
@@ -34,7 +34,7 @@ void setup_ipv4(IPv4Header& ip, uint32_t src_host, uint32_t dst_host, uint8_t pr
     ip.iph.tot_len = htons(static_cast<uint16_t>(sizeof(iphdr) + payload_len));
     ip.iph.saddr = htonl(src_host);
     ip.iph.daddr = htonl(dst_host);
-    ip.iph.check = nat::detail::recompute_ipv4_checksum(ip.iph);
+    ip.iph.check = checksum::recompute_ipv4_checksum(ip.iph);
 }
 
 void setup_tcp(TCPHeader& tcp, IPv4Header& ip, uint16_t src_port, uint16_t dst_port,
@@ -103,13 +103,13 @@ void test_tcp_translation(const NatConfig& cfg) {
     assert(pub_ip != prv_ip);
     assert(pub_port != 12345);
 
-    uint16_t expected_ip_check = nat::detail::adjust_checksum32(ip_check_before, prv_ip, pub_ip);
+    uint16_t expected_ip_check = checksum::adjust_checksum32(ip_check_before, prv_ip, pub_ip);
     assert(ip.iph.check == expected_ip_check);
 
     uint16_t expected_tcp_check =
-        nat::detail::adjust_checksum32(tcp_check_before, prv_ip, pub_ip);
+        checksum::adjust_checksum32(tcp_check_before, prv_ip, pub_ip);
     expected_tcp_check =
-        nat::detail::adjust_checksum16(expected_tcp_check, static_cast<uint16_t>(12345),
+        checksum::adjust_checksum16(expected_tcp_check, static_cast<uint16_t>(12345),
                                        pub_port);
     assert(tcp.tcph.check == expected_tcp_check);
 
@@ -128,14 +128,14 @@ void test_tcp_translation(const NatConfig& cfg) {
     assert(ntohs(reply_tcp.tcph.dest) == 12345);
 
     uint16_t reply_ip_expected =
-        nat::detail::adjust_checksum32(reply_ip_before, pub_ip, prv_ip);
+        checksum::adjust_checksum32(reply_ip_before, pub_ip, prv_ip);
     assert(reply_ip.iph.check == reply_ip_expected);
 
     if (reply_tcp.tcph.check != 0) {
         uint16_t reply_tcp_expected =
-            nat::detail::adjust_checksum32(reply_tcp_before, pub_ip, prv_ip);
+            checksum::adjust_checksum32(reply_tcp_before, pub_ip, prv_ip);
         reply_tcp_expected =
-            nat::detail::adjust_checksum16(reply_tcp_expected, pub_port, static_cast<uint16_t>(12345));
+            checksum::adjust_checksum16(reply_tcp_expected, pub_port, static_cast<uint16_t>(12345));
         assert(reply_tcp.tcph.check == reply_tcp_expected);
     }
 }
@@ -161,14 +161,14 @@ void test_udp_translation(const NatConfig& cfg) {
     assert(pub_ip != prv_ip);
     assert(pub_port != 40000);
 
-    uint16_t expected_ip_check = nat::detail::adjust_checksum32(ip_check_before, prv_ip, pub_ip);
+    uint16_t expected_ip_check = checksum::adjust_checksum32(ip_check_before, prv_ip, pub_ip);
     assert(ip.iph.check == expected_ip_check);
 
     if (udp.udph.check != 0) {
         uint16_t expected_udp_check =
-            nat::detail::adjust_checksum32(udp_check_before, prv_ip, pub_ip);
+            checksum::adjust_checksum32(udp_check_before, prv_ip, pub_ip);
         expected_udp_check =
-            nat::detail::adjust_checksum16(expected_udp_check, static_cast<uint16_t>(40000),
+            checksum::adjust_checksum16(expected_udp_check, static_cast<uint16_t>(40000),
                                            pub_port);
         assert(udp.udph.check == expected_udp_check || udp.udph.check == htons(0xFFFF));
     }
@@ -187,14 +187,14 @@ void test_udp_translation(const NatConfig& cfg) {
     assert(ntohs(reply_udp.udph.dest) == 40000);
 
     uint16_t reply_ip_expected =
-        nat::detail::adjust_checksum32(reply_ip_before, pub_ip, prv_ip);
+        checksum::adjust_checksum32(reply_ip_before, pub_ip, prv_ip);
     assert(reply_ip.iph.check == reply_ip_expected);
 
     if (reply_udp.udph.check != 0) {
         uint16_t reply_udp_expected =
-            nat::detail::adjust_checksum32(reply_udp_before, pub_ip, prv_ip);
+            checksum::adjust_checksum32(reply_udp_before, pub_ip, prv_ip);
         reply_udp_expected =
-            nat::detail::adjust_checksum16(reply_udp_expected, pub_port, static_cast<uint16_t>(40000));
+            checksum::adjust_checksum16(reply_udp_expected, pub_port, static_cast<uint16_t>(40000));
         assert(reply_udp.udph.check == reply_udp_expected || reply_udp.udph.check == htons(0xFFFF));
     }
 }
@@ -234,11 +234,11 @@ void test_icmp_translation(const NatConfig& cfg) {
     assert(pub_ip != prv_ip);
     assert(pub_id != 0x1000);
 
-    uint16_t expected_ip_check = nat::detail::adjust_checksum32(ip_check_before, prv_ip, pub_ip);
+    uint16_t expected_ip_check = checksum::adjust_checksum32(ip_check_before, prv_ip, pub_ip);
     assert(ip.iph.check == expected_ip_check);
 
     uint16_t expected_icmp_check =
-        nat::detail::adjust_checksum16(icmp_check_before, static_cast<uint16_t>(0x1000), pub_id);
+        checksum::adjust_checksum16(icmp_check_before, static_cast<uint16_t>(0x1000), pub_id);
     assert(icmp.icmph.checksum == expected_icmp_check);
 
     IPv4Header reply_ip{};
@@ -255,11 +255,11 @@ void test_icmp_translation(const NatConfig& cfg) {
     assert(ntohs(reply_icmp.icmph.un.echo.id) == 0x1000);
 
     uint16_t reply_ip_expected =
-        nat::detail::adjust_checksum32(reply_ip_before, pub_ip, prv_ip);
+        checksum::adjust_checksum32(reply_ip_before, pub_ip, prv_ip);
     assert(reply_ip.iph.check == reply_ip_expected);
 
     uint16_t reply_icmp_expected =
-        nat::detail::adjust_checksum16(reply_icmp_before, pub_id, static_cast<uint16_t>(0x1000));
+        checksum::adjust_checksum16(reply_icmp_before, pub_id, static_cast<uint16_t>(0x1000));
     assert(reply_icmp.icmph.checksum == reply_icmp_expected);
 }
 

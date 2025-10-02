@@ -1,6 +1,6 @@
 #include "nat.h"
 
-#include "checksum_utils.hpp"
+#include "checksum.hpp"
 #include "../include/icmp.h"
 #include "../include/ipv4.h"
 
@@ -10,11 +10,11 @@
 namespace {
 
 auto checksum_after_ip_change(uint16_t checksum_net, uint32_t old_ip, uint32_t new_ip) {
-    return nat::detail::adjust_checksum32(checksum_net, old_ip, new_ip);
+    return checksum::adjust_checksum32(checksum_net, old_ip, new_ip);
 }
 
 auto checksum_after_id_change(uint16_t checksum_net, uint16_t old_id, uint16_t new_id) {
-    return nat::detail::adjust_checksum16(checksum_net, old_id, new_id);
+    return checksum::adjust_checksum16(checksum_net, old_id, new_id);
 }
 
 bool supports_id_translation(const icmphdr& hdr) {

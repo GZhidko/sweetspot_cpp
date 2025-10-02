@@ -1,6 +1,6 @@
 #include "nat.h"
 
-#include "checksum_utils.hpp"
+#include "checksum.hpp"
 #include "../include/ipv4.h"
 
 #include <arpa/inet.h>
@@ -38,7 +38,7 @@ void Nat::process(IPv4Header& ip, Clock::time_point) {
         if (new_ip != src_ip) {
             LOG(DEBUG_NAT, "IPv4 outbound translating src ", to_string_host(src_ip), " -> ",
                 to_string_host(new_ip));
-            uint16_t checksum = nat::detail::adjust_checksum32(ip.iph.check, src_ip, new_ip);
+            uint16_t checksum = checksum::adjust_checksum32(ip.iph.check, src_ip, new_ip);
             ip.iph.saddr = htonl(new_ip);
             ip.iph.check = checksum;
         }
@@ -49,7 +49,7 @@ void Nat::process(IPv4Header& ip, Clock::time_point) {
             if (new_ip != dst_ip) {
                 LOG(DEBUG_NAT, "IPv4 inbound translating dst ", to_string_host(dst_ip), " -> ",
                     to_string_host(new_ip));
-                uint16_t checksum = nat::detail::adjust_checksum32(ip.iph.check, dst_ip, new_ip);
+                uint16_t checksum = checksum::adjust_checksum32(ip.iph.check, dst_ip, new_ip);
                 ip.iph.daddr = htonl(new_ip);
                 ip.iph.check = checksum;
             }

@@ -1,7 +1,6 @@
 #include "nat.h"
 
-#include "checksum_utils.hpp"
-#include "../af_packet_io/checksum_utils.h"
+#include "checksum.hpp"
 #include "../include/tcp.h"
 #include "../include/ipv4.h"
 
@@ -12,7 +11,7 @@
 namespace {
 
 auto checksum_after_ip_change(uint16_t checksum_net, uint32_t old_ip, uint32_t new_ip) {
-    return nat::detail::adjust_checksum32(checksum_net, old_ip, new_ip);
+    return checksum::adjust_checksum32(checksum_net, old_ip, new_ip);
 }
 
 std::string to_string_host(uint32_t host_ip) {
@@ -121,21 +120,21 @@ void Nat::process(TCPHeader& tcp, Clock::time_point) {
         std::memcpy(old_ports.data(), &old_src_port_net, sizeof(uint16_t));
         std::memcpy(old_ports.data() + sizeof(uint16_t), &old_dst_port_net, sizeof(uint16_t));
 
-        if (!nat::detail::checksum_block_decrement(partial, checksum_host, true,
+        if (!checksum::checksum_block_decrement(partial, checksum_host, true,
                                                    old_ports.data(), old_ports.size())) {
             goto recompute_tcp_full;
         }
         checksum_host = partial;
 
         auto old_pseudo = make_tcp_pseudo(old_src_ip_net, old_dst_ip_net, tcp_len_net);
-        if (!nat::detail::checksum_block_decrement(partial, checksum_host, false,
+        if (!checksum::checksum_block_decrement(partial, checksum_host, false,
                                                    old_pseudo.data(), old_pseudo.size())) {
             goto recompute_tcp_full;
         }
         checksum_host = partial;
 
         auto new_pseudo = make_tcp_pseudo(ip.iph.saddr, ip.iph.daddr, tcp_len_net);
-        if (!nat::detail::checksum_block_increment(checksum_host, checksum_host, false,
+        if (!checksum::checksum_block_increment(checksum_host, checksum_host, false,
                                                    new_pseudo.data(), new_pseudo.size())) {
             goto recompute_tcp_full;
         }
@@ -144,7 +143,7 @@ void Nat::process(TCPHeader& tcp, Clock::time_point) {
         std::array<uint8_t, 2 * sizeof(uint16_t)> new_ports{};
         std::memcpy(new_ports.data(), &tcp.tcph.source, sizeof(uint16_t));
         std::memcpy(new_ports.data() + sizeof(uint16_t), &tcp.tcph.dest, sizeof(uint16_t));
-        if (!nat::detail::checksum_block_increment(checksum_host, partial, true,
+        if (!checksum::checksum_block_increment(checksum_host, partial, true,
                                                    new_ports.data(), new_ports.size())) {
             goto recompute_tcp_full;
         }
@@ -157,10 +156,10 @@ void Nat::process(TCPHeader& tcp, Clock::time_point) {
 recompute_tcp_full:
     if (tcp_len >= sizeof(tcphdr)) {
         tcp.tcph.check = 0;
-        uint16_t full = af_packet_io::l4_checksum(&ip.iph,
-                                                  reinterpret_cast<const uint8_t*>(&tcp.tcph),
-                                                  tcp_len,
-                                                  IPPROTO_TCP);
+        uint16_t full = checksum::l4_checksum(&ip.iph,
+                                              reinterpret_cast<const uint8_t*>(&tcp.tcph),
+                                              tcp_len,
+                                              IPPROTO_TCP);
         tcp.tcph.check = htons(full);
     } else {
         tcp.tcph.check = 0;

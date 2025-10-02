@@ -20,14 +20,15 @@ file(GLOB SRC
 
 add_executable(PacketProcessor ${SRC})
 target_include_directories(PacketProcessor PRIVATE
-    include
-    committer
-    common
-    parsers
-    filters
-    nat
-    chain
-    af_packet_io
+     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/committer
+    ${CMAKE_SOURCE_DIR}/common
+    ${CMAKE_SOURCE_DIR}/parsers
+    ${CMAKE_SOURCE_DIR}/filters
+    ${CMAKE_SOURCE_DIR}/nat
+    ${CMAKE_SOURCE_DIR}/chain
+    ${CMAKE_SOURCE_DIR}/af_packet_io
+   
 )
 
 
@@ -88,7 +89,7 @@ add_test(NAME FanoutTest COMMAND test_fanout)
 
 add_executable(test_checksum
     tests/test_checksum.cpp
-    af_packet_io/checksum_utils.cpp
+    common/checksum.cpp
 )
 target_include_directories(test_checksum PRIVATE
     ${CMAKE_SOURCE_DIR}/af_packet_io
