@@ -38,10 +38,9 @@ void Nat::process(IPv4Header& ip, Clock::time_point) {
         if (new_ip != src_ip) {
             LOG(DEBUG_NAT, "IPv4 outbound translating src ", to_string_host(src_ip), " -> ",
                 to_string_host(new_ip));
-            uint16_t checksum = ntohs(ip.iph.check);
-            checksum = nat::detail::adjust_checksum32(checksum, src_ip, new_ip);
+            uint16_t checksum = nat::detail::adjust_checksum32(ip.iph.check, src_ip, new_ip);
             ip.iph.saddr = htonl(new_ip);
-            ip.iph.check = htons(checksum);
+            ip.iph.check = checksum;
         }
     } else if (is_public(dst_ip)) {
         auto tr = find_ip_reply(dst_ip, src_ip, proto);
@@ -50,10 +49,9 @@ void Nat::process(IPv4Header& ip, Clock::time_point) {
             if (new_ip != dst_ip) {
                 LOG(DEBUG_NAT, "IPv4 inbound translating dst ", to_string_host(dst_ip), " -> ",
                     to_string_host(new_ip));
-                uint16_t checksum = ntohs(ip.iph.check);
-                checksum = nat::detail::adjust_checksum32(checksum, dst_ip, new_ip);
+                uint16_t checksum = nat::detail::adjust_checksum32(ip.iph.check, dst_ip, new_ip);
                 ip.iph.daddr = htonl(new_ip);
-                ip.iph.check = htons(checksum);
+                ip.iph.check = checksum;
             }
         }
     }

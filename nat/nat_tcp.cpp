@@ -9,15 +9,11 @@
 namespace {
 
 auto checksum_after_ip_change(uint16_t checksum_net, uint32_t old_ip, uint32_t new_ip) {
-    uint16_t host = ntohs(checksum_net);
-    host = nat::detail::adjust_checksum32(host, old_ip, new_ip);
-    return htons(host);
+    return nat::detail::adjust_checksum32(checksum_net, old_ip, new_ip);
 }
 
 auto checksum_after_port_change(uint16_t checksum_net, uint16_t old_port, uint16_t new_port) {
-    uint16_t host = ntohs(checksum_net);
-    host = nat::detail::adjust_checksum16(host, old_port, new_port);
-    return htons(host);
+    return nat::detail::adjust_checksum16(checksum_net, old_port, new_port);
 }
 
 std::string to_string_host(uint32_t host_ip) {

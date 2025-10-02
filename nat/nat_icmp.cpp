@@ -10,15 +10,11 @@
 namespace {
 
 auto checksum_after_ip_change(uint16_t checksum_net, uint32_t old_ip, uint32_t new_ip) {
-    uint16_t host = ntohs(checksum_net);
-    host = nat::detail::adjust_checksum32(host, old_ip, new_ip);
-    return htons(host);
+    return nat::detail::adjust_checksum32(checksum_net, old_ip, new_ip);
 }
 
 auto checksum_after_id_change(uint16_t checksum_net, uint16_t old_id, uint16_t new_id) {
-    uint16_t host = ntohs(checksum_net);
-    host = nat::detail::adjust_checksum16(host, old_id, new_id);
-    return htons(host);
+    return nat::detail::adjust_checksum16(checksum_net, old_id, new_id);
 }
 
 bool supports_id_translation(const icmphdr& hdr) {
@@ -69,10 +65,6 @@ void Nat::process(ICMPHeader& icmp, Clock::time_point) {
             icmp.icmph.un.echo.id = htons(new_id);
             icmp.icmph.checksum = checksum_after_id_change(icmp.icmph.checksum, ident, new_id);
         }
-
-        if (new_ip != src_ip) {
-            icmp.icmph.checksum = checksum_after_ip_change(icmp.icmph.checksum, src_ip, new_ip);
-        }
     } else if (is_public(dst_ip)) {
         auto tr = find_icmp_reply(dst_ip, src_ip, ident, seq);
         if (!tr) {
@@ -97,10 +89,6 @@ void Nat::process(ICMPHeader& icmp, Clock::time_point) {
             icmp.icmph.un.echo.id = htons(new_id);
             icmp.icmph.checksum = checksum_after_id_change(icmp.icmph.checksum, old_id, new_id);
             LOG(DEBUG_NAT, "ICMP id translate ", old_id, " -> ", new_id);
-        }
-
-        if (new_ip != dst_ip) {
-            icmp.icmph.checksum = checksum_after_ip_change(icmp.icmph.checksum, dst_ip, new_ip);
         }
     }
 }

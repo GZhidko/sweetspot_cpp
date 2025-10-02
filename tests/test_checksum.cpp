@@ -65,9 +65,8 @@ int main() {
         icmp->type = ICMP_ECHO;
         icmp->code = 0;
         uint16_t old_id = port_dist(rng);
-        uint16_t old_seq = port_dist(rng);
         icmp->un.echo.id = htons(old_id);
-        icmp->un.echo.sequence = htons(old_seq);
+        icmp->un.echo.sequence = htons(port_dist(rng));
         icmp->checksum = 0;
         ip.tot_len = htons(static_cast<uint16_t>(ip.ihl * 4 + seg_len));
         ip.check = 0;
@@ -84,9 +83,7 @@ int main() {
         }
 
         uint16_t new_id = port_dist(rng);
-        uint16_t new_seq = port_dist(rng);
         icmp->un.echo.id = htons(new_id);
-        icmp->un.echo.sequence = htons(new_seq);
 
         if (!nat::detail::checksum_block_increment(checksum_host, partial, true,
                                                    reinterpret_cast<const uint8_t*>(&icmp->un),
