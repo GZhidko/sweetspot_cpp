@@ -13,6 +13,7 @@
 
 template<typename Chain>
 bool apply_filters(const Chain& chain) {
+    filters::ScopedPacket scope(filters::Direction::Outbound);
     bool ok = true;
     chain.for_each([&](auto& hdr) {
         if (!Filter<std::decay_t<decltype(hdr)>>{}(hdr)) ok = false;

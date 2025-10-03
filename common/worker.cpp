@@ -153,7 +153,11 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
     LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": received frame len=", len,
         " net_offset=", net_offset);
 
-    
+    filters::Direction dir = (origin == FramePayload::Origin::Public)
+                                 ? filters::Direction::Inbound
+                                 : filters::Direction::Outbound;
+    filters::ScopedPacket packet_scope(dir);
+
     Chain chain_;
     if (!chain_.parse(l3_data, l3_len)) {
         LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": parse failed");

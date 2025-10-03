@@ -125,3 +125,31 @@ target_include_directories(test_nat PRIVATE
 target_link_libraries(test_nat PRIVATE Threads::Threads)
 
 add_test(NAME NatTest COMMAND test_nat)
+
+file(GLOB TEST_FILTERS_SRC
+    tests/test_filters.cpp
+    committer/*.cpp
+    parsers/*.cpp
+    filters/*.cpp
+    nat/*.cpp
+    common/*.cpp
+    af_packet_io/*.cpp
+)
+
+add_executable(test_filters ${TEST_FILTERS_SRC})
+
+target_include_directories(test_filters PRIVATE
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/committer
+    ${CMAKE_SOURCE_DIR}/common
+    ${CMAKE_SOURCE_DIR}/parsers
+    ${CMAKE_SOURCE_DIR}/filters
+    ${CMAKE_SOURCE_DIR}/nat
+    ${CMAKE_SOURCE_DIR}/chain
+    ${CMAKE_SOURCE_DIR}/af_packet_io
+)
+
+target_link_libraries(test_filters PRIVATE Threads::Threads)
+
+add_test(NAME FiltersTest COMMAND test_filters)
