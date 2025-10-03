@@ -273,6 +273,12 @@ std::optional<Nat::Translation> Nat::maybe_static_translation(uint32_t prv_ip, u
     return Translation{flow, pub, thread_index_};
 }
 
+std::optional<Nat::Translation> Nat::find_static_outbound(uint32_t prv_ip, uint32_t dst_ip,
+                                                          uint16_t src_port, uint16_t dst_port,
+                                                          uint8_t protocol) const {
+    return maybe_static_translation(prv_ip, dst_ip, src_port, dst_port, protocol);
+}
+
 std::optional<Nat::Translation> Nat::maybe_static_inbound(uint32_t pub_ip, uint32_t remote_ip,
                                                           uint16_t pub_port, uint16_t remote_port,
                                                           uint8_t protocol) const {
