@@ -107,7 +107,11 @@ class Nat : public EndpointBase {
     std::optional<Translation> find_icmp_reply(uint32_t pub_ip, uint32_t remote_ip,
                                                uint16_t pub_id, uint16_t remote_seq);
     std::optional<Translation> lookup_tcp_outbound(uint32_t prv_ip, uint32_t dst_ip,
-                                                   uint16_t src_port, uint16_t dst_port) const;
+                                                   uint16_t src_port, uint16_t dst_port);
+    std::optional<Translation> lookup_udp_outbound(uint32_t prv_ip, uint32_t dst_ip,
+                                                   uint16_t src_port, uint16_t dst_port);
+    std::optional<Translation> lookup_icmp_outbound(uint32_t prv_ip, uint32_t dst_ip,
+                                                    uint16_t ident, uint16_t seq);
     std::optional<Translation> find_static_outbound(uint32_t prv_ip, uint32_t dst_ip,
                                                     uint16_t src_port, uint16_t dst_port,
                                                     uint8_t protocol) const;

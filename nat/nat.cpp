@@ -251,6 +251,45 @@ std::optional<Nat::Translation> Nat::find_icmp_reply(uint32_t pub_ip, uint32_t r
     return find_inbound(icmp_table_, key);
 }
 
+std::optional<Nat::Translation> Nat::lookup_tcp_outbound(uint32_t prv_ip, uint32_t dst_ip,
+                                                         uint16_t src_port, uint16_t dst_port) {
+    FlowKey flow{prv_ip, dst_ip, src_port, dst_port, static_cast<uint8_t>(IPPROTO_TCP)};
+    auto it = tcp_table_.forward.find(flow);
+    if (it == tcp_table_.forward.end()) {
+        return std::nullopt;
+    }
+    touch_entry(tcp_table_, it->second);
+    return make_translation(it->second);
+}
+
+std::optional<Nat::Translation> Nat::lookup_udp_outbound(uint32_t prv_ip, uint32_t dst_ip,
+                                                         uint16_t src_port, uint16_t dst_port) {
+    FlowKey flow{prv_ip, dst_ip, src_port, dst_port, static_cast<uint8_t>(IPPROTO_UDP)};
+    auto it = udp_table_.forward.find(flow);
+    if (it == udp_table_.forward.end()) {
+        return std::nullopt;
+    }
+    touch_entry(udp_table_, it->second);
+    return make_translation(it->second);
+}
+
+std::optional<Nat::Translation> Nat::lookup_icmp_outbound(uint32_t prv_ip, uint32_t dst_ip,
+                                                          uint16_t ident, uint16_t seq) {
+    FlowKey flow{prv_ip, dst_ip, ident, seq, static_cast<uint8_t>(IPPROTO_ICMP)};
+    auto it = icmp_table_.forward.find(flow);
+    if (it == icmp_table_.forward.end()) {
+        return std::nullopt;
+    }
+    touch_entry(icmp_table_, it->second);
+    return make_translation(it->second);
+}
+
+std::optional<Nat::Translation> Nat::find_static_outbound(uint32_t prv_ip, uint32_t dst_ip,
+                                                          uint16_t src_port, uint16_t dst_port,
+                                                          uint8_t protocol) const {
+    return maybe_static_translation(prv_ip, dst_ip, src_port, dst_port, protocol);
+}
+
 std::optional<Nat::Translation> Nat::maybe_static_translation(uint32_t prv_ip, uint32_t dst_ip,
                                                               uint16_t src_port, uint16_t dst_port,
                                                               uint8_t protocol) const {
@@ -271,12 +310,6 @@ std::optional<Nat::Translation> Nat::maybe_static_translation(uint32_t prv_ip, u
         " prv=", ip_to_string(prv_ip), ":", src_port, " -> pub=",
         ip_to_string(pub_key.pub_ip), ":", pub_key.pub_port);
     return Translation{flow, pub, thread_index_};
-}
-
-std::optional<Nat::Translation> Nat::find_static_outbound(uint32_t prv_ip, uint32_t dst_ip,
-                                                          uint16_t src_port, uint16_t dst_port,
-                                                          uint8_t protocol) const {
-    return maybe_static_translation(prv_ip, dst_ip, src_port, dst_port, protocol);
 }
 
 std::optional<Nat::Translation> Nat::maybe_static_inbound(uint32_t pub_ip, uint32_t remote_ip,

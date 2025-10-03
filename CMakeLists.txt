@@ -97,3 +97,31 @@ target_include_directories(test_checksum PRIVATE
     ${CMAKE_SOURCE_DIR}/common
 )
 add_test(NAME ChecksumTest COMMAND test_checksum)
+
+
+file(GLOB TEST_NAT_SRC
+    tests/test_nat.cpp
+    committer/*.cpp
+    parsers/*.cpp
+    filters/*.cpp
+    nat/*.cpp
+    common/*.cpp
+    af_packet_io/*.cpp
+)
+
+add_executable(test_nat ${TEST_NAT_SRC})
+target_include_directories(test_nat PRIVATE
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/committer
+    ${CMAKE_SOURCE_DIR}/common
+    ${CMAKE_SOURCE_DIR}/parsers
+    ${CMAKE_SOURCE_DIR}/filters
+    ${CMAKE_SOURCE_DIR}/nat
+    ${CMAKE_SOURCE_DIR}/chain
+    ${CMAKE_SOURCE_DIR}/af_packet_io
+)
+
+target_link_libraries(test_nat PRIVATE Threads::Threads)
+
+add_test(NAME NatTest COMMAND test_nat)

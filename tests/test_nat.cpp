@@ -3,6 +3,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <random>
+#include <tuple>
+#include <vector>
 
 #include "netset.hpp"
 #include "icmp.h"
@@ -12,6 +15,9 @@
 #include "checksum.hpp"
 #include "nat.h"
 #include "nat_config.hpp"
+#include "worker.hpp"
+#include "jenkins_hash.hpp"
+#include "logger.h"
 
 namespace {
 
@@ -80,6 +86,31 @@ NatConfig make_base_config() {
     cfg.udp_thread_capacity = 128;
     cfg.icmp_thread_capacity = 64;
     return cfg;
+}
+
+std::vector<uint8_t> make_tcp_frame(uint32_t src_ip, uint32_t dst_ip, uint16_t src_port,
+                                    uint16_t dst_port) {
+    std::vector<uint8_t> frame(sizeof(iphdr) + sizeof(tcphdr));
+    auto* ip = reinterpret_cast<iphdr*>(frame.data());
+    std::memset(ip, 0, sizeof(iphdr));
+    ip->version = 4;
+    ip->ihl = 5;
+    ip->ttl = 64;
+    ip->protocol = IPPROTO_TCP;
+    ip->saddr = htonl(src_ip);
+    ip->daddr = htonl(dst_ip);
+    ip->tot_len = htons(static_cast<uint16_t>(sizeof(iphdr) + sizeof(tcphdr)));
+
+    auto* tcp = reinterpret_cast<tcphdr*>(frame.data() + sizeof(iphdr));
+    std::memset(tcp, 0, sizeof(tcphdr));
+    tcp->source = htons(src_port);
+    tcp->dest = htons(dst_port);
+    tcp->doff = sizeof(tcphdr) / 4;
+
+    ip->check = checksum::ip_checksum(reinterpret_cast<const uint8_t*>(ip), sizeof(iphdr));
+    tcp->check = checksum::l4_checksum(ip, reinterpret_cast<const uint8_t*>(tcp), sizeof(tcphdr),
+                                       IPPROTO_TCP);
+    return frame;
 }
 
 void test_tcp_translation(const NatConfig& cfg) {
@@ -348,6 +379,173 @@ void test_static_tcp(const NatConfig& cfg) {
     assert(ntohs(reply_tcp.tcph.dest) == 12345);
 }
 
+
+void test_nat_fanout_consistency(const NatConfig& cfg) {
+    CPUFanoutHash::set_siphash_key(0, 0);
+    const uint32_t worker_count = 5;
+    Nat nat(cfg, 0, worker_count);
+    std::mt19937 rng(4242);
+    std::uniform_int_distribution<uint32_t> priv_oct(1, 250);
+    std::uniform_int_distribution<uint32_t> remote_oct(1, 250);
+    std::uniform_int_distribution<uint16_t> port_dist(1024, 60000);
+
+    for (int i = 0; i < 1000; ++i) {
+        bool use_tcp = (i % 2) == 0;
+        uint32_t src_ip = 0x0A000000u | priv_oct(rng);
+        uint32_t dst_ip = 0xCB007100u | remote_oct(rng);
+        uint16_t src_port = port_dist(rng);
+        uint16_t dst_port = static_cast<uint16_t>(2000 + (i % 4000));
+
+        uint8_t proto = use_tcp ? static_cast<uint8_t>(IPPROTO_TCP)
+                                : static_cast<uint8_t>(IPPROTO_UDP);
+        auto forward_tuple = std::make_tuple(src_ip, dst_ip, src_port, dst_port, proto);
+        uint32_t forward_cpu = CPUFanoutHash::select_cpu(
+            CPUFanoutHash::hash_tuple(forward_tuple), worker_count);
+
+        if (use_tcp) {
+            IPv4Header ip{};
+            setup_ipv4(ip, src_ip, dst_ip, IPPROTO_TCP, sizeof(tcphdr));
+            TCPHeader tcp{};
+            setup_tcp(tcp, ip, src_port, dst_port, 0);
+            tcp.tcph.check = 0;
+            tcp.tcph.check = htons(checksum::l4_checksum(
+                &ip.iph, reinterpret_cast<const uint8_t*>(&tcp.tcph), sizeof(tcphdr), IPPROTO_TCP));
+
+            nat.process(tcp);
+
+            uint32_t pub_ip = ntohl(ip.iph.saddr);
+            uint16_t pub_port = ntohs(tcp.tcph.source);
+            uint32_t inbound_cpu = CPUFanoutHash::select_cpu(
+                CPUFanoutHash::hash_tuple(std::make_tuple(dst_ip, pub_ip, dst_port, pub_port,
+                                                          static_cast<uint8_t>(IPPROTO_TCP))),
+                worker_count);
+            assert(forward_cpu == inbound_cpu);
+        } else {
+            IPv4Header ip{};
+            setup_ipv4(ip, src_ip, dst_ip, IPPROTO_UDP, sizeof(udphdr));
+            UDPHeader udp{};
+            setup_udp(udp, ip, src_port, dst_port, 0);
+            udp.udph.check = 0;
+            udp.udph.check = htons(checksum::l4_checksum(
+                &ip.iph, reinterpret_cast<const uint8_t*>(&udp.udph), sizeof(udphdr), IPPROTO_UDP));
+
+            nat.process(udp);
+
+            uint32_t pub_ip = ntohl(ip.iph.saddr);
+            uint16_t pub_port = ntohs(udp.udph.source);
+            uint32_t inbound_cpu = CPUFanoutHash::select_cpu(
+                CPUFanoutHash::hash_tuple(std::make_tuple(dst_ip, pub_ip, dst_port, pub_port,
+                                                          static_cast<uint8_t>(IPPROTO_UDP))),
+                worker_count);
+            assert(forward_cpu == inbound_cpu);
+        }
+    }
+}
+
+void test_worker_forwarding_dynamic(const NatConfig& cfg) {
+    CPUFanoutHash::set_siphash_key(0, 0);
+
+    WorkerPipelineConfig worker_cfg{};
+    worker_cfg.enable_io = false;
+    worker_cfg.thread_count = 2;
+    worker_cfg.thread_index = 0;
+    worker_cfg.nat = cfg;
+
+    Worker worker(worker_cfg);
+    std::vector<uint32_t> forwarded_targets;
+    worker.set_forward_callback([&](uint32_t target, Worker::FramePayload&& payload) {
+        forwarded_targets.push_back(target);
+    });
+
+    uint32_t src_ip = ip_from_string("10.0.0.50");
+    uint32_t dst_ip = ip_from_string("203.0.113.200");
+    uint16_t src_port = 4000;
+    uint16_t dst_port = 5201;
+
+    std::vector<uint8_t> frame;
+    uint32_t target = 0;
+    auto compute_target = [&](uint16_t sport, uint16_t dport) {
+        auto tuple = std::make_tuple(htonl(src_ip), htonl(dst_ip), htons(sport), htons(dport),
+                                     static_cast<uint8_t>(IPPROTO_TCP));
+        return CPUFanoutHash::select_cpu(CPUFanoutHash::hash_tuple(tuple), worker_cfg.thread_count);
+    };
+
+    for (int attempt = 0; attempt < 16; ++attempt) {
+        uint16_t candidate_port = static_cast<uint16_t>(src_port + attempt);
+        frame = make_tcp_frame(src_ip, dst_ip, candidate_port, dst_port);
+        target = compute_target(candidate_port, dst_port);
+        if (target != worker_cfg.thread_index) {
+            src_port = candidate_port;
+            break;
+        }
+    }
+
+    assert(target != worker_cfg.thread_index);
+    worker.process_frame_for_tests(frame);
+    assert(forwarded_targets.size() == 1);
+    assert(forwarded_targets[0] == target);
+}
+
+void test_worker_forwarding_static(const NatConfig& cfg) {
+    CPUFanoutHash::set_siphash_key(0, 0);
+
+    WorkerPipelineConfig worker_cfg{};
+    worker_cfg.enable_io = false;
+    worker_cfg.thread_count = 2;
+    worker_cfg.thread_index = 0;
+    worker_cfg.nat = cfg;
+
+    uint32_t prv_ip = ip_from_string("10.0.0.60");
+    uint32_t pub_ip = ip_from_string("198.51.100.250");
+    uint16_t prv_port = 6000;
+    uint16_t pub_port = 46000;
+    worker_cfg.static_tcp.emplace_back(prv_ip, prv_port, pub_ip, pub_port);
+
+    Worker worker(worker_cfg);
+    std::vector<uint32_t> forwarded_targets;
+    worker.set_forward_callback([&](uint32_t target, Worker::FramePayload&& payload) {
+        forwarded_targets.push_back(target);
+    });
+
+    uint32_t remote_ip = ip_from_string("203.0.113.210");
+    uint16_t remote_port = 5201;
+
+    std::vector<uint8_t> frame;
+    uint32_t target = 0;
+    auto compute_target = [&](uint16_t sport, uint16_t dport) {
+        auto tuple = std::make_tuple(htonl(prv_ip), htonl(remote_ip), htons(sport), htons(dport),
+                                     static_cast<uint8_t>(IPPROTO_TCP));
+        return CPUFanoutHash::select_cpu(CPUFanoutHash::hash_tuple(tuple), worker_cfg.thread_count);
+    };
+
+    for (int attempt = 0; attempt < 16; ++attempt) {
+        uint16_t candidate_dport = static_cast<uint16_t>(remote_port + attempt);
+        frame = make_tcp_frame(prv_ip, remote_ip, prv_port, candidate_dport);
+        target = compute_target(prv_port, candidate_dport);
+        if (target != worker_cfg.thread_index) {
+            remote_port = candidate_dport;
+            break;
+        }
+    }
+
+    assert(target != worker_cfg.thread_index);
+    worker.process_frame_for_tests(frame);
+    assert(forwarded_targets.size() == 1);
+    assert(forwarded_targets[0] == target);
+
+    forwarded_targets.clear();
+    auto inbound_tuple = std::make_tuple(htonl(remote_ip), htonl(pub_ip), htons(remote_port),
+                                         htons(pub_port), static_cast<uint8_t>(IPPROTO_TCP));
+    uint32_t inbound_target = CPUFanoutHash::select_cpu(CPUFanoutHash::hash_tuple(inbound_tuple),
+                                                        worker_cfg.thread_count);
+    assert(inbound_target != worker_cfg.thread_index);
+
+    auto inbound = make_tcp_frame(remote_ip, pub_ip, remote_port, pub_port);
+    worker.process_frame_for_tests(inbound, Worker::FramePayload::Origin::Public);
+    assert(forwarded_targets.size() == 1);
+    assert(forwarded_targets[0] == inbound_target);
+}
+
 void test_dynamic_ip_translation(const NatConfig& cfg) {
     Nat nat(cfg, 0, 4);
     uint32_t prv_ip = ip_from_string("10.0.0.40");
@@ -386,17 +584,31 @@ void test_static_ip(const NatConfig& cfg) {
 } // namespace
 
 int main() {
+    Logger::setFlags(0);
+    std::cout << "Logger flags reset" << std::endl;
+
     NatConfig cfg = make_base_config();
 
+    std::cout << "\n=== test_tcp_translation ===\n";
     test_tcp_translation(cfg);
+    std::cout << "\n=== test_udp_translation ===\n";
     test_udp_translation(cfg);
+    std::cout << "\n=== test_udp_zero_checksum_stays_zero ===\n";
     test_udp_zero_checksum_stays_zero(cfg);
+    std::cout << "\n=== test_icmp_translation ===\n";
     test_icmp_translation(cfg);
+    std::cout << "\n=== test_non_private_source_untouched ===\n";
     test_non_private_source_untouched(cfg);
+    std::cout << "\n=== test_capacity_eviction ===\n";
     test_capacity_eviction(cfg);
+    std::cout << "\n=== test_static_tcp ===\n";
     test_static_tcp(cfg);
-    test_dynamic_ip_translation(cfg);
-    test_static_ip(cfg);
+    std::cout << "\n=== test_nat_fanout_consistency ===\n";
+    test_nat_fanout_consistency(cfg);
+    std::cout << "\n=== test_worker_forwarding_dynamic ===\n";
+    test_worker_forwarding_dynamic(cfg);
+    std::cout << "\n=== test_worker_forwarding_static ===\n";
+    test_worker_forwarding_static(cfg);
 
     std::cout << "NAT tests passed" << std::endl;
     return 0;

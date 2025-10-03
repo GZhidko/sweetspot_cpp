@@ -9,6 +9,7 @@
 #include <chrono>
 #include <cstring>
 #include <optional>
+#include <optional>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <vector>
@@ -190,77 +191,35 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
     auto* icmp = chain_.template get<ICMPHeader>();
 
     if (forward_fn_) {
-        uint32_t local_ip = source_private ? src_ip : dst_ip;
-        uint32_t remote_ip = source_private ? dst_ip : src_ip;
-        uint16_t local_port = 0;
-        uint16_t remote_port = 0;
-        uint8_t tuple_proto = ip->iph.protocol;
+        uint16_t src_port_hash = 0;
+        uint16_t dst_port_hash = 0;
+        uint8_t proto_hash = ip->iph.protocol;
 
         if (tcp) {
-            tuple_proto = IPPROTO_TCP;
-            if (source_private) {
-                local_port = ntohs(tcp->tcph.source);
-                remote_port = ntohs(tcp->tcph.dest);
-            } else {
-                local_port = ntohs(tcp->tcph.dest);
-                remote_port = ntohs(tcp->tcph.source);
-            }
+            proto_hash = IPPROTO_TCP;
+            src_port_hash = ntohs(tcp->tcph.source);
+            dst_port_hash = ntohs(tcp->tcph.dest);
         } else if (udp) {
-            tuple_proto = IPPROTO_UDP;
-            if (source_private) {
-                local_port = ntohs(udp->udph.source);
-                remote_port = ntohs(udp->udph.dest);
-            } else {
-                local_port = ntohs(udp->udph.dest);
-                remote_port = ntohs(udp->udph.source);
-            }
+            proto_hash = IPPROTO_UDP;
+            src_port_hash = ntohs(udp->udph.source);
+            dst_port_hash = ntohs(udp->udph.dest);
         } else if (icmp) {
-            tuple_proto = IPPROTO_ICMP;
-            uint16_t id = ntohs(icmp->icmph.un.echo.id);
-            uint16_t seq = ntohs(icmp->icmph.un.echo.sequence);
-            local_port = id;
-            remote_port = seq;
+            proto_hash = IPPROTO_ICMP;
+            src_port_hash = ntohs(icmp->icmph.un.echo.id);
+            dst_port_hash = ntohs(icmp->icmph.un.echo.sequence);
         }
 
-        bool should_forward = false;
-
-        if (!source_private && dest_public) {
-            should_forward = true;
-        } else if (source_private) {
-            std::optional<Nat::Translation> static_outbound;
-            if (tcp) {
-                static_outbound = nat_.find_static_outbound(src_ip, dst_ip, local_port,
-                                                            remote_port, IPPROTO_TCP);
-            } else if (udp) {
-                static_outbound = nat_.find_static_outbound(src_ip, dst_ip, local_port,
-                                                            remote_port, IPPROTO_UDP);
-            } else if (icmp) {
-                static_outbound = nat_.find_static_outbound(src_ip, dst_ip, local_port,
-                                                            remote_port, IPPROTO_ICMP);
-            } else {
-                static_outbound = nat_.find_static_outbound(src_ip, dst_ip, 0, 0, tuple_proto);
-            }
-
-            if (static_outbound.has_value()) {
-                should_forward = true;
-                local_ip = static_outbound->pub.pub_ip;
-                local_port = static_outbound->pub.pub_port;
-            }
-        }
-
-        if (should_forward) {
-            auto tuple = std::make_tuple(htonl(local_ip), htonl(remote_ip), htons(local_port),
-                                         htons(remote_port), static_cast<uint8_t>(tuple_proto));
-            uint32_t target = CPUFanoutHash::select_cpu(CPUFanoutHash::hash_tuple(tuple),
-                                                        cfg_.thread_count);
-            if (target != cfg_.thread_index) {
-                FramePayload payload;
-                payload.origin = origin;
-                payload.buffer.assign(data, data + len);
-                payload.net_offset = net_offset;
-                forward_fn_(target, std::move(payload));
-                return;
-            }
+        auto tuple = std::make_tuple(htonl(src_ip), htonl(dst_ip), htons(src_port_hash),
+                                     htons(dst_port_hash), static_cast<uint8_t>(proto_hash));
+        uint32_t target = CPUFanoutHash::select_cpu(CPUFanoutHash::hash_tuple(tuple),
+                                                    cfg_.thread_count);
+        if (target != cfg_.thread_index) {
+            FramePayload payload;
+            payload.origin = origin;
+            payload.buffer.assign(data, data + len);
+            payload.net_offset = net_offset;
+            forward_fn_(target, std::move(payload));
+            return;
         }
     }
 
