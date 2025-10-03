@@ -177,7 +177,7 @@ class EndpointBase {
         uint32_t pub_ip = select_public_ip(forward_hash);
 
         auto builder = [&](uint16_t new_id) {
-            return std::make_tuple(htonl(pub_ip), htonl(dst_ip), htons(new_id),
+            return std::make_tuple(htonl(dst_ip), htonl(pub_ip), htons(new_id),
                                    htons(icmp_seq_val), static_cast<uint8_t>(1));
         };
         uint16_t new_id = choose_port_for_cpu(desired_cpu, rmin, rmax, forward_hash, builder);
