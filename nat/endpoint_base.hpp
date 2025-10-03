@@ -109,21 +109,30 @@ class EndpointBase {
     // Поиск порта/ID внутри диапазона, который даёт нужный CPU
     template <typename TupleBuilder>
     uint16_t choose_port_for_cpu(uint32_t desired_cpu, uint16_t rmin, uint16_t rmax,
-                                 TupleBuilder build_tuple) const {
-        uint32_t span = static_cast<uint32_t>(rmax - rmin + 1);
-        uint32_t slots = (span + cpu_count_ - 1) / cpu_count_; // ceil(span / cpu_count)
-
-        uint32_t h = CPUFanoutHash::hash_tuple(build_tuple(rmin));
-        uint32_t offset = (h / cpu_count_) % slots;
-
-        uint32_t candidate = static_cast<uint32_t>(rmin) + desired_cpu + offset * cpu_count_;
-        if (candidate > rmax) {
-            candidate = static_cast<uint32_t>(rmin) + (candidate - rmin) % span;
+                                 uint32_t hash_seed, TupleBuilder build_tuple) const {
+        const uint32_t span = static_cast<uint32_t>(rmax - rmin + 1);
+        if (span == 0) {
+            return rmin;
         }
-        LOG(DEBUG_NAT, "choose_port_for_cpu desired_cpu=", desired_cpu, " range=[", rmin, "-",
-            rmax, "] span=", span, " slots=", slots, " offset=", offset,
-            " candidate=", candidate);
-        return static_cast<uint16_t>(candidate);
+
+        const uint32_t start_offset = hash_seed % span;
+        for (uint32_t attempt = 0; attempt < span; ++attempt) {
+            const uint32_t offset = (start_offset + attempt) % span;
+            const uint16_t candidate = static_cast<uint16_t>(static_cast<uint32_t>(rmin) + offset);
+            const uint32_t cpu = pick_cpu(CPUFanoutHash::hash_tuple(build_tuple(candidate)));
+            if (cpu == desired_cpu) {
+                LOG(DEBUG_NAT, "choose_port_for_cpu desired_cpu=", desired_cpu,
+                    " range=[", rmin, "-", rmax, "] span=", span,
+                    " attempt=", attempt, " candidate=", candidate, " hit_cpu=", cpu);
+                return candidate;
+            }
+        }
+
+        const uint16_t fallback = static_cast<uint16_t>(static_cast<uint32_t>(rmin) + start_offset);
+        LOG(DEBUG_NAT, "choose_port_for_cpu fallback desired_cpu=", desired_cpu,
+            " range=[", rmin, "-", rmax, "] span=", span,
+            " fallback=", fallback);
+        return fallback;
     }
 
     // ---------- TCP/UDP ----------
@@ -131,17 +140,20 @@ class EndpointBase {
     std::pair<uint32_t, uint16_t> map_tcp_udp(uint32_t prv_ip, uint32_t dst_ip, uint16_t src_port,
                                               uint16_t dst_port, uint8_t protocol,
                                               uint16_t port_min, uint16_t port_max) const {
-        auto fwd_tuple = std::make_tuple(prv_ip, dst_ip, src_port, dst_port, protocol);
-        uint32_t desired_cpu = pick_cpu(CPUFanoutHash::hash_tuple(fwd_tuple));
+        auto fwd_tuple = std::make_tuple(htonl(prv_ip), htonl(dst_ip), htons(src_port),
+                                         htons(dst_port), protocol);
+        uint32_t forward_hash = CPUFanoutHash::hash_tuple(fwd_tuple);
+        uint32_t desired_cpu = pick_cpu(forward_hash);
 
         auto [rmin, rmax] = get_port_range(prv_ip, port_min, port_max);
 
-        uint32_t pub_ip = select_public_ip(CPUFanoutHash::hash_tuple(fwd_tuple));
+        uint32_t pub_ip = select_public_ip(forward_hash);
 
         auto builder = [&](uint16_t pub_port) {
-            return std::make_tuple(dst_ip, pub_ip, dst_port, pub_port, protocol);
+            return std::make_tuple(htonl(dst_ip), htonl(pub_ip), htons(dst_port),
+                                   htons(pub_port), protocol);
         };
-        uint16_t pub_port = choose_port_for_cpu(desired_cpu, rmin, rmax, builder);
+        uint16_t pub_port = choose_port_for_cpu(desired_cpu, rmin, rmax, forward_hash, builder);
 
         LOG(DEBUG_NETSET, "NAT map TCP/UDP: prv=", ip_to_string(prv_ip), " dst=",
             ip_to_string(dst_ip), " -> pub_ip=", ip_to_string(pub_ip), " pub_port=", pub_port,
@@ -155,17 +167,20 @@ class EndpointBase {
         uint16_t id_min = config_->icmp_id_min;
         uint16_t id_max = config_->icmp_id_max;
 
-        auto fwd_tuple = std::make_tuple(prv_ip, dst_ip, icmp_id_val, icmp_seq_val, (uint8_t)1);
-        uint32_t desired_cpu = pick_cpu(CPUFanoutHash::hash_tuple(fwd_tuple));
+        auto fwd_tuple = std::make_tuple(htonl(prv_ip), htonl(dst_ip), htons(icmp_id_val),
+                                         htons(icmp_seq_val), static_cast<uint8_t>(1));
+        uint32_t forward_hash = CPUFanoutHash::hash_tuple(fwd_tuple);
+        uint32_t desired_cpu = pick_cpu(forward_hash);
 
         auto [rmin, rmax] = get_port_range(prv_ip, id_min, id_max);
 
-        uint32_t pub_ip = select_public_ip(CPUFanoutHash::hash_tuple(fwd_tuple));
+        uint32_t pub_ip = select_public_ip(forward_hash);
 
         auto builder = [&](uint16_t new_id) {
-            return std::make_tuple(pub_ip, dst_ip, new_id, icmp_seq_val, (uint8_t)1);
+            return std::make_tuple(htonl(pub_ip), htonl(dst_ip), htons(new_id),
+                                   htons(icmp_seq_val), static_cast<uint8_t>(1));
         };
-        uint16_t new_id = choose_port_for_cpu(desired_cpu, rmin, rmax, builder);
+        uint16_t new_id = choose_port_for_cpu(desired_cpu, rmin, rmax, forward_hash, builder);
 
         LOG(DEBUG_NETSET, "NAT map ICMP: prv=", ip_to_string(prv_ip), " dst=",
             ip_to_string(dst_ip), " -> pub_ip=", ip_to_string(pub_ip), " new_id=", new_id,

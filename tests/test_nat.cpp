@@ -398,7 +398,8 @@ void test_nat_fanout_consistency(const NatConfig& cfg) {
 
         uint8_t proto = use_tcp ? static_cast<uint8_t>(IPPROTO_TCP)
                                 : static_cast<uint8_t>(IPPROTO_UDP);
-        auto forward_tuple = std::make_tuple(src_ip, dst_ip, src_port, dst_port, proto);
+        auto forward_tuple = std::make_tuple(htonl(src_ip), htonl(dst_ip), htons(src_port),
+                                             htons(dst_port), proto);
         uint32_t forward_cpu = CPUFanoutHash::select_cpu(
             CPUFanoutHash::hash_tuple(forward_tuple), worker_count);
 
@@ -416,7 +417,8 @@ void test_nat_fanout_consistency(const NatConfig& cfg) {
             uint32_t pub_ip = ntohl(ip.iph.saddr);
             uint16_t pub_port = ntohs(tcp.tcph.source);
             uint32_t inbound_cpu = CPUFanoutHash::select_cpu(
-                CPUFanoutHash::hash_tuple(std::make_tuple(dst_ip, pub_ip, dst_port, pub_port,
+                CPUFanoutHash::hash_tuple(std::make_tuple(htonl(dst_ip), htonl(pub_ip),
+                                                          htons(dst_port), htons(pub_port),
                                                           static_cast<uint8_t>(IPPROTO_TCP))),
                 worker_count);
             assert(forward_cpu == inbound_cpu);
@@ -434,7 +436,8 @@ void test_nat_fanout_consistency(const NatConfig& cfg) {
             uint32_t pub_ip = ntohl(ip.iph.saddr);
             uint16_t pub_port = ntohs(udp.udph.source);
             uint32_t inbound_cpu = CPUFanoutHash::select_cpu(
-                CPUFanoutHash::hash_tuple(std::make_tuple(dst_ip, pub_ip, dst_port, pub_port,
+                CPUFanoutHash::hash_tuple(std::make_tuple(htonl(dst_ip), htonl(pub_ip),
+                                                          htons(dst_port), htons(pub_port),
                                                           static_cast<uint8_t>(IPPROTO_UDP))),
                 worker_count);
             assert(forward_cpu == inbound_cpu);
@@ -517,29 +520,29 @@ void test_worker_forwarding_static(const NatConfig& cfg) {
                                      static_cast<uint8_t>(IPPROTO_TCP));
         return CPUFanoutHash::select_cpu(CPUFanoutHash::hash_tuple(tuple), worker_cfg.thread_count);
     };
-
-    for (int attempt = 0; attempt < 16; ++attempt) {
+    uint32_t inbound_target = worker_cfg.thread_index;
+    for (int attempt = 0; attempt < 32; ++attempt) {
         uint16_t candidate_dport = static_cast<uint16_t>(remote_port + attempt);
         frame = make_tcp_frame(prv_ip, remote_ip, prv_port, candidate_dport);
         target = compute_target(prv_port, candidate_dport);
-        if (target != worker_cfg.thread_index) {
+        inbound_target = CPUFanoutHash::select_cpu(
+            CPUFanoutHash::hash_tuple(std::make_tuple(htonl(remote_ip), htonl(pub_ip),
+                                                      htons(candidate_dport), htons(pub_port),
+                                                      static_cast<uint8_t>(IPPROTO_TCP))),
+            worker_cfg.thread_count);
+        if (target != worker_cfg.thread_index && inbound_target != worker_cfg.thread_index) {
             remote_port = candidate_dport;
             break;
         }
     }
 
     assert(target != worker_cfg.thread_index);
+    assert(inbound_target != worker_cfg.thread_index);
     worker.process_frame_for_tests(frame);
     assert(forwarded_targets.size() == 1);
     assert(forwarded_targets[0] == target);
 
     forwarded_targets.clear();
-    auto inbound_tuple = std::make_tuple(htonl(remote_ip), htonl(pub_ip), htons(remote_port),
-                                         htons(pub_port), static_cast<uint8_t>(IPPROTO_TCP));
-    uint32_t inbound_target = CPUFanoutHash::select_cpu(CPUFanoutHash::hash_tuple(inbound_tuple),
-                                                        worker_cfg.thread_count);
-    assert(inbound_target != worker_cfg.thread_index);
-
     auto inbound = make_tcp_frame(remote_ip, pub_ip, remote_port, pub_port);
     worker.process_frame_for_tests(inbound, Worker::FramePayload::Origin::Public);
     assert(forwarded_targets.size() == 1);
