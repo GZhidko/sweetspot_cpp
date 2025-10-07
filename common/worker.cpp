@@ -2,10 +2,13 @@
 
 #include "../common/logger.h"
 #include "../filters/filter.h"
+#include "../filters/filter_engine.hpp"
+#include "../sessions/session_manager.hpp"
 #include "../committer/committer.h"
 #include "checksum.hpp"
 #include "jenkins_hash.hpp"
 #include <algorithm>
+#include <cstdlib>
 #include <chrono>
 #include <cstring>
 #include <optional>
@@ -52,6 +55,14 @@ Worker::Worker(const WorkerPipelineConfig& cfg)
     }
     for (const auto& [priv_ip, pub_ip] : cfg_.static_ip) {
         nat_.add_static_ip_mapping(priv_ip, pub_ip);
+    }
+
+    try {
+        sessions::SessionManager::instance().initialize_from_netset(
+            cfg.nat.private_netset,
+            filters::Engine::instance().default_filter_name());
+    } catch (const std::exception& ex) {
+        LOG(DEBUG_ERROR, "Session init failed: ", ex.what());
     }
 }
 
@@ -156,6 +167,40 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
     filters::Direction dir = (origin == FramePayload::Origin::Public)
                                  ? filters::Direction::Inbound
                                  : filters::Direction::Outbound;
+
+    uint32_t session_ip = 0;
+    if (dir == filters::Direction::Outbound) {
+        uint32_t addr = 0;
+        std::memcpy(&addr, l3_data + 12, sizeof(uint32_t));
+        session_ip = ntohl(addr);
+    } else {
+        uint32_t addr = 0;
+        std::memcpy(&addr, l3_data + 16, sizeof(uint32_t));
+        session_ip = ntohl(addr);
+        if (cfg_.nat.private_netset &&
+            !cfg_.nat.private_netset->contains(session_ip)) {
+            session_ip = 0;
+        }
+    }
+
+    std::string selected_filter;
+    bool drop_for_status = false;
+    if (session_ip != 0) {
+        auto session = sessions::SessionManager::instance().find_session(session_ip);
+        if (session) {
+            selected_filter = session->filter_name;
+            if (session->status == sessions::SessionStatus::Captured) {
+                drop_for_status = true;
+            }
+        }
+    }
+    if (selected_filter.empty()) {
+        selected_filter = filters::Engine::instance().default_filter_name();
+    }
+    if (!selected_filter.empty()) {
+        filters::set_current_filter(selected_filter);
+    }
+
     filters::ScopedPacket packet_scope(dir);
 
     Chain chain_;

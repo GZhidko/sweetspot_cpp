@@ -1,8 +1,8 @@
 #pragma once
 
-#include <string>
-
 #include "filter_engine.hpp"
+
+#include <string>
 
 struct IPv4Header;
 struct TCPHeader;
