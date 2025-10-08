@@ -1,5 +1,8 @@
 #include "session_manager.hpp"
 
+#include "../acct/gauge_tracker.hpp"
+#include "../acct/manager.hpp"
+#include "../acct/snat_tracker.hpp"
 #include "../filters/filter_engine.hpp"
 #include "../common/netset.hpp"
 
@@ -91,7 +94,22 @@ Session SessionManager::start_session(uint32_t ip, const std::string& filter_nam
     LOG(DEBUG_SESSION, "start ip=", ip_to_string(ip), " filter=", session.filter_name,
         " session_id=", session.session_id);
 
-    return session;
+    Session result = session;
+    lock.unlock();
+
+    accounting::GaugeTracker::instance().reset(result.ip);
+    accounting::SnatTracker::instance().reset(result.ip);
+
+    accounting::GaugeTracker::Limits limits;
+    limits.max_duration = result.retention;
+    if (result.interim_interval.count() > 0) {
+        limits.max_idle = result.interim_interval;
+    }
+    accounting::GaugeTracker::instance().set_limits(result.ip, limits);
+    accounting::Manager::instance().submit(result, accounting::RecordType::Start,
+                                           result.event_context);
+
+    return result;
 }
 
 void SessionManager::stop_session(uint32_t ip, TerminationCause cause) {
@@ -104,7 +122,16 @@ void SessionManager::stop_session(uint32_t ip, TerminationCause cause) {
     it->second.termination_cause = cause;
     schedule_times(it->second, Clock::now());
 
+    Session result = it->second;
+
     LOG(DEBUG_SESSION, "stop ip=", ip_to_string(ip), " cause=", static_cast<int>(cause));
+
+    lock.unlock();
+
+    auto record_type = (cause == TerminationCause::Idle || cause == TerminationCause::Time)
+                           ? accounting::RecordType::StopTime
+                           : accounting::RecordType::Stop;
+    accounting::Manager::instance().submit(result, record_type, result.event_context);
 }
 
 bool SessionManager::remove_session(uint32_t ip) {
@@ -118,7 +145,14 @@ bool SessionManager::remove_session(uint32_t ip) {
     it->second.session_context.clear();
     it->second.event_context.clear();
     schedule_times(it->second, Clock::now());
+    Session result = it->second;
+
     LOG(DEBUG_SESSION, "reset session ip=", ip_to_string(ip));
+
+    lock.unlock();
+
+    accounting::GaugeTracker::instance().reset(ip);
+    accounting::SnatTracker::instance().reset(ip);
     return true;
 }
 
@@ -196,6 +230,8 @@ void SessionManager::run_maintenance(Clock::time_point now) {
     }
 
     for (const auto& session : interim_due) {
+        accounting::Manager::instance().submit(session, accounting::RecordType::Interim,
+                                              session.event_context);
         try {
             if (interim_callback_) {
                 interim_callback_(session);
@@ -206,6 +242,8 @@ void SessionManager::run_maintenance(Clock::time_point now) {
     }
 
     for (const auto& session : expired) {
+        accounting::Manager::instance().submit(session, accounting::RecordType::StopTime,
+                                              session.event_context);
         try {
             if (expire_callback_) {
                 expire_callback_(session);

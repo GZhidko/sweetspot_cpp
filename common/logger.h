@@ -20,6 +20,7 @@ enum DebugFlags : uint32_t {
     DEBUG_IO       = 1 << 4,
     DEBUG_SESSION  = 1 << 5,
     DEBUG_UAM      = 1 << 6,
+    DEBUG_ACCT     = 1 << 7,
     DEBUG_ALL    = 0xFFFFFFFF
 };
 
@@ -32,6 +33,7 @@ inline const char* colorForFlag(uint32_t flag) {
         case DEBUG_IO:       return "\033[33m"; // yellow
         case DEBUG_SESSION:  return "\033[34m"; // blue
         case DEBUG_UAM:      return "\033[90m"; // bright gray
+        case DEBUG_ACCT:     return "\033[94m"; // bright blue
         case DEBUG_ERROR:    return "\033[31m"; // red
         default:           return "\033[0m";  // reset
     }

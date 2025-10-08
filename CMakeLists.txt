@@ -18,6 +18,7 @@ file(GLOB SRC
     af_packet_io/*.cpp
     sessions/*.cpp
     uam/*.cpp
+    acct/*.cpp
 )
 
 add_executable(PacketProcessor ${SRC})
@@ -32,7 +33,8 @@ target_include_directories(PacketProcessor PRIVATE
     ${CMAKE_SOURCE_DIR}/af_packet_io
     ${CMAKE_SOURCE_DIR}/sessions
     ${CMAKE_SOURCE_DIR}/uam
-   
+    ${CMAKE_SOURCE_DIR}/acct
+
 )
 
 
@@ -47,6 +49,7 @@ file(GLOB AF_PACKET_RUNNER_SRC
     af_packet_io/*.cpp
     sessions/*.cpp
     uam/*.cpp
+    acct/*.cpp
 )
 
 add_executable(af_packet_runner ${AF_PACKET_RUNNER_SRC})
@@ -61,6 +64,7 @@ target_include_directories(af_packet_runner PRIVATE
     ${CMAKE_SOURCE_DIR}/af_packet_io
     ${CMAKE_SOURCE_DIR}/sessions
     ${CMAKE_SOURCE_DIR}/uam
+    ${CMAKE_SOURCE_DIR}/acct
 )
 target_link_libraries(af_packet_runner PRIVATE Threads::Threads)
 
@@ -76,6 +80,7 @@ file(GLOB SWEETSPOT_DAEMON_SRC
     af_packet_io/*.cpp
     sessions/*.cpp
     uam/*.cpp
+    acct/*.cpp
 )
 
 add_executable(sweetspot_daemon ${SWEETSPOT_DAEMON_SRC})
@@ -90,6 +95,7 @@ target_include_directories(sweetspot_daemon PRIVATE
     ${CMAKE_SOURCE_DIR}/af_packet_io
     ${CMAKE_SOURCE_DIR}/sessions
     ${CMAKE_SOURCE_DIR}/uam
+    ${CMAKE_SOURCE_DIR}/acct
 )
 target_link_libraries(sweetspot_daemon PRIVATE Threads::Threads)
 
@@ -108,6 +114,7 @@ file(GLOB TEST_SRC
     af_packet_io/*.cpp
     sessions/*.cpp
     uam/*.cpp
+    acct/*.cpp
 )
 
 add_executable(test_fanout ${TEST_SRC})
@@ -124,6 +131,7 @@ target_include_directories(test_fanout PRIVATE
     ${CMAKE_SOURCE_DIR}/af_packet_io
     ${CMAKE_SOURCE_DIR}/sessions
     ${CMAKE_SOURCE_DIR}/uam
+    ${CMAKE_SOURCE_DIR}/acct
 )
 add_test(NAME FanoutTest COMMAND test_fanout)
 
@@ -149,6 +157,7 @@ file(GLOB TEST_NAT_SRC
     af_packet_io/*.cpp
     sessions/*.cpp
     uam/*.cpp
+    acct/*.cpp
 )
 
 add_executable(test_nat ${TEST_NAT_SRC})
@@ -164,6 +173,7 @@ target_include_directories(test_nat PRIVATE
     ${CMAKE_SOURCE_DIR}/af_packet_io
     ${CMAKE_SOURCE_DIR}/sessions
     ${CMAKE_SOURCE_DIR}/uam
+    ${CMAKE_SOURCE_DIR}/acct
 )
 
 target_link_libraries(test_nat PRIVATE Threads::Threads)
@@ -180,6 +190,7 @@ file(GLOB TEST_FILTERS_SRC
     af_packet_io/*.cpp
     sessions/*.cpp
     uam/*.cpp
+    acct/*.cpp
 )
 
 add_executable(test_filters ${TEST_FILTERS_SRC})
@@ -196,6 +207,7 @@ target_include_directories(test_filters PRIVATE
     ${CMAKE_SOURCE_DIR}/af_packet_io
     ${CMAKE_SOURCE_DIR}/sessions
     ${CMAKE_SOURCE_DIR}/uam
+    ${CMAKE_SOURCE_DIR}/acct
 )
 
 target_link_libraries(test_filters PRIVATE Threads::Threads)
@@ -212,6 +224,7 @@ file(GLOB TEST_SESSIONS_SRC
     af_packet_io/*.cpp
     sessions/*.cpp
     uam/*.cpp
+    acct/*.cpp
 )
 
 add_executable(test_sessions ${TEST_SESSIONS_SRC})
@@ -228,6 +241,7 @@ target_include_directories(test_sessions PRIVATE
     ${CMAKE_SOURCE_DIR}/af_packet_io
     ${CMAKE_SOURCE_DIR}/sessions
     ${CMAKE_SOURCE_DIR}/uam
+    ${CMAKE_SOURCE_DIR}/acct
 )
 
 target_link_libraries(test_sessions PRIVATE Threads::Threads)
@@ -244,6 +258,7 @@ file(GLOB TEST_UAM_SRC
     af_packet_io/*.cpp
     sessions/*.cpp
     uam/*.cpp
+    acct/*.cpp
 )
 
 add_executable(test_uam ${TEST_UAM_SRC})
@@ -260,8 +275,43 @@ target_include_directories(test_uam PRIVATE
     ${CMAKE_SOURCE_DIR}/af_packet_io
     ${CMAKE_SOURCE_DIR}/sessions
     ${CMAKE_SOURCE_DIR}/uam
+    ${CMAKE_SOURCE_DIR}/acct
 )
 
 target_link_libraries(test_uam PRIVATE Threads::Threads)
 
 add_test(NAME UamTest COMMAND test_uam)
+
+file(GLOB TEST_ACCT_SRC
+    tests/test_acct.cpp
+    committer/*.cpp
+    parsers/*.cpp
+    filters/*.cpp
+    nat/*.cpp
+    common/*.cpp
+    af_packet_io/*.cpp
+    sessions/*.cpp
+    uam/*.cpp
+    acct/*.cpp
+)
+
+add_executable(test_acct ${TEST_ACCT_SRC})
+
+target_include_directories(test_acct PRIVATE
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/committer
+    ${CMAKE_SOURCE_DIR}/common
+    ${CMAKE_SOURCE_DIR}/parsers
+    ${CMAKE_SOURCE_DIR}/filters
+    ${CMAKE_SOURCE_DIR}/nat
+    ${CMAKE_SOURCE_DIR}/chain
+    ${CMAKE_SOURCE_DIR}/af_packet_io
+    ${CMAKE_SOURCE_DIR}/sessions
+    ${CMAKE_SOURCE_DIR}/uam
+    ${CMAKE_SOURCE_DIR}/acct
+)
+
+target_link_libraries(test_acct PRIVATE Threads::Threads)
+
+add_test(NAME AcctTest COMMAND test_acct)

@@ -1,3 +1,4 @@
+#include "../acct/manager.hpp"
 #include "../af_packet_io/io_context.hpp"
 #include "../common/logger.h"
 #include "../common/netset.hpp"
@@ -77,6 +78,7 @@ struct AppConfig {
     std::string uam_secret;
     uint32_t thread_count = 0;
     std::optional<uint32_t> acct_interim_interval;
+    std::string acct_detail_file;
 };
 
 class ConfigLoader {
@@ -142,6 +144,11 @@ class ConfigLoader {
                         throw std::runtime_error("missing value");
                     }
                     cfg.filter_dir = rest;
+                } else if (lower_key == "acct-detail-file") {
+                    if (rest.empty()) {
+                        throw std::runtime_error("missing value");
+                    }
+                    cfg.acct_detail_file = rest;
                 } else if (lower_key == "filter-anonymous") {
                     if (tokens.empty()) {
                         throw std::runtime_error("missing value");
@@ -277,6 +284,12 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    accounting::Config acct_config;
+    acct_config.detail_file = config.acct_detail_file.empty()
+                                  ? std::string("/var/sweetspot/detail")
+                                  : config.acct_detail_file;
+    accounting::Manager::instance().configure(acct_config);
+
     uam::Server uam_server;
     if (!config.uam_address.empty() && config.uam_port != 0) {
         uam::ServerConfig uam_cfg;
@@ -351,6 +364,7 @@ int main(int argc, char** argv) {
               << " uam=" << config.uam_address << ':' << config.uam_port << std::endl;
 
     while (!g_stop.load()) {
+        accounting::Manager::instance().commit(false);
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
 
@@ -361,6 +375,8 @@ int main(int argc, char** argv) {
     workers.clear();
 
     uam_server.stop();
+
+    accounting::Manager::instance().commit(true);
 
     std::cout << "Stopped" << std::endl;
     return 0;

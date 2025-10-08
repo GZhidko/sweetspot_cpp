@@ -4,6 +4,7 @@
 #include "../filters/filter.h"
 #include "../filters/filter_engine.hpp"
 #include "../sessions/session_manager.hpp"
+#include "../acct/gauge_tracker.hpp"
 #include "../committer/committer.h"
 #include "checksum.hpp"
 #include "jenkins_hash.hpp"
@@ -181,6 +182,13 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
             !cfg_.nat.private_netset->contains(session_ip)) {
             session_ip = 0;
         }
+    }
+
+    if (session_ip != 0) {
+        auto direction = (origin == FramePayload::Origin::Private)
+                             ? accounting::GaugeTracker::Direction::Outbound
+                             : accounting::GaugeTracker::Direction::Inbound;
+        accounting::GaugeTracker::instance().record(session_ip, l3_len, direction);
     }
 
     std::string selected_filter;
