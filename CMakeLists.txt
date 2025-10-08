@@ -66,6 +66,34 @@ target_link_libraries(af_packet_runner PRIVATE Threads::Threads)
 
 
 
+file(GLOB SWEETSPOT_DAEMON_SRC
+    apps/sweetspot_daemon.cpp
+    committer/*.cpp
+    parsers/*.cpp
+    filters/*.cpp
+    nat/*.cpp
+    common/*.cpp
+    af_packet_io/*.cpp
+    sessions/*.cpp
+    uam/*.cpp
+)
+
+add_executable(sweetspot_daemon ${SWEETSPOT_DAEMON_SRC})
+target_include_directories(sweetspot_daemon PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/committer
+    ${CMAKE_SOURCE_DIR}/common
+    ${CMAKE_SOURCE_DIR}/parsers
+    ${CMAKE_SOURCE_DIR}/filters
+    ${CMAKE_SOURCE_DIR}/nat
+    ${CMAKE_SOURCE_DIR}/chain
+    ${CMAKE_SOURCE_DIR}/af_packet_io
+    ${CMAKE_SOURCE_DIR}/sessions
+    ${CMAKE_SOURCE_DIR}/uam
+)
+target_link_libraries(sweetspot_daemon PRIVATE Threads::Threads)
+
+
 # ---------- TESTS ----------
 enable_testing()
 
