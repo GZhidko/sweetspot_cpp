@@ -43,6 +43,9 @@ class SessionManager {
     void initialize_from_netset(std::shared_ptr<Netset> netset,
                                 const std::string& default_filter = {});
 
+    bool acquire_state_id(uint32_t ip, int& state_id, bool modified);
+    bool verify_state_id(uint32_t ip, int& state_id) const;
+
   private:
     SessionManager() = default;
 

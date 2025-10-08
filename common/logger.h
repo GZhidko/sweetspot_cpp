@@ -13,22 +13,26 @@
 
 // Флаги дебага
 enum DebugFlags : uint32_t {
-    DEBUG_NETSET = 1 << 0,
-    DEBUG_PARSER = 1 << 1,
-    DEBUG_NAT    = 1 << 2,
-    DEBUG_ERROR  = 1 << 3,
-    DEBUG_IO     = 1 << 4,
+    DEBUG_NETSET   = 1 << 0,
+    DEBUG_PARSER   = 1 << 1,
+    DEBUG_NAT      = 1 << 2,
+    DEBUG_ERROR    = 1 << 3,
+    DEBUG_IO       = 1 << 4,
+    DEBUG_SESSION  = 1 << 5,
+    DEBUG_UAM      = 1 << 6,
     DEBUG_ALL    = 0xFFFFFFFF
 };
 
 // Цвета ANSI
 inline const char* colorForFlag(uint32_t flag) {
     switch (flag) {
-        case DEBUG_NETSET: return "\033[36m"; // cyan
-        case DEBUG_PARSER: return "\033[32m"; // green
-        case DEBUG_NAT:    return "\033[35m"; // magenta
-        case DEBUG_IO:     return "\033[33m"; // yellow
-        case DEBUG_ERROR:  return "\033[31m"; // red
+        case DEBUG_NETSET:   return "\033[36m"; // cyan
+        case DEBUG_PARSER:   return "\033[32m"; // green
+        case DEBUG_NAT:      return "\033[35m"; // magenta
+        case DEBUG_IO:       return "\033[33m"; // yellow
+        case DEBUG_SESSION:  return "\033[34m"; // blue
+        case DEBUG_UAM:      return "\033[90m"; // bright gray
+        case DEBUG_ERROR:    return "\033[31m"; // red
         default:           return "\033[0m";  // reset
     }
 }

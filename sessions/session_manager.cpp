@@ -9,6 +9,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -46,6 +47,7 @@ void SessionManager::set_filters_directory(const std::filesystem::path& dir, boo
             default_filter_name_ = names.front();
         }
     }
+    LOG(DEBUG_SESSION, "filters directory set to ", dir, " recursive=", recursive);
 }
 
 Session SessionManager::start_session(uint32_t ip, const std::string& filter_name,
@@ -53,37 +55,41 @@ Session SessionManager::start_session(uint32_t ip, const std::string& filter_nam
     std::unique_lock lock(mutex_);
     ensure_filter_loaded(filter_name);
 
-    Session session;
-    session.ip = ip;
+    auto it = sessions_.find(ip);
+    if (it == sessions_.end()) {
+        Session base;
+        base.ip = ip;
+        base.filter_name = default_filter_name_;
+        schedule_times(base, Clock::now());
+        it = sessions_.emplace(ip, std::move(base)).first;
+    }
+
+    Session& session = it->second;
     session.filter_name = filter_name.empty() ? default_filter_name_ : filter_name;
     session.status = options.status;
-    session.session_id = options.session_id;
-    if (session.session_id == 0) {
+    if (options.session_id != 0) {
+        session.session_id = options.session_id;
+    } else {
         session.session_id = next_session_id_++;
         if (next_session_id_ == 0) {
             next_session_id_ = 1;
         }
     }
     session.interim_interval = options.interim_interval;
-    session.retention = options.retention.count() > 0 ? options.retention
-                                                     : std::chrono::hours(1);
+    if (options.retention.count() > 0) {
+        session.retention = options.retention;
+    }
     session.session_context = options.session_context;
     session.event_context = options.event_context;
     session.termination_cause = TerminationCause::None;
-    auto now = Clock::now();
-    schedule_times(session, now);
-
-    sessions_[ip] = session;
+    schedule_times(session, Clock::now());
 
     if (default_filter_name_.empty()) {
         default_filter_name_ = session.filter_name;
     }
 
-    if (const char* dbg = std::getenv("SWEETSPOT_SESSION_DEBUG")) {
-        (void)dbg;
-        std::cerr << "session start ip=" << ip_to_string(ip) << " filter='"
-                  << session.filter_name << "'" << std::endl;
-    }
+    LOG(DEBUG_SESSION, "start ip=", ip_to_string(ip), " filter=", session.filter_name,
+        " session_id=", session.session_id);
 
     return session;
 }
@@ -98,16 +104,22 @@ void SessionManager::stop_session(uint32_t ip, TerminationCause cause) {
     it->second.termination_cause = cause;
     schedule_times(it->second, Clock::now());
 
-    if (const char* dbg = std::getenv("SWEETSPOT_SESSION_DEBUG")) {
-        (void)dbg;
-        std::cerr << "session stop ip=" << ip_to_string(ip) << " cause="
-                  << static_cast<int>(cause) << std::endl;
-    }
+    LOG(DEBUG_SESSION, "stop ip=", ip_to_string(ip), " cause=", static_cast<int>(cause));
 }
 
 bool SessionManager::remove_session(uint32_t ip) {
     std::unique_lock lock(mutex_);
-    return sessions_.erase(ip) > 0;
+    auto it = sessions_.find(ip);
+    if (it == sessions_.end()) {
+        return false;
+    }
+    it->second.status = SessionStatus::Captured;
+    it->second.termination_cause = TerminationCause::None;
+    it->second.session_context.clear();
+    it->second.event_context.clear();
+    schedule_times(it->second, Clock::now());
+    LOG(DEBUG_SESSION, "reset session ip=", ip_to_string(ip));
+    return true;
 }
 
 std::optional<Session> SessionManager::find_session(uint32_t ip) const {
@@ -166,6 +178,8 @@ void SessionManager::run_maintenance(Clock::time_point now) {
                 }
                 session.next_interim = now + session.interim_interval;
                 session.updated_at = now;
+                LOG(DEBUG_SESSION, "interim scheduled ip=", ip_to_string(ip),
+                    " next=", session.interim_interval.count(), "s");
             }
 
             if (session.status == SessionStatus::Captured &&
@@ -176,6 +190,7 @@ void SessionManager::run_maintenance(Clock::time_point now) {
                 if (expire_callback_) {
                     expired.push_back(session);
                 }
+                LOG(DEBUG_SESSION, "retention expired ip=", ip_to_string(ip));
             }
         }
     }
@@ -238,6 +253,40 @@ void SessionManager::initialize_from_netset(std::shared_ptr<Netset> netset,
     initialized_ = true;
 }
 
+bool SessionManager::acquire_state_id(uint32_t ip, int& state_id, bool modified) {
+    std::unique_lock lock(mutex_);
+    auto it = sessions_.find(ip);
+    if (it == sessions_.end()) {
+        return false;
+    }
+    Session& session = it->second;
+    if (modified) {
+        session.state_id++;
+        if (session.state_id == std::numeric_limits<int>::max()) {
+            session.state_id = 1;
+        }
+    } else if (session.state_id == 0) {
+        session.state_id = 1;
+    }
+    state_id = session.state_id;
+    return true;
+}
+
+bool SessionManager::verify_state_id(uint32_t ip, int& state_id) const {
+    std::shared_lock lock(mutex_);
+    auto it = sessions_.find(ip);
+    if (it == sessions_.end()) {
+        return false;
+    }
+    const Session& session = it->second;
+    if (state_id != 0 && state_id != session.state_id) {
+        state_id = session.state_id;
+        return false;
+    }
+    state_id = session.state_id;
+    return true;
+}
+
 void SessionManager::ensure_filter_loaded(const std::string& filter_name) {
     if (filter_name.empty()) {
         return;
@@ -253,12 +302,14 @@ void SessionManager::ensure_filter_loaded(const std::string& filter_name) {
     std::error_code ec;
     if (std::filesystem::is_regular_file(candidate, ec)) {
         filters::Engine::instance().load_filter(filter_name, candidate);
+        LOG(DEBUG_SESSION, "loaded filter ", filter_name, " from ", candidate);
         return;
     }
     // Try with .conf extension for compatibility
     candidate.replace_extension(".conf");
     if (std::filesystem::is_regular_file(candidate, ec)) {
         filters::Engine::instance().load_filter(filter_name, candidate);
+        LOG(DEBUG_SESSION, "loaded filter ", filter_name, " from ", candidate);
         return;
     }
     throw std::runtime_error("Filter file not found for '" + filter_name + "'");

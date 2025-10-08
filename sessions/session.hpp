@@ -22,6 +22,7 @@ struct Session {
     std::string filter_name;
     SessionStatus status = SessionStatus::Captured;
     uint32_t session_id = 0;
+    int state_id = 0;
     TerminationCause termination_cause = TerminationCause::None;
     std::chrono::seconds interim_interval{0};
     std::chrono::seconds retention{std::chrono::hours(1)};
