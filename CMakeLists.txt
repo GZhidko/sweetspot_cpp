@@ -19,6 +19,7 @@ file(GLOB SRC
     sessions/*.cpp
     uam/*.cpp
     acct/*.cpp
+    shape/*.cpp
 )
 
 add_executable(PacketProcessor ${SRC})
@@ -50,6 +51,7 @@ file(GLOB AF_PACKET_RUNNER_SRC
     sessions/*.cpp
     uam/*.cpp
     acct/*.cpp
+    shape/*.cpp
 )
 
 add_executable(af_packet_runner ${AF_PACKET_RUNNER_SRC})
@@ -81,6 +83,7 @@ file(GLOB SWEETSPOT_DAEMON_SRC
     sessions/*.cpp
     uam/*.cpp
     acct/*.cpp
+    shape/*.cpp
 )
 
 add_executable(sweetspot_daemon ${SWEETSPOT_DAEMON_SRC})
@@ -115,6 +118,7 @@ file(GLOB TEST_SRC
     sessions/*.cpp
     uam/*.cpp
     acct/*.cpp
+    shape/*.cpp
 )
 
 add_executable(test_fanout ${TEST_SRC})
@@ -158,6 +162,7 @@ file(GLOB TEST_NAT_SRC
     sessions/*.cpp
     uam/*.cpp
     acct/*.cpp
+    shape/*.cpp
 )
 
 add_executable(test_nat ${TEST_NAT_SRC})
@@ -191,6 +196,7 @@ file(GLOB TEST_FILTERS_SRC
     sessions/*.cpp
     uam/*.cpp
     acct/*.cpp
+    shape/*.cpp
 )
 
 add_executable(test_filters ${TEST_FILTERS_SRC})
@@ -225,6 +231,7 @@ file(GLOB TEST_SESSIONS_SRC
     sessions/*.cpp
     uam/*.cpp
     acct/*.cpp
+    shape/*.cpp
 )
 
 add_executable(test_sessions ${TEST_SESSIONS_SRC})
@@ -259,6 +266,7 @@ file(GLOB TEST_UAM_SRC
     sessions/*.cpp
     uam/*.cpp
     acct/*.cpp
+    shape/*.cpp
 )
 
 add_executable(test_uam ${TEST_UAM_SRC})
@@ -293,6 +301,7 @@ file(GLOB TEST_ACCT_SRC
     sessions/*.cpp
     uam/*.cpp
     acct/*.cpp
+    shape/*.cpp
 )
 
 add_executable(test_acct ${TEST_ACCT_SRC})

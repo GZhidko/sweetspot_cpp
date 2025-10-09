@@ -65,6 +65,8 @@ Worker::Worker(const WorkerPipelineConfig& cfg)
     } catch (const std::exception& ex) {
         LOG(DEBUG_ERROR, "Session init failed: ", ex.what());
     }
+
+    shape_controller_ = std::make_unique<shape::ShapeController>(*this);
 }
 
 Worker::~Worker() { stop(); }
@@ -82,6 +84,9 @@ void Worker::stop() {
     }
     if (thread_.joinable()) {
         thread_.join();
+    }
+    if (shape_controller_) {
+        shape_controller_->shutdown();
     }
 }
 
@@ -228,6 +233,8 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
         return;
     }
 
+    const auto& decision = filters::current_decision();
+
     auto* ip = chain_.template get<IPv4Header>();
     if (!ip) {
         return;
@@ -342,11 +349,20 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
         " icmp_id=", log_icmp_id,
         " via=", (dest_ctx == &pub_ctx_ ? "pub" : "priv"));
 
-    enqueue_tx(*dest_ctx, std::vector<uint8_t>(data, data + len), net_offset, "direct");
+    std::vector<uint8_t> tx_buffer(data, data + len);
+    bool shaped = has_flag(decision.actions, filters::ActionFlag::Shape) && decision.shape_rate > 0;
+    if (shaped && shape_controller_) {
+        auto target = (dest_ctx == &pub_ctx_) ? shape::ShapeController::Target::Public
+                                              : shape::ShapeController::Target::Private;
+        shape_controller_->enqueue(target, std::move(tx_buffer), net_offset, decision.shape_rate);
+    } else {
+        enqueue_tx(*dest_ctx, std::move(tx_buffer), net_offset, "direct");
+    }
 }
 
 void Worker::enqueue_tx(InterfaceContext& ctx, std::vector<uint8_t>&& frame, size_t net_offset,
                         const char* reason) {
+    std::lock_guard<std::mutex> lock(ctx.tx_mutex);
     ctx.tx_queue.push_back({});
     ctx.tx_queue.back().buffer = std::move(frame);
     ctx.tx_queue.back().net_offset = net_offset;
@@ -357,12 +373,16 @@ void Worker::enqueue_tx(InterfaceContext& ctx, std::vector<uint8_t>&& frame, siz
 }
 
 void Worker::transmit_pending(InterfaceContext& ctx) {
-    if (ctx.tx_queue.empty()) {
-        return;
+    std::vector<TxFrame> frames;
+    {
+        std::lock_guard<std::mutex> lock(ctx.tx_mutex);
+        if (ctx.tx_queue.empty()) {
+            return;
+        }
+        frames.swap(ctx.tx_queue);
     }
 
     if (!ctx.io) {
-        ctx.tx_queue.clear();
         return;
     }
 
@@ -381,11 +401,10 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
         LOG(DEBUG_IO, "Worker", cfg_.thread_index,
             ": TX ring not mapped origin=",
             (&ctx == &priv_ctx_) ? "priv" : "pub",
-            " fallback for ", ctx.tx_queue.size(), " frames");
-        for (auto& frame : ctx.tx_queue) {
+            " fallback for ", frames.size(), " frames");
+        for (auto& frame : frames) {
             send_frame(frame, frame.reason);
         }
-        ctx.tx_queue.clear();
         return;
     }
 
@@ -394,11 +413,10 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
         LOG(DEBUG_IO, "Worker", cfg_.thread_index,
             ": TX ring empty origin=",
             (&ctx == &priv_ctx_) ? "priv" : "pub",
-            " fallback for ", ctx.tx_queue.size(), " frames");
-        for (auto& frame : ctx.tx_queue) {
+            " fallback for ", frames.size(), " frames");
+        for (auto& frame : frames) {
             send_frame(frame, frame.reason);
         }
-        ctx.tx_queue.clear();
         return;
     }
 
@@ -406,7 +424,7 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
     size_t frame_size = tx_view.frame_size();
     constexpr size_t hdr_size = TPACKET_ALIGN(sizeof(tpacket3_hdr));
 
-    for (auto& frame : ctx.tx_queue) {
+    for (auto& frame : frames) {
         bool written = false;
         for (size_t attempt = 0; attempt < frame_count; ++attempt) {
             size_t idx = ctx.tx_ring_index % frame_count;
@@ -433,7 +451,6 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
     }
     ::sendto(fd, nullptr, 0, 0, nullptr, 0);
     LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": TX batch complete");
-    ctx.tx_queue.clear();
 }
 
 void Worker::process_remote_frames() {
@@ -459,6 +476,7 @@ void Worker::submit_remote_frame(FramePayload&& frame) {
 std::vector<std::vector<uint8_t>> Worker::collect_tx_frames() {
     std::vector<std::vector<uint8_t>> out;
     auto collect = [&](InterfaceContext& ctx) {
+        std::lock_guard<std::mutex> lock(ctx.tx_mutex);
         for (auto& frame : ctx.tx_queue) {
             out.push_back(std::move(frame.buffer));
         }
@@ -467,4 +485,13 @@ std::vector<std::vector<uint8_t>> Worker::collect_tx_frames() {
     collect(priv_ctx_);
     collect(pub_ctx_);
     return out;
+}
+
+void Worker::enqueue_shaped_frame(InterfaceKind kind, std::vector<uint8_t>&& frame,
+                                  size_t net_offset) {
+    if (kind == InterfaceKind::Private) {
+        enqueue_tx(priv_ctx_, std::move(frame), net_offset, "shape");
+    } else {
+        enqueue_tx(pub_ctx_, std::move(frame), net_offset, "shape");
+    }
 }

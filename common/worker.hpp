@@ -15,6 +15,8 @@
 #include <thread>
 #include <vector>
 
+#include "../shape/shape_controller.hpp"
+
 struct WorkerPipelineConfig {
     af_packet_io::IoConfig io_priv;
     af_packet_io::IoConfig io_pub;
@@ -46,7 +48,10 @@ class Worker {
         std::unique_ptr<af_packet_io::IoContext> io;
         std::vector<TxFrame> tx_queue;
         size_t tx_ring_index = 0;
+        std::mutex tx_mutex;
     };
+
+    enum class InterfaceKind { Private, Public };
 
     explicit Worker(const WorkerPipelineConfig& cfg);
     ~Worker();
@@ -54,6 +59,8 @@ class Worker {
     void start();
     void stop();
     void join();
+
+    void enqueue_shaped_frame(InterfaceKind kind, std::vector<uint8_t>&& frame, size_t net_offset);
 
   private:
     void run();
@@ -81,6 +88,8 @@ class Worker {
 
     std::mutex remote_mutex_;
     std::deque<FramePayload> remote_queue_;
+
+    std::unique_ptr<shape::ShapeController> shape_controller_;
 
   public:
     void set_forward_callback(std::function<void(uint32_t, FramePayload&&)> fn) {
