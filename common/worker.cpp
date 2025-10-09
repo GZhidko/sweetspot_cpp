@@ -155,12 +155,7 @@ void Worker::run() {
             std::lock_guard<std::mutex> lock(pub_ctx_.tx_mutex);
             pub_tx = pub_ctx_.tx_queue.size();
         }
-        LOG(DEBUG_RELAY, "relay cycle thread=", cfg_.thread_index,
-            " iteration=", iteration,
-            " remote_pending=", remote_pending,
-            " priv_tx_queue=", priv_tx,
-            " pub_tx_queue=", pub_tx);
-        process_remote_frames();
+            process_remote_frames();
         if (priv_ctx_.io) {
             process_interface(priv_ctx_, priv_view, FramePayload::Origin::Private);
         }
@@ -179,9 +174,6 @@ void Worker::run() {
 
 void Worker::process_interface(InterfaceContext& src_ctx, af_packet_io::RingView& view,
                                FramePayload::Origin origin) {
-    LOG(DEBUG_RELAY, "relay process_interface thread=", cfg_.thread_index,
-        " origin=", origin_to_string(origin),
-        " blocks=", view.block_count());
     for (size_t i = 0; i < view.block_count(); ++i) {
         auto* block = view.block_at(i);
         if (!block) {
@@ -513,16 +505,7 @@ void Worker::process_remote_frames() {
         std::lock_guard<std::mutex> lock(remote_mutex_);
         local.swap(remote_queue_);
     }
-    LOG(DEBUG_RELAY, "relay process_remote thread=", cfg_.thread_index,
-        " count=", local.size());
     for (auto& frame : local) {
-        LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
-            ": processing forwarded frame bytes=", frame.buffer.size(),
-            " net_offset=", frame.net_offset,
-            " origin=", frame.origin == FramePayload::Origin::Private ? "private" : "public");
-        LOG(DEBUG_RELAY, "relay remote frame thread=", cfg_.thread_index,
-            " origin=", origin_to_string(frame.origin),
-            " len=", frame.buffer.size());
         handle_forwarded(std::move(frame));
     }
 }

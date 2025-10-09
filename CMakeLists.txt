@@ -102,6 +102,14 @@ target_include_directories(sweetspot_daemon PRIVATE
 )
 target_link_libraries(sweetspot_daemon PRIVATE Threads::Threads)
 
+add_executable(uam_client
+    apps/uam_client.cpp
+    uam/uam_message.cpp
+)
+target_include_directories(uam_client PRIVATE
+    ${CMAKE_SOURCE_DIR}/uam
+)
+
 
 # ---------- TESTS ----------
 enable_testing()
