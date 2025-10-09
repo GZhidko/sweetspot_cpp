@@ -255,6 +255,30 @@ std::optional<Nat::Translation> Nat::find_icmp_reply(uint32_t pub_ip, uint32_t r
     return find_inbound(icmp_table_, key);
 }
 
+std::optional<uint32_t> Nat::resolve_private(uint32_t pub_ip, uint32_t remote_ip,
+                                             uint16_t pub_port, uint16_t remote_port,
+                                             uint8_t protocol) {
+    std::optional<Translation> translation;
+    switch (protocol) {
+    case IPPROTO_TCP:
+        translation = find_tcp_reply(pub_ip, remote_ip, pub_port, remote_port);
+        break;
+    case IPPROTO_UDP:
+        translation = find_udp_reply(pub_ip, remote_ip, pub_port, remote_port);
+        break;
+    case IPPROTO_ICMP:
+        translation = find_icmp_reply(pub_ip, remote_ip, pub_port, remote_port);
+        break;
+    default:
+        translation = find_ip_reply(pub_ip, remote_ip, protocol);
+        break;
+    }
+    if (translation) {
+        return translation->flow.prv_ip;
+    }
+    return std::nullopt;
+}
+
 std::optional<Nat::Translation> Nat::lookup_tcp_outbound(uint32_t prv_ip, uint32_t dst_ip,
                                                          uint16_t src_port, uint16_t dst_port) {
     FlowKey flow{prv_ip, dst_ip, src_port, dst_port, static_cast<uint8_t>(IPPROTO_TCP)};

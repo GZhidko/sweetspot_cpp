@@ -6,16 +6,19 @@
 #include "../sessions/session_manager.hpp"
 #include "../acct/gauge_tracker.hpp"
 #include "../committer/committer.h"
+#include "../shape/shape_controller.hpp"
 #include "checksum.hpp"
 #include "jenkins_hash.hpp"
 #include <algorithm>
-#include <cstdlib>
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
-#include <optional>
-#include <optional>
+#include <tuple>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <netinet/tcp.h>
+#include <netinet/udp.h>
+#include <netinet/ip_icmp.h>
 #include <vector>
 #include <linux/if_packet.h>
 #include <linux/if_ether.h>
@@ -163,67 +166,129 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
     }
     uint8_t* l3_data = data + net_offset;
     size_t l3_len = len - net_offset;
-    if (l3_len == 0) {
+    if (l3_len < sizeof(iphdr)) {
         return;
     }
 
     LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": received frame len=", len,
         " net_offset=", net_offset);
 
+    // Parse full packet once
+    filters::Direction dir = (origin == FramePayload::Origin::Public)
+                                 ? filters::Direction::Inbound
+                                 : filters::Direction::Outbound;
+    Chain chain;
+    if (!chain.parse(l3_data, l3_len)) {
+        LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": parse failed");
+        return;
+    }
+
+    auto* ipv4 = chain.get<IPv4Header>();
+    if (!ipv4) {
+        return;
+    }
+
+    const uint32_t src_ip_host = ntohl(ipv4->iph.saddr);
+    const uint32_t dst_ip_host = ntohl(ipv4->iph.daddr);
+
+    uint16_t src_port = 0;
+    uint16_t dst_port = 0;
+    if (auto* tcp = chain.get<TCPHeader>()) {
+        src_port = ntohs(tcp->tcph.source);
+        dst_port = ntohs(tcp->tcph.dest);
+    } else if (auto* udp = chain.get<UDPHeader>()) {
+        src_port = ntohs(udp->udph.source);
+        dst_port = ntohs(udp->udph.dest);
+    } else if (auto* icmp = chain.get<ICMPHeader>()) {
+        src_port = ntohs(icmp->icmph.un.echo.id);
+        dst_port = ntohs(icmp->icmph.un.echo.sequence);
+    }
+
+    if (cfg_.thread_count > 1 && forward_fn_) {
+        auto tuple = std::make_tuple(htonl(src_ip_host), htonl(dst_ip_host), htons(src_port),
+                                     htons(dst_port), static_cast<uint8_t>(ipv4->iph.protocol));
+        uint32_t target = CPUFanoutHash::select_cpu(CPUFanoutHash::hash_tuple(tuple),
+                                                    cfg_.thread_count);
+        if (target != cfg_.thread_index) {
+            FramePayload payload;
+            payload.origin = origin;
+            payload.buffer.assign(data, data + len);
+            payload.net_offset = net_offset;
+            payload.parsed_chain.emplace(std::move(chain));
+            forward_fn_(target, std::move(payload));
+            return;
+        }
+    }
+
+    process_chain(origin, data, len, net_offset, chain);
+}
+
+void Worker::handle_forwarded(FramePayload&& payload) {
+    if (!payload.parsed_chain) {
+        LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": forwarded frame missing parsed chain");
+        return;
+    }
+
+    Chain chain = std::move(*payload.parsed_chain);
+    process_chain(payload.origin, payload.buffer.data(), payload.buffer.size(),
+                  payload.net_offset, chain);
+}
+
+void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t len,
+                           size_t net_offset, Chain& chain) {
     filters::Direction dir = (origin == FramePayload::Origin::Public)
                                  ? filters::Direction::Inbound
                                  : filters::Direction::Outbound;
 
+    filters::ScopedPacket packet_scope(dir);
+
+    auto* ipv4 = chain.get<IPv4Header>();
+    if (!ipv4) {
+        return;
+    }
+
     uint32_t session_ip = 0;
+    uint16_t src_port = 0;
+    uint16_t dst_port = 0;
+    if (auto* tcp = chain.get<TCPHeader>()) {
+        src_port = ntohs(tcp->tcph.source);
+        dst_port = ntohs(tcp->tcph.dest);
+    } else if (auto* udp = chain.get<UDPHeader>()) {
+        src_port = ntohs(udp->udph.source);
+        dst_port = ntohs(udp->udph.dest);
+    } else if (auto* icmp = chain.get<ICMPHeader>()) {
+        src_port = ntohs(icmp->icmph.un.echo.id);
+        dst_port = ntohs(icmp->icmph.un.echo.sequence);
+    }
+
     if (dir == filters::Direction::Outbound) {
-        uint32_t addr = 0;
-        std::memcpy(&addr, l3_data + 12, sizeof(uint32_t));
-        session_ip = ntohl(addr);
+        session_ip = ntohl(ipv4->iph.saddr);
     } else {
-        uint32_t addr = 0;
-        std::memcpy(&addr, l3_data + 16, sizeof(uint32_t));
-        session_ip = ntohl(addr);
-        if (cfg_.nat.private_netset &&
-            !cfg_.nat.private_netset->contains(session_ip)) {
-            session_ip = 0;
+        uint32_t pub_ip = ntohl(ipv4->iph.daddr);
+        uint32_t remote_ip = ntohl(ipv4->iph.saddr);
+        if (auto resolved =
+                nat_.resolve_private(pub_ip, remote_ip, dst_port, src_port, ipv4->iph.protocol)) {
+            session_ip = *resolved;
         }
     }
 
-    if (session_ip != 0) {
-        auto direction = (origin == FramePayload::Origin::Private)
-                             ? accounting::GaugeTracker::Direction::Outbound
-                             : accounting::GaugeTracker::Direction::Inbound;
-        accounting::GaugeTracker::instance().record(session_ip, l3_len, direction);
-    }
-
-    std::string selected_filter;
+    std::string selected_filter = filters::Engine::instance().default_filter_name();
     bool drop_for_status = false;
     if (session_ip != 0) {
-        auto session = sessions::SessionManager::instance().find_session(session_ip);
-        if (session) {
-            selected_filter = session->filter_name;
+        if (auto session = sessions::SessionManager::instance().find_session(session_ip)) {
+            if (!session->filter_name.empty()) {
+                selected_filter = session->filter_name;
+            }
             if (session->status == sessions::SessionStatus::Captured) {
                 drop_for_status = true;
             }
         }
     }
-    if (selected_filter.empty()) {
-        selected_filter = filters::Engine::instance().default_filter_name();
-    }
-    if (!selected_filter.empty()) {
-        filters::set_current_filter(selected_filter);
-    }
 
-    filters::ScopedPacket packet_scope(dir);
-
-    Chain chain_;
-    if (!chain_.parse(l3_data, l3_len)) {
-        LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": parse failed");
-        return;
-    }
+    filters::set_current_filter(selected_filter);
 
     bool ok = true;
-    chain_.for_each([&](auto& hdr) {
+    chain.for_each([&](auto& hdr) {
         if (!Filter<std::decay_t<decltype(hdr)>>{}(hdr)) {
             ok = false;
         }
@@ -233,131 +298,17 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
         return;
     }
 
-    const auto& decision = filters::current_decision();
-
-    auto* ip = chain_.template get<IPv4Header>();
-    if (!ip) {
+    auto decision = filters::current_decision();
+    if (!decision.allow) {
         return;
     }
 
-    LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
-        ": frame before NAT src=", IPv4Header::ip_to_string(ip->iph.saddr),
-        " dst=", IPv4Header::ip_to_string(ip->iph.daddr),
-        " proto=", static_cast<int>(ip->iph.protocol));
-
-    uint32_t src_ip = ntohl(ip->iph.saddr);
-    uint32_t dst_ip = ntohl(ip->iph.daddr);
-    bool source_private = cfg_.nat.private_netset && cfg_.nat.private_netset->contains(src_ip);
-    bool dest_public = cfg_.nat.public_netset && cfg_.nat.public_netset->contains(dst_ip);
-
-    auto* tcp = chain_.template get<TCPHeader>();
-    auto* udp = chain_.template get<UDPHeader>();
-    auto* icmp = chain_.template get<ICMPHeader>();
-
-    if (forward_fn_) {
-        uint16_t src_port_hash = 0;
-        uint16_t dst_port_hash = 0;
-        uint8_t proto_hash = ip->iph.protocol;
-
-        if (tcp) {
-            proto_hash = IPPROTO_TCP;
-            src_port_hash = ntohs(tcp->tcph.source);
-            dst_port_hash = ntohs(tcp->tcph.dest);
-        } else if (udp) {
-            proto_hash = IPPROTO_UDP;
-            src_port_hash = ntohs(udp->udph.source);
-            dst_port_hash = ntohs(udp->udph.dest);
-        } else if (icmp) {
-            proto_hash = IPPROTO_ICMP;
-            src_port_hash = ntohs(icmp->icmph.un.echo.id);
-            dst_port_hash = ntohs(icmp->icmph.un.echo.sequence);
-        }
-
-        auto tuple = std::make_tuple(htonl(src_ip), htonl(dst_ip), htons(src_port_hash),
-                                     htons(dst_port_hash), static_cast<uint8_t>(proto_hash));
-        uint32_t target = CPUFanoutHash::select_cpu(CPUFanoutHash::hash_tuple(tuple),
-                                                    cfg_.thread_count);
-        if (target != cfg_.thread_index) {
-            FramePayload payload;
-            payload.origin = origin;
-            payload.buffer.assign(data, data + len);
-            payload.net_offset = net_offset;
-            forward_fn_(target, std::move(payload));
-            return;
-        }
-    }
-
-    chain_.for_each([&](auto& hdr) { nat_.process(hdr); });
-
-    size_t offset = 0;
-    auto* ipv4 = chain_.template get<IPv4Header>();
-    if (!ipv4 || !Committer<IPv4Header>{}(ipv4, l3_data, l3_len, offset)) {
+    if (drop_for_status) {
+        LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": frame dropped due to session status");
         return;
     }
 
-    chain_.for_each([&](auto& hdr) {
-        using Header = std::decay_t<decltype(hdr)>;
-        if constexpr (!std::is_same_v<Header, IPv4Header>) {
-            Committer<Header>{}(&hdr, l3_data, l3_len, offset, ipv4);
-        }
-    });
-
-    LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
-        ": frame after NAT src=", IPv4Header::ip_to_string(ip->iph.saddr),
-        " dst=", IPv4Header::ip_to_string(ip->iph.daddr));
-
-    uint16_t log_src_port = 0;
-    uint16_t log_dst_port = 0;
-    uint16_t log_icmp_id = 0;
-
-    switch (ip->iph.protocol) {
-    case IPPROTO_TCP: {
-        if (auto* tcp_hdr = chain_.template get<TCPHeader>()) {
-            log_src_port = ntohs(tcp_hdr->tcph.source);
-            log_dst_port = ntohs(tcp_hdr->tcph.dest);
-        }
-        break;
-    }
-    case IPPROTO_UDP: {
-        if (auto* udp_hdr = chain_.template get<UDPHeader>()) {
-            log_src_port = ntohs(udp_hdr->udph.source);
-            log_dst_port = ntohs(udp_hdr->udph.dest);
-        }
-        break;
-    }
-    case IPPROTO_ICMP: {
-        if (auto* icmp_hdr = chain_.template get<ICMPHeader>()) {
-            log_icmp_id = ntohs(icmp_hdr->icmph.un.echo.id);
-        }
-        break;
-    }
-    default:
-        break;
-    }
-
-    InterfaceContext* dest_ctx = (origin == FramePayload::Origin::Private) ? &pub_ctx_ : &priv_ctx_;
-    if (!dest_ctx->io) {
-        LOG(DEBUG_IO, "Worker", cfg_.thread_index,
-            ": destination interface missing, queuing only origin=",
-            origin == FramePayload::Origin::Private ? "private" : "public");
-    }
-
-    LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
-        ": TX schedule proto=", static_cast<int>(ipv4->iph.protocol),
-        " src=", IPv4Header::ip_to_string(ipv4->iph.saddr), ":", log_src_port,
-        " dst=", IPv4Header::ip_to_string(ipv4->iph.daddr), ":", log_dst_port,
-        " icmp_id=", log_icmp_id,
-        " via=", (dest_ctx == &pub_ctx_ ? "pub" : "priv"));
-
-    std::vector<uint8_t> tx_buffer(data, data + len);
-    bool shaped = has_flag(decision.actions, filters::ActionFlag::Shape) && decision.shape_rate > 0;
-    if (shaped && shape_controller_) {
-        auto target = (dest_ctx == &pub_ctx_) ? shape::ShapeController::Target::Public
-                                              : shape::ShapeController::Target::Private;
-        shape_controller_->enqueue(target, std::move(tx_buffer), net_offset, decision.shape_rate);
-    } else {
-        enqueue_tx(*dest_ctx, std::move(tx_buffer), net_offset, "direct");
-    }
+    finish_frame(chain, decision, origin, data, len, net_offset, session_ip);
 }
 
 void Worker::enqueue_tx(InterfaceContext& ctx, std::vector<uint8_t>&& frame, size_t net_offset,
@@ -464,7 +415,7 @@ void Worker::process_remote_frames() {
             ": processing forwarded frame bytes=", frame.buffer.size(),
             " net_offset=", frame.net_offset,
             " origin=", frame.origin == FramePayload::Origin::Private ? "private" : "public");
-        handle_frame(frame.origin, frame.buffer.data(), frame.buffer.size(), frame.net_offset);
+        handle_forwarded(std::move(frame));
     }
 }
 
@@ -493,5 +444,100 @@ void Worker::enqueue_shaped_frame(InterfaceKind kind, std::vector<uint8_t>&& fra
         enqueue_tx(priv_ctx_, std::move(frame), net_offset, "shape");
     } else {
         enqueue_tx(pub_ctx_, std::move(frame), net_offset, "shape");
+    }
+}
+
+void Worker::finish_frame(Chain& chain, const filters::Decision& decision,
+                          FramePayload::Origin origin, uint8_t* data, size_t len, size_t net_offset,
+                          uint32_t session_ip) {
+    auto* ipv4 = chain.template get<IPv4Header>();
+    if (!ipv4) {
+        return;
+    }
+
+    uint8_t* l3_data = data + net_offset;
+    size_t l3_len = len - net_offset;
+
+    chain.for_each([&](auto& hdr) { nat_.process(hdr); });
+
+    size_t offset = 0;
+    if (!Committer<IPv4Header>{}(ipv4, l3_data, l3_len, offset)) {
+        return;
+    }
+
+    chain.for_each([&](auto& hdr) {
+        using Header = std::decay_t<decltype(hdr)>;
+        if constexpr (!std::is_same_v<Header, IPv4Header>) {
+            Committer<Header>{}(&hdr, l3_data, l3_len, offset, ipv4);
+        }
+    });
+
+    uint32_t gauge_ip = session_ip;
+    if (gauge_ip == 0) {
+        gauge_ip = (origin == FramePayload::Origin::Private) ? ntohl(ipv4->iph.saddr)
+                                                            : ntohl(ipv4->iph.daddr);
+        if (cfg_.nat.private_netset && !cfg_.nat.private_netset->contains(gauge_ip)) {
+            gauge_ip = 0;
+        }
+    }
+    if (gauge_ip != 0) {
+        auto direction = (origin == FramePayload::Origin::Private)
+                             ? accounting::GaugeTracker::Direction::Outbound
+                             : accounting::GaugeTracker::Direction::Inbound;
+        accounting::GaugeTracker::instance().record(gauge_ip, l3_len, direction);
+    }
+
+    LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
+        ": frame after NAT src=", IPv4Header::ip_to_string(ipv4->iph.saddr),
+        " dst=", IPv4Header::ip_to_string(ipv4->iph.daddr));
+
+    uint16_t log_src_port = 0;
+    uint16_t log_dst_port = 0;
+    uint16_t log_icmp_id = 0;
+
+    switch (ipv4->iph.protocol) {
+    case IPPROTO_TCP:
+        if (auto* tcp_hdr = chain.template get<TCPHeader>()) {
+            log_src_port = ntohs(tcp_hdr->tcph.source);
+            log_dst_port = ntohs(tcp_hdr->tcph.dest);
+        }
+        break;
+    case IPPROTO_UDP:
+        if (auto* udp_hdr = chain.template get<UDPHeader>()) {
+            log_src_port = ntohs(udp_hdr->udph.source);
+            log_dst_port = ntohs(udp_hdr->udph.dest);
+        }
+        break;
+    case IPPROTO_ICMP:
+        if (auto* icmp_hdr = chain.template get<ICMPHeader>()) {
+            log_icmp_id = ntohs(icmp_hdr->icmph.un.echo.id);
+        }
+        break;
+    default:
+        break;
+    }
+
+    InterfaceContext* dest_ctx = (origin == FramePayload::Origin::Private) ? &pub_ctx_ : &priv_ctx_;
+    if (!dest_ctx->io) {
+        LOG(DEBUG_IO, "Worker", cfg_.thread_index,
+            ": destination interface missing, queuing only origin=",
+            origin == FramePayload::Origin::Private ? "private" : "public");
+    }
+
+    LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
+        ": TX schedule proto=", static_cast<int>(ipv4->iph.protocol),
+        " src=", IPv4Header::ip_to_string(ipv4->iph.saddr), ":", log_src_port,
+        " dst=", IPv4Header::ip_to_string(ipv4->iph.daddr), ":", log_dst_port,
+        " icmp_id=", log_icmp_id,
+        " via=", (dest_ctx == &pub_ctx_ ? "pub" : "priv"));
+
+    std::vector<uint8_t> tx_buffer(data, data + len);
+    bool shaped = has_flag(decision.actions, filters::ActionFlag::Shape) && decision.shape_rate > 0;
+    if (shaped && shape_controller_) {
+        auto target = (dest_ctx == &pub_ctx_) ? shape::ShapeController::Target::Public
+                                              : shape::ShapeController::Target::Private;
+        shape_controller_->enqueue(target, std::move(tx_buffer), net_offset, decision.shape_rate);
+    } else {
+        enqueue_tx(*dest_ctx, std::move(tx_buffer), net_offset, "direct");
     }
 }

@@ -116,6 +116,10 @@ class Nat : public EndpointBase {
                                                     uint16_t src_port, uint16_t dst_port,
                                                     uint8_t protocol) const;
 
+    std::optional<uint32_t> resolve_private(uint32_t pub_ip, uint32_t remote_ip,
+                                            uint16_t pub_port, uint16_t remote_port,
+                                            uint8_t protocol);
+
     void maintenance();
     void maintenance(Clock::time_point now);
 

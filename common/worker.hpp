@@ -5,12 +5,14 @@
 #include "../nat/nat.h"
 #include "../parsers/parser.h"
 #include "../chain/header_chain.h"
+#include "../filters/filter_engine.hpp"
 #include <atomic>
 #include <cstddef>
 #include <deque>
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -32,10 +34,13 @@ struct WorkerPipelineConfig {
 
 class Worker {
   public:
+    using Chain = HeaderChainTuple<IPv4Header, TCPHeader, UDPHeader, ICMPHeader>;
+
     struct FramePayload {
         enum class Origin { Private, Public } origin = Origin::Private;
         std::vector<uint8_t> buffer;
         size_t net_offset = 0;
+        std::optional<Chain> parsed_chain;
     };
 
     struct TxFrame {
@@ -69,10 +74,16 @@ class Worker {
     void process_rx_block(InterfaceContext& src_ctx, FramePayload::Origin origin,
                           tpacket_block_desc* block_desc);
     void handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len, size_t net_offset);
+    void handle_forwarded(FramePayload&& payload);
     void enqueue_tx(InterfaceContext& ctx, std::vector<uint8_t>&& frame, size_t net_offset,
                     const char* reason);
     void transmit_pending(InterfaceContext& ctx);
     void process_remote_frames();
+    void process_chain(FramePayload::Origin origin, uint8_t* data, size_t len, size_t net_offset,
+                       Chain& chain);
+    void finish_frame(Chain& chain, const filters::Decision& decision,
+                      FramePayload::Origin origin, uint8_t* data, size_t len, size_t net_offset,
+                      uint32_t session_ip);
 
     WorkerPipelineConfig cfg_;
     InterfaceContext priv_ctx_;
@@ -83,8 +94,6 @@ class Worker {
     std::atomic<bool> running_{false};
 
     std::function<void(uint32_t, FramePayload&&)> forward_fn_;
-
-    using Chain = HeaderChainTuple<IPv4Header, TCPHeader, UDPHeader, ICMPHeader>;
 
     std::mutex remote_mutex_;
     std::deque<FramePayload> remote_queue_;

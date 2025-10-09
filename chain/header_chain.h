@@ -12,6 +12,15 @@
 template <typename... Headers> class HeaderChainTuple {
   public:
     HeaderChainTuple() = default;
+    HeaderChainTuple(const HeaderChainTuple& other) { copy_from(other); }
+    HeaderChainTuple(HeaderChainTuple&&) = default;
+    HeaderChainTuple& operator=(const HeaderChainTuple& other) {
+        if (this != &other) {
+            copy_from(other);
+        }
+        return *this;
+    }
+    HeaderChainTuple& operator=(HeaderChainTuple&&) = default;
 
     bool parse(const uint8_t* data, size_t len) {
         size_t offset = 0;
@@ -47,6 +56,35 @@ template <typename... Headers> class HeaderChainTuple {
 
   private:
     std::tuple<std::unique_ptr<Headers>...> headers{};
+
+    void copy_from(const HeaderChainTuple& other) {
+        copy_from_impl(other, std::make_index_sequence<sizeof...(Headers)>{});
+        if (auto* ip = get<IPv4Header>()) {
+            if (auto* tcp = get<TCPHeader>()) {
+                tcp->ip_header = ip;
+            }
+            if (auto* udp = get<UDPHeader>()) {
+                udp->ip_header = ip;
+            }
+            if (auto* icmp = get<ICMPHeader>()) {
+                icmp->ip_header = ip;
+            }
+        }
+    }
+
+    template <std::size_t... I>
+    void copy_from_impl(const HeaderChainTuple& other, std::index_sequence<I...>) {
+        (clone_ptr(std::get<I>(headers), std::get<I>(other.headers)), ...);
+    }
+
+    template <typename Ptr>
+    static void clone_ptr(Ptr& dst, const Ptr& src) {
+        if (src) {
+            dst = std::make_unique<typename Ptr::element_type>(*src);
+        } else {
+            dst.reset();
+        }
+    }
 
     bool parse_packet(const uint8_t* data, size_t len, size_t& offset) {
         // IPv4 обязателен
