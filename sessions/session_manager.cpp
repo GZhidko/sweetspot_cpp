@@ -56,6 +56,12 @@ void SessionManager::set_filters_directory(const std::filesystem::path& dir, boo
 Session SessionManager::start_session(uint32_t ip, const std::string& filter_name,
                                       const StartOptions& options) {
     std::unique_lock lock(mutex_);
+    LOG(DEBUG_SESSION, "start request ip=", ip_to_string(ip), " filter=", filter_name,
+        " status=", static_cast<int>(options.status),
+        " interim=", options.interim_interval.count(),
+        " retention=", options.retention.count(),
+        " session_ctx=", options.session_context,
+        " event_ctx=", options.event_context);
     ensure_filter_loaded(filter_name);
 
     auto it = sessions_.find(ip);
@@ -91,8 +97,8 @@ Session SessionManager::start_session(uint32_t ip, const std::string& filter_nam
         default_filter_name_ = session.filter_name;
     }
 
-    LOG(DEBUG_SESSION, "start ip=", ip_to_string(ip), " filter=", session.filter_name,
-        " session_id=", session.session_id);
+    LOG(DEBUG_SESSION, "start created ip=", ip_to_string(ip), " filter=", session.filter_name,
+        " session_id=", session.session_id, " status=", static_cast<int>(session.status));
 
     Session result = session;
     lock.unlock();
@@ -114,8 +120,11 @@ Session SessionManager::start_session(uint32_t ip, const std::string& filter_nam
 
 void SessionManager::stop_session(uint32_t ip, TerminationCause cause) {
     std::unique_lock lock(mutex_);
+    LOG(DEBUG_SESSION, "stop request ip=", ip_to_string(ip),
+        " cause=", static_cast<int>(cause));
     auto it = sessions_.find(ip);
     if (it == sessions_.end()) {
+        LOG(DEBUG_SESSION, "stop request missing ip=", ip_to_string(ip));
         return;
     }
     it->second.status = SessionStatus::Captured;
@@ -124,7 +133,9 @@ void SessionManager::stop_session(uint32_t ip, TerminationCause cause) {
 
     Session result = it->second;
 
-    LOG(DEBUG_SESSION, "stop ip=", ip_to_string(ip), " cause=", static_cast<int>(cause));
+    LOG(DEBUG_SESSION, "stop applied ip=", ip_to_string(ip),
+        " cause=", static_cast<int>(cause),
+        " status=", static_cast<int>(result.status));
 
     lock.unlock();
 
@@ -136,8 +147,10 @@ void SessionManager::stop_session(uint32_t ip, TerminationCause cause) {
 
 bool SessionManager::remove_session(uint32_t ip) {
     std::unique_lock lock(mutex_);
+    LOG(DEBUG_SESSION, "remove request ip=", ip_to_string(ip));
     auto it = sessions_.find(ip);
     if (it == sessions_.end()) {
+        LOG(DEBUG_SESSION, "remove missing ip=", ip_to_string(ip));
         return false;
     }
     it->second.status = SessionStatus::Captured;
@@ -147,7 +160,7 @@ bool SessionManager::remove_session(uint32_t ip) {
     schedule_times(it->second, Clock::now());
     Session result = it->second;
 
-    LOG(DEBUG_SESSION, "reset session ip=", ip_to_string(ip));
+    LOG(DEBUG_SESSION, "remove reset session ip=", ip_to_string(ip));
 
     lock.unlock();
 
@@ -160,8 +173,11 @@ std::optional<Session> SessionManager::find_session(uint32_t ip) const {
     std::shared_lock lock(mutex_);
     auto it = sessions_.find(ip);
     if (it == sessions_.end()) {
+        LOG(DEBUG_SESSION, "find miss ip=", ip_to_string(ip));
         return std::nullopt;
     }
+    LOG(DEBUG_SESSION, "find hit ip=", ip_to_string(ip), " status=",
+        static_cast<int>(it->second.status), " filter=", it->second.filter_name);
     return it->second;
 }
 
@@ -172,6 +188,7 @@ std::vector<Session> SessionManager::snapshot() const {
     for (const auto& [_, session] : sessions_) {
         out.push_back(session);
     }
+    LOG(DEBUG_SESSION, "snapshot size=", out.size());
     return out;
 }
 
@@ -179,10 +196,12 @@ void SessionManager::set_default_filter(const std::string& filter_name) {
     std::unique_lock lock(mutex_);
     ensure_filter_loaded(filter_name);
     default_filter_name_ = filter_name;
+    LOG(DEBUG_SESSION, "default filter set name=", default_filter_name_);
 }
 
 std::string SessionManager::default_filter() const {
     std::shared_lock lock(mutex_);
+    LOG(DEBUG_SESSION, "default filter query result=", default_filter_name_);
     return default_filter_name_;
 }
 
@@ -191,13 +210,17 @@ void SessionManager::set_callbacks(std::function<void(const Session&)> interim_c
     std::unique_lock lock(mutex_);
     interim_callback_ = std::move(interim_callback);
     expire_callback_ = std::move(expire_callback);
+    LOG(DEBUG_SESSION, "callbacks set interim=", static_cast<bool>(interim_callback_),
+        " expire=", static_cast<bool>(expire_callback_));
 }
 
 void SessionManager::run_maintenance() {
+    LOG(DEBUG_SESSION, "maintenance run default now");
     run_maintenance(Clock::now());
 }
 
 void SessionManager::run_maintenance(Clock::time_point now) {
+    LOG(DEBUG_SESSION, "maintenance start now=", now.time_since_epoch().count());
     std::vector<Session> interim_due;
     std::vector<Session> expired;
 
@@ -228,6 +251,9 @@ void SessionManager::run_maintenance(Clock::time_point now) {
             }
         }
     }
+
+    LOG(DEBUG_SESSION, "maintenance due interim=", interim_due.size(),
+        " expired=", expired.size());
 
     for (const auto& session : interim_due) {
         accounting::Manager::instance().submit(session, accounting::RecordType::Interim,
@@ -261,6 +287,7 @@ void SessionManager::initialize_from_netset(std::shared_ptr<Netset> netset,
     }
     std::unique_lock lock(mutex_);
     if (initialized_) {
+        LOG(DEBUG_SESSION, "initialize_from_netset skipped already initialized");
         return;
     }
     netset_ = netset;
@@ -275,6 +302,8 @@ void SessionManager::initialize_from_netset(std::shared_ptr<Netset> netset,
     }
 
     uint32_t total = netset_->size();
+    LOG(DEBUG_SESSION, "initialize_from_netset total=", total,
+        " default_filter=", default_filter_name_);
     sessions_.reserve(total);
     auto now = Clock::now();
     for (uint32_t idx = 0; idx < total; ++idx) {
@@ -289,12 +318,14 @@ void SessionManager::initialize_from_netset(std::shared_ptr<Netset> netset,
         sessions_.emplace(ip, std::move(session));
     }
     initialized_ = true;
+    LOG(DEBUG_SESSION, "initialize_from_netset complete sessions=", sessions_.size());
 }
 
 bool SessionManager::acquire_state_id(uint32_t ip, int& state_id, bool modified) {
     std::unique_lock lock(mutex_);
     auto it = sessions_.find(ip);
     if (it == sessions_.end()) {
+        LOG(DEBUG_SESSION, "acquire_state_id miss ip=", ip_to_string(ip));
         return false;
     }
     Session& session = it->second;
@@ -307,6 +338,8 @@ bool SessionManager::acquire_state_id(uint32_t ip, int& state_id, bool modified)
         session.state_id = 1;
     }
     state_id = session.state_id;
+    LOG(DEBUG_SESSION, "acquire_state_id ip=", ip_to_string(ip), " state_id=", state_id,
+        " modified=", modified);
     return true;
 }
 
@@ -314,14 +347,19 @@ bool SessionManager::verify_state_id(uint32_t ip, int& state_id) const {
     std::shared_lock lock(mutex_);
     auto it = sessions_.find(ip);
     if (it == sessions_.end()) {
+        LOG(DEBUG_SESSION, "verify_state_id miss ip=", ip_to_string(ip));
         return false;
     }
     const Session& session = it->second;
     if (state_id != 0 && state_id != session.state_id) {
         state_id = session.state_id;
+        LOG(DEBUG_SESSION, "verify_state_id mismatch ip=", ip_to_string(ip),
+            " new_state_id=", state_id);
         return false;
     }
     state_id = session.state_id;
+    LOG(DEBUG_SESSION, "verify_state_id ok ip=", ip_to_string(ip),
+        " state_id=", state_id);
     return true;
 }
 
@@ -333,6 +371,7 @@ void SessionManager::ensure_filter_loaded(const std::string& filter_name) {
     if (std::find(names.begin(), names.end(), filter_name) != names.end()) {
         return;
     }
+    LOG(DEBUG_SESSION, "ensure_filter_loaded load name=", filter_name);
     if (filters_dir_.empty()) {
         throw std::runtime_error("Filter '" + filter_name + "' not loaded and no directory set");
     }
@@ -365,6 +404,10 @@ void SessionManager::schedule_times(Session& session, Clock::time_point now) {
     } else {
         session.next_interim = Clock::time_point{};
     }
+    LOG(DEBUG_SESSION, "schedule_times ip=", ip_to_string(session.ip),
+        " status=", static_cast<int>(session.status),
+        " retention=", session.retention.count(),
+        " interim=", session.interim_interval.count());
 }
 
 } // namespace sessions

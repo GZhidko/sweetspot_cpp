@@ -126,7 +126,8 @@ class Engine {
         std::filesystem::path source;
     };
 
-    Decision evaluate_rules(const PacketState& state, const std::vector<Rule>& rules) const;
+    Decision evaluate_rules(const PacketState& state, const std::string& filter_name,
+                            const std::vector<Rule>& rules) const;
     std::vector<Rule> parse_file(const std::filesystem::path& path) const;
     static std::string derive_name_from_path(const std::filesystem::path& path);
 

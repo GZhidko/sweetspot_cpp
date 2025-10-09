@@ -15,6 +15,8 @@
 #include <string_view>
 #include <utility>
 
+#include "../common/logger.h"
+
 namespace filters {
 namespace {
 
@@ -22,6 +24,33 @@ constexpr uint8_t DIR_IN_MASK = 0x01;
 constexpr uint8_t DIR_OUT_MASK = 0x02;
 constexpr std::size_t MAX_RULES = 512;
 constexpr std::size_t MAX_PORTS = 8;
+
+std::string ip_to_string(uint32_t ip_host) {
+    in_addr addr{};
+    addr.s_addr = htonl(ip_host);
+    char buf[INET_ADDRSTRLEN] = {};
+    if (!inet_ntop(AF_INET, &addr, buf, sizeof(buf))) {
+        return "<invalid_ip>";
+    }
+    return buf;
+}
+
+std::string describe_packet_state(const PacketState& state) {
+    std::ostringstream oss;
+    oss << "dir=" << (state.direction == Direction::Inbound ? "in" : "out")
+        << " ipv4=" << state.has_ipv4
+        << " src=" << ip_to_string(state.src_ip)
+        << " dst=" << ip_to_string(state.dst_ip)
+        << " proto=" << static_cast<int>(state.protocol)
+        << " l4=" << state.has_l4
+        << " sport=" << state.src_port
+        << " dport=" << state.dst_port;
+    if (state.tcp_flags_valid) {
+        oss << " flags=0x" << std::hex << std::uppercase << static_cast<int>(state.tcp_flags)
+            << std::dec << std::nouppercase;
+    }
+    return oss.str();
+}
 
 uint8_t direction_to_mask(Direction dir) {
     return dir == Direction::Inbound ? DIR_IN_MASK : DIR_OUT_MASK;
@@ -647,6 +676,7 @@ std::string Engine::derive_name_from_path(const std::filesystem::path& path) {
 void Engine::set_config_path(const std::string& path) {
     std::filesystem::path p(path);
     auto name = derive_name_from_path(p);
+    LOG(DEBUG_FILTER, "filter set_config_path updating name=", name, " path=", p.string());
     load_filter(name, p);
     std::lock_guard<std::mutex> guard(mutex_);
     default_filter_ = name;
@@ -659,6 +689,7 @@ void Engine::load_filter(const std::string& name, const std::filesystem::path& p
         std::cerr << "Filter warning: file '" << path << "' not found" << std::endl;
         return;
     }
+    LOG(DEBUG_FILTER, "filter load begin name=", name, " path=", path.string());
     std::vector<Rule> rules = parse_file(path);
     if (rules.empty()) {
         std::cerr << "Filter warning: no rules loaded from '" << path << "'" << std::endl;
@@ -669,6 +700,8 @@ void Engine::load_filter(const std::string& name, const std::filesystem::path& p
         default_filter_ = name;
         default_path_ = path;
     }
+    LOG(DEBUG_FILTER, "filter load complete name=", name, " rules=", filters_[name].rules.size(),
+        " path=", path.string());
 }
 
 void Engine::load_directory(const std::filesystem::path& dir, bool recursive) {
@@ -677,12 +710,15 @@ void Engine::load_directory(const std::filesystem::path& dir, bool recursive) {
         std::cerr << "Filter warning: directory '" << dir << "' not found" << std::endl;
         return;
     }
+    LOG(DEBUG_FILTER, "filter load_directory path=", dir, " recursive=", recursive);
+    std::size_t loaded = 0;
     if (recursive) {
         for (const auto& entry : std::filesystem::recursive_directory_iterator(dir)) {
             if (!entry.is_regular_file()) {
                 continue;
             }
             load_filter(derive_name_from_path(entry.path()), entry.path());
+            ++loaded;
         }
     } else {
         for (const auto& entry : std::filesystem::directory_iterator(dir)) {
@@ -690,8 +726,10 @@ void Engine::load_directory(const std::filesystem::path& dir, bool recursive) {
                 continue;
             }
             load_filter(derive_name_from_path(entry.path()), entry.path());
+            ++loaded;
         }
     }
+    LOG(DEBUG_FILTER, "filter load_directory complete path=", dir, " loaded=", loaded);
 }
 
 void Engine::reload() {
@@ -707,7 +745,9 @@ void Engine::reload() {
             to_reload.emplace_back(default_filter_, default_path_);
         }
     }
+    LOG(DEBUG_FILTER, "filter reload targets=", to_reload.size());
     for (const auto& [name, path] : to_reload) {
+        LOG(DEBUG_FILTER, "filter reload name=", name, " path=", path.string());
         load_filter(name, path);
     }
 }
@@ -728,9 +768,15 @@ Decision Engine::evaluate(const PacketState& state, const std::string& filter_na
     std::lock_guard<std::mutex> guard(mutex_);
     auto it = filters_.find(filter_name);
     if (it == filters_.end()) {
+        LOG(DEBUG_FILTER, "filter evaluate missing name=", filter_name);
         return Decision{};
     }
-    return evaluate_rules(state, it->second.rules);
+    LOG(DEBUG_FILTER, "filter evaluate name=", filter_name,
+        " state=", describe_packet_state(state), " rules=", it->second.rules.size());
+    auto decision = evaluate_rules(state, filter_name, it->second.rules);
+    LOG(DEBUG_FILTER, "filter decision name=", filter_name, " allow=", decision.allow,
+        " matched=", decision.matched, " rule=", decision.rule_index);
+    return decision;
 }
 
 std::size_t Engine::rule_count() const {
@@ -763,7 +809,8 @@ std::string Engine::default_filter_name() const {
     return default_filter_;
 }
 
-Decision Engine::evaluate_rules(const PacketState& state, const std::vector<Rule>& rules) const {
+Decision Engine::evaluate_rules(const PacketState& state, const std::string& filter_name,
+                                const std::vector<Rule>& rules) const {
     Decision decision;
     decision.allow = true;
     for (const Rule& rule : rules) {
@@ -812,11 +859,15 @@ Decision Engine::evaluate_rules(const PacketState& state, const std::vector<Rule
         decision.shape_rate = rule.shape_rate;
         decision.dnat = rule.dnat;
         decision.allow = !has_flag(rule.actions, ActionFlag::Block);
+        LOG(DEBUG_FILTER, "filter rule matched name=", filter_name, " index=", rule.index,
+            " allow=", decision.allow, " actions=", static_cast<int>(decision.actions),
+            " shape=", decision.shape_rate);
         if (!decision.allow) {
             return decision;
         }
         return decision;
     }
+    LOG(DEBUG_FILTER, "filter no match name=", filter_name, " allow=true");
     return decision;
 }
 
@@ -833,9 +884,15 @@ std::vector<Engine::Rule> Engine::parse_file(const std::filesystem::path& path) 
         return {};
     }
     Tokenizer tokenizer(content);
-    Parser parser(tokenizer.run());
+    auto tokens = tokenizer.run();
+    LOG(DEBUG_FILTER, "filter parse tokens path=", path.string(), " count=", tokens.size());
+    Parser parser(std::move(tokens));
     std::vector<Rule> rules;
-    parser.parse(rules);
+    if (!parser.parse(rules)) {
+        LOG(DEBUG_FILTER, "filter parse failed path=", path.string());
+        return {};
+    }
+    LOG(DEBUG_FILTER, "filter parse success path=", path.string(), " rules=", rules.size());
     return rules;
 }
 

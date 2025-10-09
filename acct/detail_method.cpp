@@ -9,7 +9,10 @@
 
 namespace accounting {
 
-void DetailMethod::set_output_path(std::string path) { path_ = std::move(path); }
+void DetailMethod::set_output_path(std::string path) {
+    LOG(DEBUG_ACCT, "detail set_output_path old=", path_, " new=", path);
+    path_ = std::move(path);
+}
 
 bool DetailMethod::commit(AccountingEntry& entry, std::chrono::steady_clock::time_point now,
                           std::chrono::seconds delay) {
@@ -37,6 +40,8 @@ bool DetailMethod::commit(AccountingEntry& entry, std::chrono::steady_clock::tim
     }
     record.push_back('\n');
 
+    LOG(DEBUG_ACCT, "detail commit path=", path_, " pretty=", entry.pretty(),
+        " delay=", delay.count(), "s");
     std::lock_guard<std::mutex> lock(io_mutex_);
     std::ofstream out(path_, std::ios::out | std::ios::app | std::ios::binary);
     if (!out.is_open()) {
@@ -48,6 +53,7 @@ bool DetailMethod::commit(AccountingEntry& entry, std::chrono::steady_clock::tim
         LOG(DEBUG_ACCT, "detail write failed path=", path_);
         return false;
     }
+    LOG(DEBUG_ACCT, "detail commit success bytes=", record.size());
     return true;
 }
 

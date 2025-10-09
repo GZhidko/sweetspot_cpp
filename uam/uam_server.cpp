@@ -49,10 +49,15 @@ std::optional<std::vector<std::string>> handle_event(const ParsedMessage& reques
 
     const std::string& event = request.arguments[0];
     const std::string& ip_str = request.arguments[1];
+    LOG(DEBUG_UAM, "handle_event event=", event, " ip=", ip_str,
+        " args=", request.arguments.size(),
+        " serial=", (request.serial ? *request.serial : 0),
+        " state_id=", (request.state_id ? *request.state_id : 0));
     uint32_t ip = 0;
     try {
         ip = ip_from_string(ip_str);
     } catch (const std::exception&) {
+        LOG(DEBUG_UAM, "invalid ip string ip=", ip_str);
         return std::vector<std::string>{"ER", "invalid-ip"};
     }
 
@@ -69,14 +74,17 @@ std::optional<std::vector<std::string>> handle_event(const ParsedMessage& reques
 
     auto verify_state = [&](bool required) -> bool {
         if (!request.state_id) {
+            LOG(DEBUG_UAM, "verify_state skip required=", required);
             return !required;
         }
         int requested = *request.state_id;
         if (!manager.verify_state_id(ip, requested)) {
             state_id = requested;
+            LOG(DEBUG_UAM, "verify_state mismatch ip=", ip_str, " requested=", requested);
             return false;
         }
         state_id = requested;
+        LOG(DEBUG_UAM, "verify_state ok ip=", ip_str, " state_id=", state_id);
         return true;
     };
 
@@ -98,6 +106,8 @@ std::optional<std::vector<std::string>> handle_event(const ParsedMessage& reques
         }
 
         std::string filter = (request.arguments.size() > 5) ? request.arguments[5] : "";
+        LOG(DEBUG_UAM, "UP start filter=", filter, " interim=", opts.interim_interval.count(),
+            " session_ctx=", opts.session_context, " event_ctx=", opts.event_context);
         try {
             manager.start_session(ip, filter, opts);
         } catch (const std::exception& ex) {
@@ -139,6 +149,7 @@ Server::~Server() { stop(); }
 
 bool Server::start(const ServerConfig& config) {
     if (running_) {
+        LOG(DEBUG_UAM, "server start ignored already running");
         return false;
     }
 
@@ -179,6 +190,7 @@ bool Server::start(const ServerConfig& config) {
 
 void Server::stop() {
     if (!running_) {
+        LOG(DEBUG_UAM, "server stop ignored not running");
         return;
     }
     running_ = false;
@@ -217,6 +229,8 @@ void Server::run() {
         ParsedMessage request;
         try {
             request = parse_message(std::string_view(buffer.data(), static_cast<std::size_t>(n)));
+            LOG(DEBUG_UAM, "recv packet bytes=", n, " peer=", inet_ntoa(peer.sin_addr),
+                " port=", ntohs(peer.sin_port));
         } catch (const std::exception& ex) {
             LOG(DEBUG_ERROR, "UAM parse error: ", ex.what());
             continue;
@@ -225,6 +239,8 @@ void Server::run() {
         int state_id = request.state_id.value_or(0);
         auto response_payload = handle_event(request, state_id);
         if (!response_payload) {
+            LOG(DEBUG_UAM, "no response generated event=",
+                (request.arguments.empty() ? "" : request.arguments[0]));
             continue;
         }
 
@@ -238,12 +254,17 @@ void Server::run() {
         std::string response;
         try {
             response = build_message(out_args);
+            LOG(DEBUG_UAM, "response built bytes=", response.size(),
+                " serial=", (request.serial ? *request.serial : 0),
+                " state_id=", state_id);
         } catch (const std::exception& ex) {
             LOG(DEBUG_ERROR, "UAM build error: ", ex.what());
             continue;
         }
         ::sendto(socket_fd_, response.data(), response.size(), 0,
                  reinterpret_cast<sockaddr*>(&peer), peer_len);
+        LOG(DEBUG_UAM, "response sent peer=", inet_ntoa(peer.sin_addr),
+            " port=", ntohs(peer.sin_port));
     }
 }
 

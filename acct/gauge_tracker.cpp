@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "../common/logger.h"
+
 namespace accounting {
 
 GaugeTracker& GaugeTracker::instance() {
@@ -16,6 +18,10 @@ void GaugeTracker::set_limits(uint32_t ip, const Limits& limits) {
     std::scoped_lock lock(mutex_);
     Entry& entry = ensure_entry(ip);
     entry.limits = limits;
+    LOG(DEBUG_ACCT, "acct gauge set_limits ip=", ip, " max_octets_in=", limits.max_octets_in,
+        " max_octets_out=", limits.max_octets_out, " max_bps_in=", limits.max_bps_in,
+        " max_bps_out=", limits.max_bps_out, " max_duration=",
+        limits.max_duration.count(), " max_idle=", limits.max_idle.count());
 }
 
 void GaugeTracker::record(uint32_t ip, size_t octets, Direction direction) {
@@ -31,6 +37,7 @@ void GaugeTracker::record(uint32_t ip, size_t octets, Direction direction) {
         entry.last_in_sample = now;
         entry.last_out_sample = now;
         entry.initialized = true;
+        LOG(DEBUG_ACCT, "acct gauge init ip=", ip);
     }
 
     entry.last_activity = now;
@@ -48,6 +55,8 @@ void GaugeTracker::record(uint32_t ip, size_t octets, Direction direction) {
             }
             entry.bytes_since_last_in = 0;
             entry.last_in_sample = now;
+            LOG(DEBUG_ACCT, "acct gauge inbound ip=", ip, " octets=", entry.octets_in,
+                " peak_bps=", entry.peak_bps_in);
         }
     } else {
         entry.octets_out += octets;
@@ -62,6 +71,8 @@ void GaugeTracker::record(uint32_t ip, size_t octets, Direction direction) {
             }
             entry.bytes_since_last_out = 0;
             entry.last_out_sample = now;
+            LOG(DEBUG_ACCT, "acct gauge outbound ip=", ip, " octets=", entry.octets_out,
+                " peak_bps=", entry.peak_bps_out);
         }
     }
 }
@@ -101,11 +112,13 @@ GaugeTracker::Snapshot GaugeTracker::snapshot(uint32_t ip) const {
 void GaugeTracker::reset(uint32_t ip) {
     std::scoped_lock lock(mutex_);
     entries_.erase(ip);
+    LOG(DEBUG_ACCT, "acct gauge reset ip=", ip);
 }
 
 void GaugeTracker::reset_all() {
     std::scoped_lock lock(mutex_);
     entries_.clear();
+    LOG(DEBUG_ACCT, "acct gauge reset_all");
 }
 
 GaugeTracker::Entry& GaugeTracker::ensure_entry(uint32_t ip) {

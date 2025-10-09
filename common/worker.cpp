@@ -37,6 +37,18 @@
 #define TPACKET_ALIGN(x) (((x) + TPACKET_ALIGNMENT - 1) & ~(TPACKET_ALIGNMENT - 1))
 #endif
 
+namespace {
+
+const char* origin_to_string(Worker::FramePayload::Origin origin) {
+    return origin == Worker::FramePayload::Origin::Private ? "private" : "public";
+}
+
+const char* interface_kind_to_string(Worker::InterfaceKind kind) {
+    return kind == Worker::InterfaceKind::Private ? "private" : "public";
+}
+
+}
+
 Worker::Worker(const WorkerPipelineConfig& cfg)
     : cfg_(cfg), nat_(cfg.nat, cfg.thread_index, cfg.thread_count) {
     io_enabled_ = cfg.enable_io;
@@ -70,6 +82,16 @@ Worker::Worker(const WorkerPipelineConfig& cfg)
     }
 
     shape_controller_ = std::make_unique<shape::ShapeController>(*this);
+
+    LOG(DEBUG_RELAY, "relay init thread=", cfg_.thread_index,
+        " io_enabled=", io_enabled_,
+        " priv_rx=", cfg_.io_priv.rx_interface,
+        " pub_rx=", cfg_.io_pub.rx_interface,
+        " static_tcp=", cfg_.static_tcp.size(),
+        " static_udp=", cfg_.static_udp.size(),
+        " static_icmp=", cfg_.static_icmp.size(),
+        " static_ip=", cfg_.static_ip.size(),
+        " nat_configured=", nat_.configured());
 }
 
 Worker::~Worker() { stop(); }
@@ -78,6 +100,7 @@ void Worker::start() {
     if (running_.exchange(true)) {
         return;
     }
+    LOG(DEBUG_RELAY, "relay start requested thread=", cfg_.thread_index);
     thread_ = std::thread(&Worker::run, this);
 }
 
@@ -85,6 +108,7 @@ void Worker::stop() {
     if (!running_.exchange(false)) {
         return;
     }
+    LOG(DEBUG_RELAY, "relay stop requested thread=", cfg_.thread_index);
     if (thread_.joinable()) {
         thread_.join();
     }
@@ -109,7 +133,33 @@ void Worker::run() {
         pub_view = pub_ctx_.io->rx_ring();
     }
 
+    LOG(DEBUG_RELAY, "relay loop enter thread=", cfg_.thread_index,
+        " priv_blocks=", priv_view.block_count(),
+        " pub_blocks=", pub_view.block_count());
+
+    size_t iteration = 0;
     while (running_) {
+        ++iteration;
+        size_t remote_pending = 0;
+        {
+            std::lock_guard<std::mutex> lock(remote_mutex_);
+            remote_pending = remote_queue_.size();
+        }
+        size_t priv_tx = 0;
+        size_t pub_tx = 0;
+        {
+            std::lock_guard<std::mutex> lock(priv_ctx_.tx_mutex);
+            priv_tx = priv_ctx_.tx_queue.size();
+        }
+        {
+            std::lock_guard<std::mutex> lock(pub_ctx_.tx_mutex);
+            pub_tx = pub_ctx_.tx_queue.size();
+        }
+        LOG(DEBUG_RELAY, "relay cycle thread=", cfg_.thread_index,
+            " iteration=", iteration,
+            " remote_pending=", remote_pending,
+            " priv_tx_queue=", priv_tx,
+            " pub_tx_queue=", pub_tx);
         process_remote_frames();
         if (priv_ctx_.io) {
             process_interface(priv_ctx_, priv_view, FramePayload::Origin::Private);
@@ -123,16 +173,25 @@ void Worker::run() {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
     }
+    LOG(DEBUG_RELAY, "relay loop exit thread=", cfg_.thread_index,
+        " iterations=", iteration);
 }
 
 void Worker::process_interface(InterfaceContext& src_ctx, af_packet_io::RingView& view,
                                FramePayload::Origin origin) {
+    LOG(DEBUG_RELAY, "relay process_interface thread=", cfg_.thread_index,
+        " origin=", origin_to_string(origin),
+        " blocks=", view.block_count());
     for (size_t i = 0; i < view.block_count(); ++i) {
         auto* block = view.block_at(i);
         if (!block) {
             continue;
         }
         if (block->hdr.bh1.block_status & TP_STATUS_USER) {
+            LOG(DEBUG_RELAY, "relay block ready thread=", cfg_.thread_index,
+                " origin=", origin_to_string(origin),
+                " block_index=", i,
+                " packets=", block->hdr.bh1.num_pkts);
             process_rx_block(src_ctx, origin, block);
             block->hdr.bh1.block_status = TP_STATUS_KERNEL;
         }
@@ -153,6 +212,11 @@ void Worker::process_rx_block(InterfaceContext& src_ctx, FramePayload::Origin or
                 net_offset = 0;
             }
         }
+        LOG(DEBUG_RELAY, "relay packet thread=", cfg_.thread_index,
+            " origin=", origin_to_string(origin),
+            " block_packet_index=", i,
+            " len=", len,
+            " net_offset=", net_offset);
         handle_frame(origin, data, len, net_offset);
         hdr = reinterpret_cast<tpacket3_hdr*>(reinterpret_cast<uint8_t*>(hdr) +
                                               hdr->tp_next_offset);
@@ -170,6 +234,10 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
         return;
     }
 
+    LOG(DEBUG_RELAY, "relay handle_frame thread=", cfg_.thread_index,
+        " origin=", origin_to_string(origin),
+        " len=", len,
+        " net_offset=", net_offset);
     LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": received frame len=", len,
         " net_offset=", net_offset);
 
@@ -210,6 +278,10 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
         uint32_t target = CPUFanoutHash::select_cpu(CPUFanoutHash::hash_tuple(tuple),
                                                     cfg_.thread_count);
         if (target != cfg_.thread_index) {
+            LOG(DEBUG_RELAY, "relay forward thread=", cfg_.thread_index,
+                " target=", target,
+                " origin=", origin_to_string(origin),
+                " len=", len);
             FramePayload payload;
             payload.origin = origin;
             payload.buffer.assign(data, data + len);
@@ -220,6 +292,9 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
         }
     }
 
+    LOG(DEBUG_RELAY, "relay local process thread=", cfg_.thread_index,
+        " origin=", origin_to_string(origin),
+        " len=", len);
     process_chain(origin, data, len, net_offset, chain);
 }
 
@@ -230,6 +305,10 @@ void Worker::handle_forwarded(FramePayload&& payload) {
     }
 
     Chain chain = std::move(*payload.parsed_chain);
+    LOG(DEBUG_RELAY, "relay handle_forwarded thread=", cfg_.thread_index,
+        " origin=", origin_to_string(payload.origin),
+        " len=", payload.buffer.size(),
+        " net_offset=", payload.net_offset);
     process_chain(payload.origin, payload.buffer.data(), payload.buffer.size(),
                   payload.net_offset, chain);
 }
@@ -286,6 +365,11 @@ void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t le
     }
 
     filters::set_current_filter(selected_filter);
+    LOG(DEBUG_RELAY, "relay process_chain thread=", cfg_.thread_index,
+        " origin=", origin_to_string(origin),
+        " filter=", selected_filter,
+        " session_ip=", session_ip,
+        " drop_for_status=", drop_for_status);
 
     bool ok = true;
     chain.for_each([&](auto& hdr) {
@@ -295,16 +379,26 @@ void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t le
     });
     if (!ok) {
         LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": filtered");
+        LOG(DEBUG_RELAY, "relay filter drop thread=", cfg_.thread_index,
+            " origin=", origin_to_string(origin));
         return;
     }
 
     auto decision = filters::current_decision();
+    LOG(DEBUG_RELAY, "relay decision thread=", cfg_.thread_index,
+        " allow=", decision.allow,
+        " matched=", decision.matched,
+        " rule=", decision.rule_index,
+        " actions=", static_cast<int>(decision.actions),
+        " shape_rate=", decision.shape_rate);
     if (!decision.allow) {
         return;
     }
 
     if (drop_for_status) {
         LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": frame dropped due to session status");
+        LOG(DEBUG_RELAY, "relay drop status thread=", cfg_.thread_index,
+            " session_ip=", session_ip);
         return;
     }
 
@@ -318,6 +412,11 @@ void Worker::enqueue_tx(InterfaceContext& ctx, std::vector<uint8_t>&& frame, siz
     ctx.tx_queue.back().buffer = std::move(frame);
     ctx.tx_queue.back().net_offset = net_offset;
     ctx.tx_queue.back().reason = reason;
+    LOG(DEBUG_RELAY, "relay enqueue_tx thread=", cfg_.thread_index,
+        " origin_ctx=", (&ctx == &priv_ctx_) ? "priv" : "pub",
+        " reason=", reason,
+        " bytes=", ctx.tx_queue.back().buffer.size(),
+        " queue_size=", ctx.tx_queue.size());
     LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": enqueue TX frame bytes=",
         ctx.tx_queue.back().buffer.size(), " net_offset=", net_offset,
         " reason=", reason, " queue_size=", ctx.tx_queue.size());
@@ -332,6 +431,10 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
         }
         frames.swap(ctx.tx_queue);
     }
+
+    LOG(DEBUG_RELAY, "relay transmit_pending thread=", cfg_.thread_index,
+        " origin_ctx=", (&ctx == &priv_ctx_) ? "priv" : "pub",
+        " frames=", frames.size());
 
     if (!ctx.io) {
         return;
@@ -410,11 +513,16 @@ void Worker::process_remote_frames() {
         std::lock_guard<std::mutex> lock(remote_mutex_);
         local.swap(remote_queue_);
     }
+    LOG(DEBUG_RELAY, "relay process_remote thread=", cfg_.thread_index,
+        " count=", local.size());
     for (auto& frame : local) {
         LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
             ": processing forwarded frame bytes=", frame.buffer.size(),
             " net_offset=", frame.net_offset,
             " origin=", frame.origin == FramePayload::Origin::Private ? "private" : "public");
+        LOG(DEBUG_RELAY, "relay remote frame thread=", cfg_.thread_index,
+            " origin=", origin_to_string(frame.origin),
+            " len=", frame.buffer.size());
         handle_forwarded(std::move(frame));
     }
 }
@@ -422,6 +530,8 @@ void Worker::process_remote_frames() {
 void Worker::submit_remote_frame(FramePayload&& frame) {
     std::lock_guard<std::mutex> lock(remote_mutex_);
     remote_queue_.emplace_back(std::move(frame));
+    LOG(DEBUG_RELAY, "relay submit_remote thread=", cfg_.thread_index,
+        " queue_size=", remote_queue_.size());
 }
 
 std::vector<std::vector<uint8_t>> Worker::collect_tx_frames() {
@@ -435,11 +545,17 @@ std::vector<std::vector<uint8_t>> Worker::collect_tx_frames() {
     };
     collect(priv_ctx_);
     collect(pub_ctx_);
+    LOG(DEBUG_RELAY, "relay collect_tx_frames thread=", cfg_.thread_index,
+        " collected=", out.size());
     return out;
 }
 
 void Worker::enqueue_shaped_frame(InterfaceKind kind, std::vector<uint8_t>&& frame,
                                   size_t net_offset) {
+    LOG(DEBUG_RELAY, "relay enqueue_shaped thread=", cfg_.thread_index,
+        " target=", interface_kind_to_string(kind),
+        " bytes=", frame.size(),
+        " net_offset=", net_offset);
     if (kind == InterfaceKind::Private) {
         enqueue_tx(priv_ctx_, std::move(frame), net_offset, "shape");
     } else {
@@ -536,8 +652,15 @@ void Worker::finish_frame(Chain& chain, const filters::Decision& decision,
     if (shaped && shape_controller_) {
         auto target = (dest_ctx == &pub_ctx_) ? shape::ShapeController::Target::Public
                                               : shape::ShapeController::Target::Private;
+        LOG(DEBUG_RELAY, "relay shape enqueue thread=", cfg_.thread_index,
+            " target=", (dest_ctx == &pub_ctx_ ? "pub" : "priv"),
+            " rate=", decision.shape_rate,
+            " bytes=", tx_buffer.size());
         shape_controller_->enqueue(target, std::move(tx_buffer), net_offset, decision.shape_rate);
     } else {
+        LOG(DEBUG_RELAY, "relay direct enqueue thread=", cfg_.thread_index,
+            " target=", (dest_ctx == &pub_ctx_ ? "pub" : "priv"),
+            " bytes=", tx_buffer.size());
         enqueue_tx(*dest_ctx, std::move(tx_buffer), net_offset, "direct");
     }
 }
