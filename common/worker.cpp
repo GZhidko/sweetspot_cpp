@@ -328,8 +328,8 @@ void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t le
         src_port = ntohs(udp->udph.source);
         dst_port = ntohs(udp->udph.dest);
     } else if (auto* icmp = chain.get<ICMPHeader>()) {
-        src_port = ntohs(icmp->icmph.un.echo.id);
-        dst_port = ntohs(icmp->icmph.un.echo.sequence);
+        dst_port = ntohs(icmp->icmph.un.echo.id);
+        src_port = ntohs(icmp->icmph.un.echo.sequence);
     }
 
     if (dir == filters::Direction::Outbound) {
@@ -337,6 +337,7 @@ void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t le
     } else {
         uint32_t pub_ip = ntohl(ipv4->iph.daddr);
         uint32_t remote_ip = ntohl(ipv4->iph.saddr);
+        
         if (auto resolved =
                 nat_.resolve_private(pub_ip, remote_ip, dst_port, src_port, ipv4->iph.protocol)) {
             session_ip = *resolved;
