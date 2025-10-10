@@ -48,30 +48,6 @@ class Nat : public EndpointBase {
         uint32_t owner_thread = 0;
     };
 
-    struct PrivateKey {
-        uint32_t prv_ip = 0;
-        uint16_t src_port = 0;
-        uint8_t protocol = 0;
-
-        bool operator==(const PrivateKey& other) const noexcept;
-    };
-
-    struct PubOnlyKey {
-        uint32_t pub_ip = 0;
-        uint16_t pub_port = 0;
-        uint8_t protocol = 0;
-
-        bool operator==(const PubOnlyKey& other) const noexcept;
-    };
-
-    struct PrivateKeyHash {
-        size_t operator()(const PrivateKey& key) const noexcept;
-    };
-
-    struct PubOnlyKeyHash {
-        size_t operator()(const PubOnlyKey& key) const noexcept;
-    };
-
     Nat(const NatConfig& cfg, uint32_t thread_index = 0, uint32_t thread_count = 1);
 
     bool configured() const noexcept { return ready_; }
@@ -89,15 +65,6 @@ class Nat : public EndpointBase {
     void process(ICMPHeader& icmp);
     void process(ICMPHeader& icmp, Clock::time_point now);
 
-    void add_static_tcp_mapping(uint32_t prv_ip, uint16_t private_port, uint32_t pub_ip,
-                                uint16_t public_port);
-    void add_static_udp_mapping(uint32_t prv_ip, uint16_t private_port, uint32_t pub_ip,
-                                uint16_t public_port);
-    void add_static_icmp_mapping(uint32_t prv_ip, uint16_t private_id, uint32_t pub_ip,
-                                 uint16_t public_id);
-    void add_static_ip_mapping(uint32_t prv_ip, uint32_t pub_ip);
-    void clear_static_mappings();
-
     std::optional<Translation> find_ip_reply(uint32_t pub_ip, uint32_t remote_ip,
                                              uint8_t protocol);
     std::optional<Translation> find_tcp_reply(uint32_t pub_ip, uint32_t remote_ip,
@@ -112,9 +79,6 @@ class Nat : public EndpointBase {
                                                    uint16_t src_port, uint16_t dst_port);
     std::optional<Translation> lookup_icmp_outbound(uint32_t prv_ip, uint32_t dst_ip,
                                                     uint16_t ident, uint16_t seq);
-    std::optional<Translation> find_static_outbound(uint32_t prv_ip, uint32_t dst_ip,
-                                                    uint16_t src_port, uint16_t dst_port,
-                                                    uint8_t protocol) const;
 
     std::optional<uint32_t> resolve_private(uint32_t pub_ip, uint32_t remote_ip,
                                             uint16_t pub_port, uint16_t remote_port,
@@ -152,19 +116,11 @@ class Nat : public EndpointBase {
     uint32_t map_ip(uint32_t prv_ip, uint32_t dst_ip, uint8_t protocol,
                     uint32_t thread_index) const;
 
-    std::optional<Translation> maybe_static_translation(uint32_t prv_ip, uint32_t dst_ip,
-                                                        uint16_t src_port, uint16_t dst_port,
-                                                        uint8_t protocol) const;
-    std::optional<Translation> maybe_static_inbound(uint32_t pub_ip, uint32_t remote_ip,
-                                                    uint16_t pub_port, uint16_t remote_port,
-                                                    uint8_t protocol) const;
     Translation make_translation(const MappingEntry& entry) const;
     std::optional<Translation> find_inbound(MappingTable& table, const PubKey& key);
     void touch_entry(MappingTable& table, MappingEntry& entry);
     void evict_if_needed(MappingTable& table);
     MappingEntry& insert_entry(MappingTable& table, FlowKey flow, PubKey pub);
-    void add_static_mapping(uint32_t prv_ip, uint16_t private_port, uint8_t protocol,
-                            uint32_t pub_ip, uint16_t public_port);
 
     bool ready_ = false;
     uint32_t thread_index_ = 0;
@@ -172,9 +128,6 @@ class Nat : public EndpointBase {
     MappingTable tcp_table_{};
     MappingTable udp_table_{};
     MappingTable icmp_table_{};
-
-    std::unordered_map<PrivateKey, PubOnlyKey, PrivateKeyHash> static_forward_;
-    std::unordered_map<PubOnlyKey, PrivateKey, PubOnlyKeyHash> static_reverse_;
 };
 
 namespace std {

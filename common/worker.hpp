@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "../shape/shape_controller.hpp"
+#include "dnat_table.hpp"
 
 struct WorkerPipelineConfig {
     af_packet_io::IoConfig io_priv;
@@ -81,6 +82,11 @@ class Worker {
     void process_remote_frames();
     void process_chain(FramePayload::Origin origin, uint8_t* data, size_t len, size_t net_offset,
                        Chain& chain);
+    bool apply_inbound_dnat(FramePayload::Origin origin, Chain& chain,
+                            IPv4Header& ipv4, uint8_t* l3_data, size_t l3_len,
+                            const filters::Decision& decision);
+    bool apply_outbound_dnat(FramePayload::Origin origin, Chain& chain, IPv4Header& ipv4,
+                             uint8_t* l3_data, size_t l3_len);
     void finish_frame(Chain& chain, const filters::Decision& decision,
                       FramePayload::Origin origin, uint8_t* data, size_t len, size_t net_offset,
                       uint32_t session_ip);

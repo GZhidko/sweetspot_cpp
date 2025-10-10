@@ -354,32 +354,6 @@ void test_capacity_eviction(const NatConfig& base_cfg) {
     assert(ntohs(udp_reply_a.udph.dest) == pub_port_a);
 }
 
-void test_static_tcp(const NatConfig& cfg) {
-    Nat nat(cfg, 0, 4);
-    uint32_t prv_ip = ip_from_string("10.0.0.14");
-    uint32_t dst_ip = ip_from_string("203.0.113.40");
-    uint32_t pub_ip = ip_from_string("198.51.100.150");
-    uint16_t pub_port = 55000;
-    nat.add_static_tcp_mapping(prv_ip, 12345, pub_ip, pub_port);
-
-    IPv4Header ip{};
-    setup_ipv4(ip, prv_ip, dst_ip, IPPROTO_TCP, sizeof(tcphdr));
-    TCPHeader tcp{};
-    setup_tcp(tcp, ip, 12345, 80, 0x6a6a);
-    nat.process(tcp);
-    assert(ntohl(ip.iph.saddr) == pub_ip);
-    assert(ntohs(tcp.tcph.source) == pub_port);
-
-    IPv4Header reply{};
-    setup_ipv4(reply, dst_ip, pub_ip, IPPROTO_TCP, sizeof(tcphdr));
-    TCPHeader reply_tcp{};
-    setup_tcp(reply_tcp, reply, 80, pub_port, 0x5b5b);
-    nat.process(reply_tcp);
-    assert(ntohl(reply.iph.daddr) == prv_ip);
-    assert(ntohs(reply_tcp.tcph.dest) == 12345);
-}
-
-
 void test_nat_fanout_consistency(const NatConfig& cfg) {
     CPUFanoutHash::set_siphash_key(0, 0);
     const uint32_t worker_count = 5;
@@ -489,66 +463,6 @@ void test_worker_forwarding_dynamic(const NatConfig& cfg) {
     assert(forwarded_targets[0] == target);
 }
 
-void test_worker_forwarding_static(const NatConfig& cfg) {
-    CPUFanoutHash::set_siphash_key(0, 0);
-
-    WorkerPipelineConfig worker_cfg{};
-    worker_cfg.enable_io = false;
-    worker_cfg.thread_count = 2;
-    worker_cfg.thread_index = 0;
-    worker_cfg.nat = cfg;
-
-    uint32_t prv_ip = ip_from_string("10.0.0.60");
-    uint32_t pub_ip = ip_from_string("198.51.100.250");
-    uint16_t prv_port = 6000;
-    uint16_t pub_port = 46000;
-    worker_cfg.static_tcp.emplace_back(prv_ip, prv_port, pub_ip, pub_port);
-
-    Worker worker(worker_cfg);
-    std::vector<uint32_t> forwarded_targets;
-    worker.set_forward_callback([&](uint32_t target, Worker::FramePayload&& payload) {
-        forwarded_targets.push_back(target);
-    });
-
-    uint32_t remote_ip = ip_from_string("203.0.113.210");
-    uint16_t remote_port = 5201;
-
-    std::vector<uint8_t> frame;
-    uint32_t target = 0;
-    auto compute_target = [&](uint16_t sport, uint16_t dport) {
-        auto tuple = std::make_tuple(htonl(prv_ip), htonl(remote_ip), htons(sport), htons(dport),
-                                     static_cast<uint8_t>(IPPROTO_TCP));
-        return CPUFanoutHash::select_cpu(CPUFanoutHash::hash_tuple(tuple), worker_cfg.thread_count);
-    };
-    uint32_t inbound_target = worker_cfg.thread_index;
-    for (int attempt = 0; attempt < 32; ++attempt) {
-        uint16_t candidate_dport = static_cast<uint16_t>(remote_port + attempt);
-        frame = make_tcp_frame(prv_ip, remote_ip, prv_port, candidate_dport);
-        target = compute_target(prv_port, candidate_dport);
-        inbound_target = CPUFanoutHash::select_cpu(
-            CPUFanoutHash::hash_tuple(std::make_tuple(htonl(remote_ip), htonl(pub_ip),
-                                                      htons(candidate_dport), htons(pub_port),
-                                                      static_cast<uint8_t>(IPPROTO_TCP))),
-            worker_cfg.thread_count);
-        if (target != worker_cfg.thread_index && inbound_target != worker_cfg.thread_index) {
-            remote_port = candidate_dport;
-            break;
-        }
-    }
-
-    assert(target != worker_cfg.thread_index);
-    assert(inbound_target != worker_cfg.thread_index);
-    worker.process_frame_for_tests(frame);
-    assert(forwarded_targets.size() == 1);
-    assert(forwarded_targets[0] == target);
-
-    forwarded_targets.clear();
-    auto inbound = make_tcp_frame(remote_ip, pub_ip, remote_port, pub_port);
-    worker.process_frame_for_tests(inbound, Worker::FramePayload::Origin::Public);
-    assert(forwarded_targets.size() == 1);
-    assert(forwarded_targets[0] == inbound_target);
-}
-
 void test_dynamic_ip_translation(const NatConfig& cfg) {
     Nat nat(cfg, 0, 4);
     uint32_t prv_ip = ip_from_string("10.0.0.40");
@@ -559,24 +473,6 @@ void test_dynamic_ip_translation(const NatConfig& cfg) {
     nat.process(ip);
     uint32_t pub_ip = ntohl(ip.iph.saddr);
     assert(pub_ip != prv_ip);
-
-    IPv4Header reply{};
-    setup_ipv4(reply, dst_ip, pub_ip, 47, 0);
-    nat.process(reply);
-    assert(ntohl(reply.iph.daddr) == prv_ip);
-}
-
-void test_static_ip(const NatConfig& cfg) {
-    Nat nat(cfg, 0, 4);
-    uint32_t prv_ip = ip_from_string("10.0.0.30");
-    uint32_t dst_ip = ip_from_string("203.0.113.60");
-    uint32_t pub_ip = ip_from_string("198.51.100.200");
-    nat.add_static_ip_mapping(prv_ip, pub_ip);
-
-    IPv4Header ip{};
-    setup_ipv4(ip, prv_ip, dst_ip, 47 /* GRE */, 0);
-    nat.process(ip);
-    assert(ntohl(ip.iph.saddr) == pub_ip);
 
     IPv4Header reply{};
     setup_ipv4(reply, dst_ip, pub_ip, 47, 0);
@@ -604,14 +500,10 @@ int main() {
     test_non_private_source_untouched(cfg);
     std::cout << "\n=== test_capacity_eviction ===\n";
     test_capacity_eviction(cfg);
-    std::cout << "\n=== test_static_tcp ===\n";
-    test_static_tcp(cfg);
     std::cout << "\n=== test_nat_fanout_consistency ===\n";
     test_nat_fanout_consistency(cfg);
     std::cout << "\n=== test_worker_forwarding_dynamic ===\n";
     test_worker_forwarding_dynamic(cfg);
-    std::cout << "\n=== test_worker_forwarding_static ===\n";
-    test_worker_forwarding_static(cfg);
 
     std::cout << "NAT tests passed" << std::endl;
     return 0;

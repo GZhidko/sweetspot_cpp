@@ -1,11 +1,11 @@
 #include "worker.hpp"
 
+#include "../acct/gauge_tracker.hpp"
+#include "../committer/committer.h"
 #include "../common/logger.h"
 #include "../filters/filter.h"
 #include "../filters/filter_engine.hpp"
 #include "../sessions/session_manager.hpp"
-#include "../acct/gauge_tracker.hpp"
-#include "../committer/committer.h"
 #include "../shape/shape_controller.hpp"
 #include "checksum.hpp"
 #include "jenkins_hash.hpp"
@@ -13,17 +13,17 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
-#include <tuple>
+#include <linux/if_ether.h>
+#include <linux/if_packet.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <netinet/ip_icmp.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
-#include <netinet/ip_icmp.h>
-#include <vector>
-#include <linux/if_packet.h>
-#include <linux/if_ether.h>
 #include <sys/socket.h>
+#include <tuple>
 #include <unistd.h>
+#include <vector>
 
 #ifndef TP_STATUS_OUTGOING
 #define TP_STATUS_OUTGOING 0x20000000
@@ -47,7 +47,7 @@ const char* interface_kind_to_string(Worker::InterfaceKind kind) {
     return kind == Worker::InterfaceKind::Private ? "private" : "public";
 }
 
-}
+} // namespace
 
 Worker::Worker(const WorkerPipelineConfig& cfg)
     : cfg_(cfg), nat_(cfg.nat, cfg.thread_index, cfg.thread_count) {
@@ -60,41 +60,35 @@ Worker::Worker(const WorkerPipelineConfig& cfg)
             pub_ctx_.io = std::make_unique<af_packet_io::IoContext>(cfg.io_pub);
         }
     }
-    for (const auto& [priv_ip, priv_port, pub_ip, pub_port] : cfg_.static_tcp) {
-        nat_.add_static_tcp_mapping(priv_ip, priv_port, pub_ip, pub_port);
-    }
-    for (const auto& [priv_ip, priv_port, pub_ip, pub_port] : cfg_.static_udp) {
-        nat_.add_static_udp_mapping(priv_ip, priv_port, pub_ip, pub_port);
-    }
-    for (const auto& [priv_ip, priv_id, pub_ip, pub_id] : cfg_.static_icmp) {
-        nat_.add_static_icmp_mapping(priv_ip, priv_id, pub_ip, pub_id);
-    }
-    for (const auto& [priv_ip, pub_ip] : cfg_.static_ip) {
-        nat_.add_static_ip_mapping(priv_ip, pub_ip);
+    if (!cfg_.static_tcp.empty() || !cfg_.static_udp.empty() || !cfg_.static_icmp.empty() ||
+        !cfg_.static_ip.empty()) {
+        LOG(DEBUG_NAT,
+            "Static NAT mappings via WorkerPipelineConfig are no longer supported and will be "
+            "ignored "
+            "tcp=",
+            cfg_.static_tcp.size(), " udp=", cfg_.static_udp.size(),
+            " icmp=", cfg_.static_icmp.size(), " ip=", cfg_.static_ip.size());
     }
 
     try {
         sessions::SessionManager::instance().initialize_from_netset(
-            cfg.nat.private_netset,
-            filters::Engine::instance().default_filter_name());
+            cfg.nat.private_netset, filters::Engine::instance().default_filter_name());
     } catch (const std::exception& ex) {
         LOG(DEBUG_ERROR, "Session init failed: ", ex.what());
     }
 
     shape_controller_ = std::make_unique<shape::ShapeController>(*this);
 
-    LOG(DEBUG_RELAY, "relay init thread=", cfg_.thread_index,
-        " io_enabled=", io_enabled_,
-        " priv_rx=", cfg_.io_priv.rx_interface,
-        " pub_rx=", cfg_.io_pub.rx_interface,
-        " static_tcp=", cfg_.static_tcp.size(),
-        " static_udp=", cfg_.static_udp.size(),
-        " static_icmp=", cfg_.static_icmp.size(),
-        " static_ip=", cfg_.static_ip.size(),
+    LOG(DEBUG_RELAY, "relay init thread=", cfg_.thread_index, " io_enabled=", io_enabled_,
+        " priv_rx=", cfg_.io_priv.rx_interface, " pub_rx=", cfg_.io_pub.rx_interface,
+        " static_tcp=", cfg_.static_tcp.size(), " static_udp=", cfg_.static_udp.size(),
+        " static_icmp=", cfg_.static_icmp.size(), " static_ip=", cfg_.static_ip.size(),
         " nat_configured=", nat_.configured());
 }
 
-Worker::~Worker() { stop(); }
+Worker::~Worker() {
+    stop();
+}
 
 void Worker::start() {
     if (running_.exchange(true)) {
@@ -134,8 +128,7 @@ void Worker::run() {
     }
 
     LOG(DEBUG_RELAY, "relay loop enter thread=", cfg_.thread_index,
-        " priv_blocks=", priv_view.block_count(),
-        " pub_blocks=", pub_view.block_count());
+        " priv_blocks=", priv_view.block_count(), " pub_blocks=", pub_view.block_count());
 
     size_t iteration = 0;
     while (running_) {
@@ -155,7 +148,7 @@ void Worker::run() {
             std::lock_guard<std::mutex> lock(pub_ctx_.tx_mutex);
             pub_tx = pub_ctx_.tx_queue.size();
         }
-            process_remote_frames();
+        process_remote_frames();
         if (priv_ctx_.io) {
             process_interface(priv_ctx_, priv_view, FramePayload::Origin::Private);
         }
@@ -168,8 +161,7 @@ void Worker::run() {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
     }
-    LOG(DEBUG_RELAY, "relay loop exit thread=", cfg_.thread_index,
-        " iterations=", iteration);
+    LOG(DEBUG_RELAY, "relay loop exit thread=", cfg_.thread_index, " iterations=", iteration);
 }
 
 void Worker::process_interface(InterfaceContext& src_ctx, af_packet_io::RingView& view,
@@ -181,8 +173,7 @@ void Worker::process_interface(InterfaceContext& src_ctx, af_packet_io::RingView
         }
         if (block->hdr.bh1.block_status & TP_STATUS_USER) {
             LOG(DEBUG_RELAY, "relay block ready thread=", cfg_.thread_index,
-                " origin=", origin_to_string(origin),
-                " block_index=", i,
+                " origin=", origin_to_string(origin), " block_index=", i,
                 " packets=", block->hdr.bh1.num_pkts);
             process_rx_block(src_ctx, origin, block);
             block->hdr.bh1.block_status = TP_STATUS_KERNEL;
@@ -193,7 +184,7 @@ void Worker::process_interface(InterfaceContext& src_ctx, af_packet_io::RingView
 void Worker::process_rx_block(InterfaceContext& src_ctx, FramePayload::Origin origin,
                               tpacket_block_desc* block_desc) {
     auto* hdr = reinterpret_cast<tpacket3_hdr*>(reinterpret_cast<char*>(block_desc) +
-                                                 block_desc->hdr.bh1.offset_to_first_pkt);
+                                                block_desc->hdr.bh1.offset_to_first_pkt);
     for (uint32_t i = 0; i < block_desc->hdr.bh1.num_pkts; ++i) {
         uint8_t* data = reinterpret_cast<uint8_t*>(hdr) + hdr->tp_mac;
         size_t len = hdr->tp_snaplen;
@@ -205,13 +196,11 @@ void Worker::process_rx_block(InterfaceContext& src_ctx, FramePayload::Origin or
             }
         }
         LOG(DEBUG_RELAY, "relay packet thread=", cfg_.thread_index,
-            " origin=", origin_to_string(origin),
-            " block_packet_index=", i,
-            " len=", len,
+            " origin=", origin_to_string(origin), " block_packet_index=", i, " len=", len,
             " net_offset=", net_offset);
         handle_frame(origin, data, len, net_offset);
-        hdr = reinterpret_cast<tpacket3_hdr*>(reinterpret_cast<uint8_t*>(hdr) +
-                                              hdr->tp_next_offset);
+        hdr =
+            reinterpret_cast<tpacket3_hdr*>(reinterpret_cast<uint8_t*>(hdr) + hdr->tp_next_offset);
     }
 }
 
@@ -227,9 +216,7 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
     }
 
     LOG(DEBUG_RELAY, "relay handle_frame thread=", cfg_.thread_index,
-        " origin=", origin_to_string(origin),
-        " len=", len,
-        " net_offset=", net_offset);
+        " origin=", origin_to_string(origin), " len=", len, " net_offset=", net_offset);
     LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": received frame len=", len,
         " net_offset=", net_offset);
 
@@ -267,13 +254,11 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
     if (cfg_.thread_count > 1 && forward_fn_) {
         auto tuple = std::make_tuple(htonl(src_ip_host), htonl(dst_ip_host), htons(src_port),
                                      htons(dst_port), static_cast<uint8_t>(ipv4->iph.protocol));
-        uint32_t target = CPUFanoutHash::select_cpu(CPUFanoutHash::hash_tuple(tuple),
-                                                    cfg_.thread_count);
+        uint32_t target =
+            CPUFanoutHash::select_cpu(CPUFanoutHash::hash_tuple(tuple), cfg_.thread_count);
         if (target != cfg_.thread_index) {
-            LOG(DEBUG_RELAY, "relay forward thread=", cfg_.thread_index,
-                " target=", target,
-                " origin=", origin_to_string(origin),
-                " len=", len);
+            LOG(DEBUG_RELAY, "relay forward thread=", cfg_.thread_index, " target=", target,
+                " origin=", origin_to_string(origin), " len=", len);
             FramePayload payload;
             payload.origin = origin;
             payload.buffer.assign(data, data + len);
@@ -285,8 +270,7 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
     }
 
     LOG(DEBUG_RELAY, "relay local process thread=", cfg_.thread_index,
-        " origin=", origin_to_string(origin),
-        " len=", len);
+        " origin=", origin_to_string(origin), " len=", len);
     process_chain(origin, data, len, net_offset, chain);
 }
 
@@ -298,11 +282,10 @@ void Worker::handle_forwarded(FramePayload&& payload) {
 
     Chain chain = std::move(*payload.parsed_chain);
     LOG(DEBUG_RELAY, "relay handle_forwarded thread=", cfg_.thread_index,
-        " origin=", origin_to_string(payload.origin),
-        " len=", payload.buffer.size(),
+        " origin=", origin_to_string(payload.origin), " len=", payload.buffer.size(),
         " net_offset=", payload.net_offset);
-    process_chain(payload.origin, payload.buffer.data(), payload.buffer.size(),
-                  payload.net_offset, chain);
+    process_chain(payload.origin, payload.buffer.data(), payload.buffer.size(), payload.net_offset,
+                  chain);
 }
 
 void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t len,
@@ -317,6 +300,9 @@ void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t le
     if (!ipv4) {
         return;
     }
+
+    uint8_t* l3_data = data + net_offset;
+    size_t l3_len = len > net_offset ? len - net_offset : 0;
 
     uint32_t session_ip = 0;
     uint16_t src_port = 0;
@@ -337,7 +323,6 @@ void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t le
     } else {
         uint32_t pub_ip = ntohl(ipv4->iph.daddr);
         uint32_t remote_ip = ntohl(ipv4->iph.saddr);
-        
         if (auto resolved =
                 nat_.resolve_private(pub_ip, remote_ip, dst_port, src_port, ipv4->iph.protocol)) {
             session_ip = *resolved;
@@ -359,10 +344,8 @@ void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t le
 
     filters::set_current_filter(selected_filter);
     LOG(DEBUG_RELAY, "relay process_chain thread=", cfg_.thread_index,
-        " origin=", origin_to_string(origin),
-        " filter=", selected_filter,
-        " session_ip=", session_ip,
-        " drop_for_status=", drop_for_status);
+        " origin=", origin_to_string(origin), " filter=", selected_filter,
+        " session_ip=", session_ip, " drop_for_status=", drop_for_status);
 
     bool ok = true;
     chain.for_each([&](auto& hdr) {
@@ -378,14 +361,17 @@ void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t le
     }
 
     auto decision = filters::current_decision();
-    LOG(DEBUG_RELAY, "relay decision thread=", cfg_.thread_index,
-        " allow=", decision.allow,
-        " matched=", decision.matched,
-        " rule=", decision.rule_index,
-        " actions=", static_cast<int>(decision.actions),
-        " shape_rate=", decision.shape_rate);
+    LOG(DEBUG_RELAY, "relay decision thread=", cfg_.thread_index, " allow=", decision.allow,
+        " matched=", decision.matched, " rule=", decision.rule_index,
+        " actions=", static_cast<int>(decision.actions), " shape_rate=", decision.shape_rate);
     if (!decision.allow) {
         return;
+    }
+
+    if (origin == FramePayload::Origin::Public) {
+        apply_inbound_dnat(origin, chain, *ipv4, l3_data, l3_len, decision);
+    } else {
+        apply_outbound_dnat(origin, chain, *ipv4, l3_data, l3_len);
     }
 
     if (drop_for_status) {
@@ -398,6 +384,217 @@ void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t le
     finish_frame(chain, decision, origin, data, len, net_offset, session_ip);
 }
 
+namespace {
+
+uint16_t compute_tcp_checksum(const iphdr& ip, uint8_t* l4_data, uint16_t tcp_len) {
+    auto checksum = checksum::l4_checksum(&ip, l4_data, tcp_len, IPPROTO_TCP);
+    return htons(checksum);
+}
+
+uint16_t compute_udp_checksum(const iphdr& ip, uint8_t* l4_data, uint16_t udp_len) {
+    auto checksum = checksum::l4_checksum(&ip, l4_data, udp_len, IPPROTO_UDP);
+    return htons(checksum);
+}
+
+uint16_t compute_icmp_checksum(uint8_t* icmp_bytes, uint16_t icmp_len) {
+    auto checksum = checksum::ip_checksum(icmp_bytes, icmp_len);
+    return htons(checksum);
+}
+
+} // namespace
+
+bool Worker::apply_inbound_dnat(FramePayload::Origin origin, Chain& chain, IPv4Header& ipv4,
+                                uint8_t* l3_data, size_t l3_len,
+                                const filters::Decision& decision) {
+    if (origin != FramePayload::Origin::Public) {
+        return false;
+    }
+    if (!has_flag(decision.actions, filters::ActionFlag::Dnat) || !decision.dnat.valid) {
+        return false;
+    }
+
+    const uint8_t protocol = ipv4.iph.protocol;
+    const uint32_t target_ip = decision.dnat.ip;
+    const uint16_t requested_target_port = decision.dnat.port;
+    const uint32_t original_ip = ntohl(ipv4.iph.daddr);
+    const uint32_t remote_ip = ntohl(ipv4.iph.saddr);
+
+    uint16_t original_port = 0;
+    uint16_t remote_port = 0;
+    uint16_t effective_target_port = requested_target_port;
+
+    auto* tcp = chain.get<TCPHeader>();
+    auto* udp = chain.get<UDPHeader>();
+    auto* icmp = chain.get<ICMPHeader>();
+
+    uint16_t ip_header_len = static_cast<uint16_t>(ipv4.iph.ihl) * 4u;
+    uint16_t total_len = ntohs(ipv4.iph.tot_len);
+    if (l3_len < total_len || total_len < ip_header_len) {
+        LOG(DEBUG_ERROR, "Worker", cfg_.thread_index,
+            ": DNAT inbound invalid lengths total=", total_len, " header=", ip_header_len,
+            " l3_len=", l3_len);
+        return false;
+    }
+
+    if (tcp) {
+        original_port = ntohs(tcp->tcph.dest);
+        remote_port = ntohs(tcp->tcph.source);
+        if (requested_target_port != 0) {
+            tcp->tcph.dest = htons(requested_target_port);
+            effective_target_port = requested_target_port;
+        } else {
+            effective_target_port = original_port;
+        }
+    } else if (udp) {
+        original_port = ntohs(udp->udph.dest);
+        remote_port = ntohs(udp->udph.source);
+        if (requested_target_port != 0) {
+            udp->udph.dest = htons(requested_target_port);
+            effective_target_port = requested_target_port;
+        } else {
+            effective_target_port = original_port;
+        }
+    } else if (icmp) {
+        original_port = ntohs(icmp->icmph.un.echo.id);
+        remote_port = ntohs(icmp->icmph.un.echo.sequence);
+        if (requested_target_port != 0) {
+            icmp->icmph.un.echo.id = htons(requested_target_port);
+            effective_target_port = requested_target_port;
+        } else {
+            effective_target_port = original_port;
+        }
+    } else {
+        effective_target_port = requested_target_port;
+    }
+
+    LOG(DEBUG_RELAY, "relay DNAT inbound thread=", cfg_.thread_index,
+        " original_ip=", IPv4Header::ip_to_string(original_ip), " original_port=", original_port,
+        " target_ip=", IPv4Header::ip_to_string(target_ip), " target_port=", effective_target_port,
+        " remote_ip=", IPv4Header::ip_to_string(remote_ip), " remote_port=", remote_port,
+        " protocol=", static_cast<int>(protocol));
+
+    DnatTable::instance().upsert(target_ip, effective_target_port, remote_ip, remote_port,
+                                 original_ip, original_port, protocol, protocol == IPPROTO_TCP);
+
+    ipv4.iph.daddr = htonl(target_ip);
+    ipv4.iph.check = checksum::recompute_ipv4_checksum(ipv4.iph);
+    std::memcpy(l3_data, &ipv4.iph, ip_header_len);
+
+    uint8_t* l4_data = l3_data + ip_header_len;
+    uint16_t payload_len = static_cast<uint16_t>(total_len - ip_header_len);
+
+    if (tcp && payload_len >= sizeof(tcphdr)) {
+        std::memcpy(l4_data, &tcp->tcph, sizeof(tcphdr));
+        auto* raw_tcp = reinterpret_cast<tcphdr*>(l4_data);
+        raw_tcp->check = 0;
+        raw_tcp->check = compute_tcp_checksum(ipv4.iph, l4_data, payload_len);
+        tcp->tcph.check = raw_tcp->check;
+    } else if (udp && payload_len >= sizeof(udphdr)) {
+        std::memcpy(l4_data, &udp->udph, sizeof(udphdr));
+        auto* raw_udp = reinterpret_cast<udphdr*>(l4_data);
+        if (raw_udp->check != 0) {
+            raw_udp->check = 0;
+            raw_udp->check = compute_udp_checksum(ipv4.iph, l4_data, payload_len);
+        }
+        udp->udph.check = raw_udp->check;
+    } else if (icmp && payload_len >= sizeof(icmphdr)) {
+        std::memcpy(l4_data, &icmp->icmph, sizeof(icmphdr));
+        auto* raw_icmp = reinterpret_cast<icmphdr*>(l4_data);
+        raw_icmp->checksum = 0;
+        raw_icmp->checksum = compute_icmp_checksum(l4_data, payload_len);
+        icmp->icmph.checksum = raw_icmp->checksum;
+    }
+
+    return true;
+}
+
+bool Worker::apply_outbound_dnat(FramePayload::Origin origin, Chain& chain, IPv4Header& ipv4,
+                                 uint8_t* l3_data, size_t l3_len) {
+    if (origin != FramePayload::Origin::Private) {
+        return false;
+    }
+
+    const uint8_t protocol = ipv4.iph.protocol;
+    uint32_t source_ip = ntohl(ipv4.iph.saddr);
+    uint32_t dest_ip = ntohl(ipv4.iph.daddr);
+    uint16_t source_port = 0;
+    uint16_t dest_port = 0;
+
+    auto* tcp = chain.get<TCPHeader>();
+    auto* udp = chain.get<UDPHeader>();
+    auto* icmp = chain.get<ICMPHeader>();
+
+    if (tcp) {
+        source_port = ntohs(tcp->tcph.source);
+        dest_port = ntohs(tcp->tcph.dest);
+    } else if (udp) {
+        source_port = ntohs(udp->udph.source);
+        dest_port = ntohs(udp->udph.dest);
+    } else if (icmp) {
+        source_port = ntohs(icmp->icmph.un.echo.id);
+        dest_port = ntohs(icmp->icmph.un.echo.sequence);
+    }
+
+    auto lookup =
+        DnatTable::instance().consume(source_ip, source_port, dest_ip, dest_port, protocol);
+    if (!lookup) {
+        return false;
+    }
+
+    uint16_t ip_header_len = static_cast<uint16_t>(ipv4.iph.ihl) * 4u;
+    uint16_t total_len = ntohs(ipv4.iph.tot_len);
+    if (l3_len < total_len || total_len < ip_header_len) {
+        LOG(DEBUG_ERROR, "Worker", cfg_.thread_index,
+            ": DNAT outbound invalid lengths total=", total_len, " header=", ip_header_len,
+            " l3_len=", l3_len);
+        return false;
+    }
+
+    LOG(DEBUG_RELAY, "relay DNAT outbound thread=", cfg_.thread_index,
+        " src_ip=", IPv4Header::ip_to_string(source_ip), ":", source_port,
+        " restored_ip=", IPv4Header::ip_to_string(lookup->original_ip), ":", lookup->original_port,
+        " remote_ip=", IPv4Header::ip_to_string(dest_ip), ":", dest_port,
+        " protocol=", static_cast<int>(protocol));
+
+    ipv4.iph.saddr = htonl(lookup->original_ip);
+    ipv4.iph.check = checksum::recompute_ipv4_checksum(ipv4.iph);
+    std::memcpy(l3_data, &ipv4.iph, ip_header_len);
+
+    uint8_t* l4_data = l3_data + ip_header_len;
+    uint16_t payload_len = static_cast<uint16_t>(total_len - ip_header_len);
+
+    if (tcp && payload_len >= sizeof(tcphdr)) {
+        tcp->tcph.source = htons(lookup->original_port);
+        std::memcpy(l4_data, &tcp->tcph, sizeof(tcphdr));
+        auto* raw_tcp = reinterpret_cast<tcphdr*>(l4_data);
+        raw_tcp->check = 0;
+        raw_tcp->check = compute_tcp_checksum(ipv4.iph, l4_data, payload_len);
+        tcp->tcph.check = raw_tcp->check;
+    } else if (udp && payload_len >= sizeof(udphdr)) {
+        if (lookup->original_port != 0) {
+            udp->udph.source = htons(lookup->original_port);
+        }
+        std::memcpy(l4_data, &udp->udph, sizeof(udphdr));
+        auto* raw_udp = reinterpret_cast<udphdr*>(l4_data);
+        if (raw_udp->check != 0) {
+            raw_udp->check = 0;
+            raw_udp->check = compute_udp_checksum(ipv4.iph, l4_data, payload_len);
+        }
+        udp->udph.check = raw_udp->check;
+    } else if (icmp && payload_len >= sizeof(icmphdr)) {
+        if (lookup->original_port != 0) {
+            icmp->icmph.un.echo.id = htons(lookup->original_port);
+        }
+        std::memcpy(l4_data, &icmp->icmph, sizeof(icmphdr));
+        auto* raw_icmp = reinterpret_cast<icmphdr*>(l4_data);
+        raw_icmp->checksum = 0;
+        raw_icmp->checksum = compute_icmp_checksum(l4_data, payload_len);
+        icmp->icmph.checksum = raw_icmp->checksum;
+    }
+
+    return true;
+}
+
 void Worker::enqueue_tx(InterfaceContext& ctx, std::vector<uint8_t>&& frame, size_t net_offset,
                         const char* reason) {
     std::lock_guard<std::mutex> lock(ctx.tx_mutex);
@@ -406,12 +603,10 @@ void Worker::enqueue_tx(InterfaceContext& ctx, std::vector<uint8_t>&& frame, siz
     ctx.tx_queue.back().net_offset = net_offset;
     ctx.tx_queue.back().reason = reason;
     LOG(DEBUG_RELAY, "relay enqueue_tx thread=", cfg_.thread_index,
-        " origin_ctx=", (&ctx == &priv_ctx_) ? "priv" : "pub",
-        " reason=", reason,
-        " bytes=", ctx.tx_queue.back().buffer.size(),
-        " queue_size=", ctx.tx_queue.size());
-    LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": enqueue TX frame bytes=",
-        ctx.tx_queue.back().buffer.size(), " net_offset=", net_offset,
+        " origin_ctx=", (&ctx == &priv_ctx_) ? "priv" : "pub", " reason=", reason,
+        " bytes=", ctx.tx_queue.back().buffer.size(), " queue_size=", ctx.tx_queue.size());
+    LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
+        ": enqueue TX frame bytes=", ctx.tx_queue.back().buffer.size(), " net_offset=", net_offset,
         " reason=", reason, " queue_size=", ctx.tx_queue.size());
 }
 
@@ -426,8 +621,7 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
     }
 
     LOG(DEBUG_RELAY, "relay transmit_pending thread=", cfg_.thread_index,
-        " origin_ctx=", (&ctx == &priv_ctx_) ? "priv" : "pub",
-        " frames=", frames.size());
+        " origin_ctx=", (&ctx == &priv_ctx_) ? "priv" : "pub", " frames=", frames.size());
 
     if (!ctx.io) {
         return;
@@ -437,18 +631,17 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
     int fd = ctx.io->socket().fd();
 
     auto send_frame = [&](const TxFrame& frame, const char* reason) {
-        if (!ctx.io->send_frame(frame.buffer.data(), frame.buffer.size(), frame.net_offset, reason)) {
-            LOG(DEBUG_ERROR, "Worker", cfg_.thread_index,
-                ": TX fallback failed reason=", reason,
+        if (!ctx.io->send_frame(frame.buffer.data(), frame.buffer.size(), frame.net_offset,
+                                reason)) {
+            LOG(DEBUG_ERROR, "Worker", cfg_.thread_index, ": TX fallback failed reason=", reason,
                 " frame_len=", frame.buffer.size());
         }
     };
 
     if (!tx_view.valid()) {
         LOG(DEBUG_IO, "Worker", cfg_.thread_index,
-            ": TX ring not mapped origin=",
-            (&ctx == &priv_ctx_) ? "priv" : "pub",
-            " fallback for ", frames.size(), " frames");
+            ": TX ring not mapped origin=", (&ctx == &priv_ctx_) ? "priv" : "pub", " fallback for ",
+            frames.size(), " frames");
         for (auto& frame : frames) {
             send_frame(frame, frame.reason);
         }
@@ -458,9 +651,8 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
     size_t frame_count = tx_view.frame_count();
     if (frame_count == 0) {
         LOG(DEBUG_IO, "Worker", cfg_.thread_index,
-            ": TX ring empty origin=",
-            (&ctx == &priv_ctx_) ? "priv" : "pub",
-            " fallback for ", frames.size(), " frames");
+            ": TX ring empty origin=", (&ctx == &priv_ctx_) ? "priv" : "pub", " fallback for ",
+            frames.size(), " frames");
         for (auto& frame : frames) {
             send_frame(frame, frame.reason);
         }
@@ -478,14 +670,15 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
             auto* hdr = reinterpret_cast<tpacket3_hdr*>(base + idx * frame_size);
             if ((hdr->tp_status & TP_STATUS_AVAILABLE) == TP_STATUS_AVAILABLE) {
                 size_t copy_len = std::min(frame.buffer.size(), frame_size - hdr_size);
-                std::memcpy(reinterpret_cast<uint8_t*>(hdr) + hdr_size, frame.buffer.data(), copy_len);
+                std::memcpy(reinterpret_cast<uint8_t*>(hdr) + hdr_size, frame.buffer.data(),
+                            copy_len);
                 hdr->tp_len = copy_len;
                 hdr->tp_snaplen = copy_len;
                 hdr->tp_status = TP_STATUS_SEND_REQUEST;
                 ctx.tx_ring_index = idx + 1;
                 written = true;
-                LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
-                    ": TX via ring idx=", idx, " bytes=", copy_len);
+                LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": TX via ring idx=", idx,
+                    " bytes=", copy_len);
                 break;
             } else {
                 ::sendto(fd, nullptr, 0, 0, nullptr, 0);
@@ -537,8 +730,7 @@ std::vector<std::vector<uint8_t>> Worker::collect_tx_frames() {
 void Worker::enqueue_shaped_frame(InterfaceKind kind, std::vector<uint8_t>&& frame,
                                   size_t net_offset) {
     LOG(DEBUG_RELAY, "relay enqueue_shaped thread=", cfg_.thread_index,
-        " target=", interface_kind_to_string(kind),
-        " bytes=", frame.size(),
+        " target=", interface_kind_to_string(kind), " bytes=", frame.size(),
         " net_offset=", net_offset);
     if (kind == InterfaceKind::Private) {
         enqueue_tx(priv_ctx_, std::move(frame), net_offset, "shape");
@@ -556,10 +748,20 @@ void Worker::finish_frame(Chain& chain, const filters::Decision& decision,
     }
 
     uint8_t* l3_data = data + net_offset;
-    size_t l3_len = len - net_offset;
+    size_t l3_len = len > net_offset ? len - net_offset : 0;
 
-    chain.for_each([&](auto& hdr) { nat_.process(hdr); });
+    bool dnat_applied = false;
+    if (has_flag(decision.actions, filters::ActionFlag::Dnat) && decision.dnat.valid) {
+        if (origin == FramePayload::Origin::Public) {
+            dnat_applied = apply_inbound_dnat(origin, chain, *ipv4, l3_data, l3_len, decision);
+        } else {
+            dnat_applied = apply_outbound_dnat(origin, chain, *ipv4, l3_data, l3_len);
+        }
+    }
 
+    if (!dnat_applied) {
+        chain.for_each([&](auto& hdr) { nat_.process(hdr); });
+    }
     size_t offset = 0;
     if (!Committer<IPv4Header>{}(ipv4, l3_data, l3_len, offset)) {
         return;
@@ -575,7 +777,7 @@ void Worker::finish_frame(Chain& chain, const filters::Decision& decision,
     uint32_t gauge_ip = session_ip;
     if (gauge_ip == 0) {
         gauge_ip = (origin == FramePayload::Origin::Private) ? ntohl(ipv4->iph.saddr)
-                                                            : ntohl(ipv4->iph.daddr);
+                                                             : ntohl(ipv4->iph.daddr);
         if (cfg_.nat.private_netset && !cfg_.nat.private_netset->contains(gauge_ip)) {
             gauge_ip = 0;
         }
@@ -628,8 +830,7 @@ void Worker::finish_frame(Chain& chain, const filters::Decision& decision,
         ": TX schedule proto=", static_cast<int>(ipv4->iph.protocol),
         " src=", IPv4Header::ip_to_string(ipv4->iph.saddr), ":", log_src_port,
         " dst=", IPv4Header::ip_to_string(ipv4->iph.daddr), ":", log_dst_port,
-        " icmp_id=", log_icmp_id,
-        " via=", (dest_ctx == &pub_ctx_ ? "pub" : "priv"));
+        " icmp_id=", log_icmp_id, " via=", (dest_ctx == &pub_ctx_ ? "pub" : "priv"));
 
     std::vector<uint8_t> tx_buffer(data, data + len);
     bool shaped = has_flag(decision.actions, filters::ActionFlag::Shape) && decision.shape_rate > 0;
@@ -637,14 +838,12 @@ void Worker::finish_frame(Chain& chain, const filters::Decision& decision,
         auto target = (dest_ctx == &pub_ctx_) ? shape::ShapeController::Target::Public
                                               : shape::ShapeController::Target::Private;
         LOG(DEBUG_RELAY, "relay shape enqueue thread=", cfg_.thread_index,
-            " target=", (dest_ctx == &pub_ctx_ ? "pub" : "priv"),
-            " rate=", decision.shape_rate,
+            " target=", (dest_ctx == &pub_ctx_ ? "pub" : "priv"), " rate=", decision.shape_rate,
             " bytes=", tx_buffer.size());
         shape_controller_->enqueue(target, std::move(tx_buffer), net_offset, decision.shape_rate);
     } else {
         LOG(DEBUG_RELAY, "relay direct enqueue thread=", cfg_.thread_index,
-            " target=", (dest_ctx == &pub_ctx_ ? "pub" : "priv"),
-            " bytes=", tx_buffer.size());
+            " target=", (dest_ctx == &pub_ctx_ ? "pub" : "priv"), " bytes=", tx_buffer.size());
         enqueue_tx(*dest_ctx, std::move(tx_buffer), net_offset, "direct");
     }
 }
