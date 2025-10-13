@@ -1,6 +1,7 @@
 #include "dnat_table.hpp"
 
 #include <functional>
+#include <iterator>
 
 namespace {
 
@@ -19,11 +20,6 @@ inline std::size_t mix_hash(uint64_t value) {
 
 } // namespace
 
-DnatTable& DnatTable::instance() {
-    static DnatTable table;
-    return table;
-}
-
 bool DnatTable::Key::operator==(const Key& other) const noexcept {
     return target_ip == other.target_ip && target_port == other.target_port &&
            remote_ip == other.remote_ip && remote_port == other.remote_port &&
@@ -37,14 +33,11 @@ std::size_t DnatTable::KeyHash::operator()(const Key& key) const noexcept {
     return mix_hash(packed1 ^ packed2);
 }
 
-std::size_t DnatTable::stripe_for(const Key& key) const noexcept {
-    return KeyHash{}(key) % kStripeCount;
-}
-
-void DnatTable::purge_expired_locked(Map& map, std::chrono::steady_clock::time_point now) {
-    for (auto it = map.begin(); it != map.end();) {
+void DnatTable::purge_expired(std::chrono::steady_clock::time_point now) {
+    for (auto it = map_.begin(); it != map_.end();) {
         if (it->second.expires_at <= now) {
-            it = map.erase(it);
+            lru_.erase(it->second.lru_it);
+            it = map_.erase(it);
         } else {
             ++it;
         }
@@ -57,16 +50,30 @@ void DnatTable::upsert(uint32_t target_ip, uint16_t target_port,
                        uint8_t protocol, bool connection_oriented,
                        std::chrono::steady_clock::time_point now) {
     Key key{target_ip, target_port, remote_ip, remote_port, protocol};
-    std::size_t stripe = stripe_for(key);
-    std::lock_guard<std::mutex> lock(mutexes_[stripe]);
-    auto& map = maps_[stripe];
-    purge_expired_locked(map, now);
+    purge_expired(now);
 
-    Entry& entry = map[key];
-    entry.original_ip = original_ip;
-    entry.original_port = original_port;
-    entry.connection_oriented = connection_oriented;
-    entry.expires_at = now + kDefaultTtl;
+    auto iter = map_.find(key);
+    if (iter == map_.end()) {
+        lru_.push_back(key);
+        auto lru_it = std::prev(lru_.end());
+        Entry entry{};
+        entry.original_ip = original_ip;
+        entry.original_port = original_port;
+        entry.connection_oriented = connection_oriented;
+        entry.expires_at = now + kDefaultTtl;
+        entry.lru_it = lru_it;
+        map_.emplace(key, entry);
+    } else {
+        iter->second.original_ip = original_ip;
+        iter->second.original_port = original_port;
+        iter->second.connection_oriented = connection_oriented;
+        iter->second.expires_at = now + kDefaultTtl;
+        lru_.erase(iter->second.lru_it);
+        lru_.push_back(key);
+        iter->second.lru_it = std::prev(lru_.end());
+    }
+
+    evict_if_needed();
 }
 
 std::optional<DnatTable::LookupResult>
@@ -75,25 +82,35 @@ DnatTable::consume(uint32_t target_ip, uint16_t target_port,
                    uint8_t protocol,
                    std::chrono::steady_clock::time_point now) {
     Key key{target_ip, target_port, remote_ip, remote_port, protocol};
-    std::size_t stripe = stripe_for(key);
-    std::lock_guard<std::mutex> lock(mutexes_[stripe]);
-    auto& map = maps_[stripe];
-    purge_expired_locked(map, now);
+    purge_expired(now);
 
-    auto it = map.find(key);
-    if (it == map.end()) {
+    auto it = map_.find(key);
+    if (it == map_.end()) {
         return std::nullopt;
     }
 
     LookupResult result{it->second.original_ip, it->second.original_port,
                         it->second.connection_oriented};
     it->second.expires_at = now + kDefaultTtl;
+    lru_.erase(it->second.lru_it);
+    lru_.push_back(key);
+    it->second.lru_it = std::prev(lru_.end());
+
     return result;
 }
 
 void DnatTable::clear() {
-    for (std::size_t stripe = 0; stripe < kStripeCount; ++stripe) {
-        std::lock_guard<std::mutex> lock(mutexes_[stripe]);
-        maps_[stripe].clear();
+    map_.clear();
+    lru_.clear();
+}
+
+void DnatTable::evict_if_needed() {
+    while (map_.size() > kMaxEntries && !lru_.empty()) {
+        const Key& oldest = lru_.front();
+        auto it = map_.find(oldest);
+        if (it != map_.end()) {
+            map_.erase(it);
+        }
+        lru_.pop_front();
     }
 }

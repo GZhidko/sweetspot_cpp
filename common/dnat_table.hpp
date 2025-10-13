@@ -1,9 +1,8 @@
 #pragma once
 
-#include <array>
 #include <chrono>
 #include <cstdint>
-#include <mutex>
+#include <list>
 #include <optional>
 #include <unordered_map>
 
@@ -14,8 +13,6 @@ class DnatTable {
         uint16_t original_port;
         bool connection_oriented;
     };
-
-    static DnatTable& instance();
 
     void upsert(uint32_t target_ip, uint16_t target_port,
                 uint32_t remote_ip, uint16_t remote_port,
@@ -51,18 +48,17 @@ class DnatTable {
         uint16_t original_port;
         bool connection_oriented;
         std::chrono::steady_clock::time_point expires_at;
+        std::list<Key>::iterator lru_it;
     };
 
     static constexpr std::chrono::seconds kDefaultTtl{300};
-    static constexpr std::size_t kStripeCount = 128;
+    static constexpr std::size_t kMaxEntries = 4096;
 
     using Map = std::unordered_map<Key, Entry, KeyHash>;
 
-    std::size_t stripe_for(const Key& key) const noexcept;
+    void purge_expired(std::chrono::steady_clock::time_point now);
+    void evict_if_needed();
 
-    void purge_expired_locked(Map& map, std::chrono::steady_clock::time_point now);
-
-    std::array<Map, kStripeCount> maps_{};
-    std::array<std::mutex, kStripeCount> mutexes_;
+    Map map_;
+    std::list<Key> lru_;
 };
-

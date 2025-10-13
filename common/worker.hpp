@@ -105,6 +105,7 @@ class Worker {
     std::deque<FramePayload> remote_queue_;
 
     std::unique_ptr<shape::ShapeController> shape_controller_;
+    DnatTable dnat_table_;
 
   public:
     void set_forward_callback(std::function<void(uint32_t, FramePayload&&)> fn) {

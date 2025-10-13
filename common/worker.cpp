@@ -474,8 +474,8 @@ bool Worker::apply_inbound_dnat(FramePayload::Origin origin, Chain& chain, IPv4H
         " remote_ip=", IPv4Header::ip_to_string(remote_ip), " remote_port=", remote_port,
         " protocol=", static_cast<int>(protocol));
 
-    DnatTable::instance().upsert(target_ip, effective_target_port, remote_ip, remote_port,
-                                 original_ip, original_port, protocol, protocol == IPPROTO_TCP);
+    dnat_table_.upsert(target_ip, effective_target_port, remote_ip, remote_port,
+                       original_ip, original_port, protocol, protocol == IPPROTO_TCP);
 
     ipv4.iph.daddr = htonl(target_ip);
     ipv4.iph.check = checksum::recompute_ipv4_checksum(ipv4.iph);
@@ -537,7 +537,7 @@ bool Worker::apply_outbound_dnat(FramePayload::Origin origin, Chain& chain, IPv4
     }
 
     auto lookup =
-        DnatTable::instance().consume(source_ip, source_port, dest_ip, dest_port, protocol);
+        dnat_table_.consume(source_ip, source_port, dest_ip, dest_port, protocol);
     if (!lookup) {
       LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
           ": DNAT outbound no mapping for src=", IPv4Header::ip_to_string(source_ip), ":",
