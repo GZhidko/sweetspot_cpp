@@ -369,11 +369,9 @@ void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t le
         return;
     }
 
-    if (has_flag(decision.actions, filters::ActionFlag::Dnat)) {
+    if (has_flag(decision.actions, filters::ActionFlag::Dnat) ) {
         if (dir == filters::Direction::Inbound) {
             apply_inbound_dnat(origin, chain, *ipv4, l3_data, l3_len, decision);
-        } else {
-            apply_outbound_dnat(origin, chain, *ipv4, l3_data, l3_len);
         }
     }
 
@@ -757,8 +755,14 @@ void Worker::finish_frame(Chain& chain, const filters::Decision& decision,
     uint8_t* l3_data = data + net_offset;
     size_t l3_len = len > net_offset ? len - net_offset : 0;
 
-   
     chain.for_each([&](auto& hdr) { nat_.process(hdr); });
+
+    if (has_flag(decision.actions, filters::ActionFlag::Dnat) &&
+        origin == FramePayload::Origin::Public) {
+        if (auto* ipv4_after_nat = chain.get<IPv4Header>()) {
+            apply_outbound_dnat(origin, chain, *ipv4_after_nat, l3_data, l3_len);
+        }
+    }
     size_t offset = 0;
     if (!Committer<IPv4Header>{}(ipv4, l3_data, l3_len, offset)) {
         return;
