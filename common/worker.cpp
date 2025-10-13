@@ -363,13 +363,14 @@ void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t le
     auto decision = filters::current_decision();
     LOG(DEBUG_RELAY, "relay decision thread=", cfg_.thread_index, " allow=", decision.allow,
         " matched=", decision.matched, " rule=", decision.rule_index,
-        " actions=", static_cast<int>(decision.actions), " shape_rate=", decision.shape_rate);
+        " actions=", static_cast<int>(decision.actions), " shape_rate=", decision.shape_rate ,
+        " dnat_valid=", decision.dnat.valid, " dnat_ip=", IPv4Header::ip_to_string(decision.dnat.ip));
     if (!decision.allow) {
         return;
     }
 
-    if (has_flag(decision.actions, filters::ActionFlag::Dnat) && decision.dnat.valid) {
-        if (origin == FramePayload::Origin::Public) {
+    if (has_flag(decision.actions, filters::ActionFlag::Dnat)) {
+        if (dir == filters::Direction::Inbound) {
             apply_inbound_dnat(origin, chain, *ipv4, l3_data, l3_len, decision);
         } else {
             apply_outbound_dnat(origin, chain, *ipv4, l3_data, l3_len);
@@ -540,7 +541,11 @@ bool Worker::apply_outbound_dnat(FramePayload::Origin origin, Chain& chain, IPv4
     auto lookup =
         DnatTable::instance().consume(source_ip, source_port, dest_ip, dest_port, protocol);
     if (!lookup) {
-        return false;
+      LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
+          ": DNAT outbound no mapping for src=", IPv4Header::ip_to_string(source_ip), ":",
+          source_port, " dst=", IPv4Header::ip_to_string(dest_ip), ":", dest_port,
+          " protocol=", static_cast<int>(protocol));
+       return false;
     }
 
     uint16_t ip_header_len = static_cast<uint16_t>(ipv4.iph.ihl) * 4u;
