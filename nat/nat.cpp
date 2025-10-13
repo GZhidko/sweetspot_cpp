@@ -118,7 +118,7 @@ Nat::Translation Nat::ensure_tcp_mapping(uint32_t prv_ip, uint32_t dst_ip, uint1
 
     auto [pub_ip, pub_port] =
         map_tcp_udp(prv_ip, dst_ip, src_port, dst_port, IPPROTO_TCP, config_->tcp_port_min,
-                    config_->tcp_port_max);
+                    config_->tcp_port_max, thread_index_);
     PubKey pub{pub_ip, dst_ip, pub_port, dst_port, static_cast<uint8_t>(IPPROTO_TCP)};
     MappingEntry& entry = insert_entry(tcp_table_, flow, pub);
     accounting::SnatTracker::instance().observe_tcp(prv_ip, pub_ip, pub_port);
@@ -142,7 +142,7 @@ Nat::Translation Nat::ensure_udp_mapping(uint32_t prv_ip, uint32_t dst_ip, uint1
 
     auto [pub_ip, pub_port] =
         map_tcp_udp(prv_ip, dst_ip, src_port, dst_port, IPPROTO_UDP, config_->udp_port_min,
-                    config_->udp_port_max);
+                    config_->udp_port_max, thread_index_);
     PubKey pub{pub_ip, dst_ip, pub_port, dst_port, static_cast<uint8_t>(IPPROTO_UDP)};
     MappingEntry& entry = insert_entry(udp_table_, flow, pub);
     accounting::SnatTracker::instance().observe_udp(prv_ip, pub_ip, pub_port);
@@ -165,7 +165,7 @@ Nat::Translation Nat::ensure_icmp_mapping(uint32_t prv_ip, uint32_t dst_ip, uint
         return make_translation(it->second);
     }
 
-    auto [pub_ip, new_id] = map_icmp(prv_ip, dst_ip, ident, seq);
+    auto [pub_ip, new_id] = map_icmp(prv_ip, dst_ip, ident, seq, thread_index_);
     PubKey pub{pub_ip, dst_ip, new_id, seq, static_cast<uint8_t>(IPPROTO_ICMP)};
     MappingEntry& entry = insert_entry(icmp_table_, flow, pub);
     accounting::SnatTracker::instance().observe_icmp(prv_ip, pub_ip, new_id);

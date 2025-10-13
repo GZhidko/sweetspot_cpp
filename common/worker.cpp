@@ -221,7 +221,7 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
         " net_offset=", net_offset);
 
     // Parse full packet once
-    filters::Direction dir = (origin == FramePayload::Origin::Public)
+    filters::Direction dir = (origin == FramePayload::Origin::Private)
                                  ? filters::Direction::Inbound
                                  : filters::Direction::Outbound;
     Chain chain;
@@ -290,7 +290,7 @@ void Worker::handle_forwarded(FramePayload&& payload) {
 
 void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t len,
                            size_t net_offset, Chain& chain) {
-    filters::Direction dir = (origin == FramePayload::Origin::Public)
+    filters::Direction dir = (origin == FramePayload::Origin::Private)
                                  ? filters::Direction::Inbound
                                  : filters::Direction::Outbound;
 
@@ -318,7 +318,7 @@ void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t le
         src_port = ntohs(icmp->icmph.un.echo.sequence);
     }
 
-    if (dir == filters::Direction::Outbound) {
+    if (origin == FramePayload::Origin::Private) {
         session_ip = ntohl(ipv4->iph.saddr);
     } else {
         uint32_t pub_ip = ntohl(ipv4->iph.daddr);
@@ -368,10 +368,12 @@ void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t le
         return;
     }
 
-    if (origin == FramePayload::Origin::Public) {
-        apply_inbound_dnat(origin, chain, *ipv4, l3_data, l3_len, decision);
-    } else {
-        apply_outbound_dnat(origin, chain, *ipv4, l3_data, l3_len);
+    if (has_flag(decision.actions, filters::ActionFlag::Dnat) && decision.dnat.valid) {
+        if (origin == FramePayload::Origin::Public) {
+            apply_inbound_dnat(origin, chain, *ipv4, l3_data, l3_len, decision);
+        } else {
+            apply_outbound_dnat(origin, chain, *ipv4, l3_data, l3_len);
+        }
     }
 
     if (drop_for_status) {
@@ -406,7 +408,7 @@ uint16_t compute_icmp_checksum(uint8_t* icmp_bytes, uint16_t icmp_len) {
 bool Worker::apply_inbound_dnat(FramePayload::Origin origin, Chain& chain, IPv4Header& ipv4,
                                 uint8_t* l3_data, size_t l3_len,
                                 const filters::Decision& decision) {
-    if (origin != FramePayload::Origin::Public) {
+    if (origin != FramePayload::Origin::Private) {
         return false;
     }
     if (!has_flag(decision.actions, filters::ActionFlag::Dnat) || !decision.dnat.valid) {
@@ -510,7 +512,7 @@ bool Worker::apply_inbound_dnat(FramePayload::Origin origin, Chain& chain, IPv4H
 
 bool Worker::apply_outbound_dnat(FramePayload::Origin origin, Chain& chain, IPv4Header& ipv4,
                                  uint8_t* l3_data, size_t l3_len) {
-    if (origin != FramePayload::Origin::Private) {
+    if (origin != FramePayload::Origin::Public) {
         return false;
     }
 
@@ -750,18 +752,8 @@ void Worker::finish_frame(Chain& chain, const filters::Decision& decision,
     uint8_t* l3_data = data + net_offset;
     size_t l3_len = len > net_offset ? len - net_offset : 0;
 
-    bool dnat_applied = false;
-    if (has_flag(decision.actions, filters::ActionFlag::Dnat) && decision.dnat.valid) {
-        if (origin == FramePayload::Origin::Public) {
-            dnat_applied = apply_inbound_dnat(origin, chain, *ipv4, l3_data, l3_len, decision);
-        } else {
-            dnat_applied = apply_outbound_dnat(origin, chain, *ipv4, l3_data, l3_len);
-        }
-    }
-
-    if (!dnat_applied) {
-        chain.for_each([&](auto& hdr) { nat_.process(hdr); });
-    }
+   
+    chain.for_each([&](auto& hdr) { nat_.process(hdr); });
     size_t offset = 0;
     if (!Committer<IPv4Header>{}(ipv4, l3_data, l3_len, offset)) {
         return;

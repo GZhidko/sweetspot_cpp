@@ -10,6 +10,7 @@
 #include <memory>
 #include <stdexcept>
 #include <utility>
+#include <limits>
 
 class EndpointBase {
   protected:
@@ -139,11 +140,15 @@ class EndpointBase {
 
     std::pair<uint32_t, uint16_t> map_tcp_udp(uint32_t prv_ip, uint32_t dst_ip, uint16_t src_port,
                                               uint16_t dst_port, uint8_t protocol,
-                                              uint16_t port_min, uint16_t port_max) const {
+                                              uint16_t port_min, uint16_t port_max,
+                                              uint32_t desired_cpu_hint =
+                                                  std::numeric_limits<uint32_t>::max()) const {
         auto fwd_tuple = std::make_tuple(htonl(prv_ip), htonl(dst_ip), htons(src_port),
                                          htons(dst_port), protocol);
         uint32_t forward_hash = CPUFanoutHash::hash_tuple(fwd_tuple);
-        uint32_t desired_cpu = pick_cpu(forward_hash);
+        uint32_t desired_cpu = desired_cpu_hint == std::numeric_limits<uint32_t>::max()
+                                   ? pick_cpu(forward_hash)
+                                   : desired_cpu_hint % cpu_count_;
 
         auto [rmin, rmax] = get_port_range(prv_ip, port_min, port_max);
 
@@ -163,14 +168,18 @@ class EndpointBase {
 
     // ---------- ICMP ----------
     std::pair<uint32_t, uint16_t> map_icmp(uint32_t prv_ip, uint32_t dst_ip, uint16_t icmp_id_val,
-                                           uint16_t icmp_seq_val) const {
+                                           uint16_t icmp_seq_val,
+                                           uint32_t desired_cpu_hint =
+                                               std::numeric_limits<uint32_t>::max()) const {
         uint16_t id_min = config_->icmp_id_min;
         uint16_t id_max = config_->icmp_id_max;
 
         auto fwd_tuple = std::make_tuple(htonl(prv_ip), htonl(dst_ip), htons(icmp_id_val),
                                          htons(icmp_seq_val), static_cast<uint8_t>(1));
         uint32_t forward_hash = CPUFanoutHash::hash_tuple(fwd_tuple);
-        uint32_t desired_cpu = pick_cpu(forward_hash);
+        uint32_t desired_cpu = desired_cpu_hint == std::numeric_limits<uint32_t>::max()
+                                   ? pick_cpu(forward_hash)
+                                   : desired_cpu_hint % cpu_count_;
 
         auto [rmin, rmax] = get_port_range(prv_ip, id_min, id_max);
 
