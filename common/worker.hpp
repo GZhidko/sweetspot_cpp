@@ -7,6 +7,7 @@
 #include "../chain/header_chain.h"
 #include "../filters/filter_engine.hpp"
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <deque>
 #include <functional>
@@ -28,6 +29,8 @@ struct WorkerPipelineConfig {
     uint32_t thread_count = 1;
     bool enable_io = true;
     bool forward_pool_enabled = false;
+    bool profile_enabled = false;
+    uint32_t profile_interval_ms = 2000;
     std::vector<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>> static_tcp;
     std::vector<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>> static_udp;
     std::vector<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>> static_icmp;
@@ -93,6 +96,7 @@ class Worker {
                     const char* reason);
     void transmit_pending(InterfaceContext& ctx);
     void process_remote_frames();
+    void maybe_dump_profile(bool force);
     void process_chain(FramePayload::Origin origin, uint8_t* data, size_t len, size_t net_offset,
                        Chain& chain);
     bool apply_inbound_dnat(FramePayload::Origin origin, Chain& chain,
@@ -109,6 +113,8 @@ class Worker {
     InterfaceContext pub_ctx_;
     bool io_enabled_ = true;
     bool forward_pool_enabled_ = false;
+    bool profile_enabled_ = false;
+    uint32_t profile_interval_ms_ = 2000;
     Nat nat_;
     std::thread thread_;
     std::atomic<bool> running_{false};
@@ -121,6 +127,27 @@ class Worker {
     int remote_event_fd_ = -1;
     std::mutex forward_pool_mutex_;
     std::deque<std::vector<uint8_t>> forward_pool_;
+
+    std::chrono::steady_clock::time_point profile_started_at_{};
+    std::chrono::steady_clock::time_point profile_last_dump_at_{};
+    uint64_t profile_loops_ = 0;
+    uint64_t profile_epoll_wait_calls_ = 0;
+    uint64_t profile_epoll_ready_events_ = 0;
+    uint64_t profile_epoll_timeouts_ = 0;
+    uint64_t profile_rx_packets_ = 0;
+    uint64_t profile_rx_bytes_ = 0;
+    uint64_t profile_parse_calls_ = 0;
+    uint64_t profile_parse_fail_ = 0;
+    uint64_t profile_parse_ns_ = 0;
+    uint64_t profile_chain_calls_ = 0;
+    uint64_t profile_chain_ns_ = 0;
+    uint64_t profile_forward_remote_ = 0;
+    uint64_t profile_forward_local_ = 0;
+    uint64_t profile_remote_batches_ = 0;
+    uint64_t profile_remote_frames_ = 0;
+    uint64_t profile_tx_frames_ = 0;
+    uint64_t profile_tx_bytes_ = 0;
+    uint64_t profile_tx_fallback_frames_ = 0;
 
     std::unique_ptr<shape::ShapeController> shape_controller_;
     DnatTable dnat_table_;

@@ -41,6 +41,27 @@
 
 namespace {
 
+struct ScopedProfileTimer {
+    std::chrono::steady_clock::time_point started_at;
+    uint64_t* total_ns = nullptr;
+    uint64_t* calls = nullptr;
+
+    ScopedProfileTimer(uint64_t* total, uint64_t* calls_counter)
+        : started_at(std::chrono::steady_clock::now()), total_ns(total), calls(calls_counter) {}
+
+    ~ScopedProfileTimer() {
+        if (!total_ns) {
+            return;
+        }
+        const auto now = std::chrono::steady_clock::now();
+        *total_ns += static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(now - started_at).count());
+        if (calls) {
+            ++(*calls);
+        }
+    }
+};
+
 const char* origin_to_string(Worker::FramePayload::Origin origin) {
     return origin == Worker::FramePayload::Origin::Private ? "private" : "public";
 }
@@ -54,6 +75,12 @@ const char* interface_kind_to_string(Worker::InterfaceKind kind) {
 Worker::Worker(const WorkerPipelineConfig& cfg)
     : cfg_(cfg), nat_(cfg.nat, cfg.thread_index, cfg.thread_count) {
     forward_pool_enabled_ = cfg.forward_pool_enabled;
+    profile_enabled_ = cfg.profile_enabled;
+    profile_interval_ms_ = cfg.profile_interval_ms == 0 ? 2000 : cfg.profile_interval_ms;
+    if (profile_enabled_) {
+        profile_started_at_ = std::chrono::steady_clock::now();
+        profile_last_dump_at_ = profile_started_at_;
+    }
     remote_event_fd_ = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
     if (remote_event_fd_ < 0) {
         LOG(DEBUG_ERROR, "Worker", cfg_.thread_index, ": eventfd create failed errno=", errno);
@@ -91,7 +118,8 @@ Worker::Worker(const WorkerPipelineConfig& cfg)
         " priv_rx=", cfg_.io_priv.rx_interface, " pub_rx=", cfg_.io_pub.rx_interface,
         " static_tcp=", cfg_.static_tcp.size(), " static_udp=", cfg_.static_udp.size(),
         " static_icmp=", cfg_.static_icmp.size(), " static_ip=", cfg_.static_ip.size(),
-        " nat_configured=", nat_.configured());
+        " nat_configured=", nat_.configured(), " profile_enabled=", profile_enabled_,
+        " profile_interval_ms=", profile_interval_ms_);
 }
 
 Worker::~Worker() {
@@ -251,6 +279,9 @@ void Worker::run() {
     size_t iteration = 0;
     while (running_) {
         ++iteration;
+        if (profile_enabled_) {
+            ++profile_loops_;
+        }
         bool has_priv_tx = false;
         bool has_pub_tx = false;
         {
@@ -269,6 +300,9 @@ void Worker::run() {
         if (epfd >= 0) {
             // Block when fully idle; run immediately when local work is queued.
             int timeout_ms = (has_priv_tx || has_pub_tx) ? 0 : 5;
+            if (profile_enabled_) {
+                ++profile_epoll_wait_calls_;
+            }
             epoll_event events[4]{};
             int ready = ::epoll_wait(epfd, events, 4, timeout_ms);
             if (ready < 0) {
@@ -277,6 +311,13 @@ void Worker::run() {
                         ": epoll_wait failed errno=", errno);
                 }
             } else {
+                if (profile_enabled_) {
+                    if (ready == 0) {
+                        ++profile_epoll_timeouts_;
+                    } else {
+                        profile_epoll_ready_events_ += static_cast<uint64_t>(ready);
+                    }
+                }
                 for (int i = 0; i < ready; ++i) {
                     const uint32_t token = events[i].data.u32;
                     if (token == 1) {
@@ -315,7 +356,9 @@ void Worker::run() {
         if (!priv_ctx_.io && !pub_ctx_.io) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
+        maybe_dump_profile(false);
     }
+    maybe_dump_profile(true);
     if (epfd >= 0) {
         ::close(epfd);
     }
@@ -356,6 +399,10 @@ void Worker::process_rx_block(InterfaceContext& src_ctx, FramePayload::Origin or
         LOG(DEBUG_RELAY, "relay packet thread=", cfg_.thread_index,
             " origin=", origin_to_string(origin), " block_packet_index=", i, " len=", len,
             " net_offset=", net_offset);
+        if (profile_enabled_) {
+            ++profile_rx_packets_;
+            profile_rx_bytes_ += static_cast<uint64_t>(len);
+        }
         handle_frame(origin, data, len, net_offset);
         hdr =
             reinterpret_cast<tpacket3_hdr*>(reinterpret_cast<uint8_t*>(hdr) + hdr->tp_next_offset);
@@ -383,7 +430,22 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
                                  ? filters::Direction::Inbound
                                  : filters::Direction::Outbound;
     Chain chain;
-    if (!chain.parse(l3_data, l3_len)) {
+    bool parsed = false;
+    if (profile_enabled_) {
+        const auto parse_started = std::chrono::steady_clock::now();
+        parsed = chain.parse(l3_data, l3_len);
+        const auto parse_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                  std::chrono::steady_clock::now() - parse_started)
+                                  .count();
+        ++profile_parse_calls_;
+        profile_parse_ns_ += static_cast<uint64_t>(parse_ns);
+    } else {
+        parsed = chain.parse(l3_data, l3_len);
+    }
+    if (!parsed) {
+        if (profile_enabled_) {
+            ++profile_parse_fail_;
+        }
         LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": parse failed");
         return;
     }
@@ -428,12 +490,18 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
             payload.net_offset = net_offset;
             payload.parsed_chain.emplace(std::move(chain));
             forward_fn_(target, std::move(payload));
+            if (profile_enabled_) {
+                ++profile_forward_remote_;
+            }
             return;
         }
     }
 
     LOG(DEBUG_RELAY, "relay local process thread=", cfg_.thread_index,
         " origin=", origin_to_string(origin), " len=", len);
+    if (profile_enabled_) {
+        ++profile_forward_local_;
+    }
     process_chain(origin, data, len, net_offset, chain);
 }
 
@@ -453,6 +521,8 @@ void Worker::handle_forwarded(FramePayload&& payload) {
 
 void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t len,
                            size_t net_offset, Chain& chain) {
+    ScopedProfileTimer chain_timer(profile_enabled_ ? &profile_chain_ns_ : nullptr,
+                                   profile_enabled_ ? &profile_chain_calls_ : nullptr);
     filters::Direction dir = (origin == FramePayload::Origin::Private)
                                  ? filters::Direction::Inbound
                                  : filters::Direction::Outbound;
@@ -790,6 +860,12 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
 
     LOG(DEBUG_RELAY, "relay transmit_pending thread=", cfg_.thread_index,
         " origin_ctx=", (&ctx == &priv_ctx_) ? "priv" : "pub", " frames=", frames.size());
+    if (profile_enabled_) {
+        profile_tx_frames_ += static_cast<uint64_t>(frames.size());
+        for (const auto& frame : frames) {
+            profile_tx_bytes_ += static_cast<uint64_t>(frame.buffer.size());
+        }
+    }
 
     if (!ctx.io) {
         return;
@@ -813,6 +889,9 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
         for (auto& frame : frames) {
             send_frame(frame, frame.reason);
         }
+        if (profile_enabled_) {
+            profile_tx_fallback_frames_ += static_cast<uint64_t>(frames.size());
+        }
         return;
     }
 
@@ -823,6 +902,9 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
             frames.size(), " frames");
         for (auto& frame : frames) {
             send_frame(frame, frame.reason);
+        }
+        if (profile_enabled_) {
+            profile_tx_fallback_frames_ += static_cast<uint64_t>(frames.size());
         }
         return;
     }
@@ -855,6 +937,9 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
         }
         if (!written) {
             send_frame(frame, frame.reason);
+            if (profile_enabled_) {
+                ++profile_tx_fallback_frames_;
+            }
         }
     }
     ::sendto(fd, nullptr, 0, 0, nullptr, 0);
@@ -878,6 +963,10 @@ void Worker::process_remote_frames() {
         ++count;
     }
     remote_size_.fetch_sub(count, std::memory_order_relaxed);
+    if (profile_enabled_) {
+        ++profile_remote_batches_;
+        profile_remote_frames_ += static_cast<uint64_t>(count);
+    }
 
     while (rev) {
         RemoteNode* next = rev->next;
@@ -885,6 +974,50 @@ void Worker::process_remote_frames() {
         recycle_remote_node(rev);
         rev = next;
     }
+}
+
+void Worker::maybe_dump_profile(bool force) {
+    if (!profile_enabled_) {
+        return;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    const auto elapsed_since_last = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now - profile_last_dump_at_);
+    if (!force && elapsed_since_last.count() < static_cast<long long>(profile_interval_ms_)) {
+        return;
+    }
+    const auto elapsed_total_ns =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(now - profile_started_at_).count();
+    if (elapsed_total_ns <= 0) {
+        return;
+    }
+
+    const double elapsed_s = static_cast<double>(elapsed_total_ns) / 1e9;
+    const double rx_mpps = static_cast<double>(profile_rx_packets_) / elapsed_s / 1e6;
+    const double tx_mbps = (static_cast<double>(profile_tx_bytes_) * 8.0) / elapsed_s / 1e6;
+    const double parse_avg_us = profile_parse_calls_ == 0
+                                    ? 0.0
+                                    : (static_cast<double>(profile_parse_ns_) /
+                                       static_cast<double>(profile_parse_calls_)) /
+                                          1000.0;
+    const double chain_avg_us = profile_chain_calls_ == 0
+                                    ? 0.0
+                                    : (static_cast<double>(profile_chain_ns_) /
+                                       static_cast<double>(profile_chain_calls_)) /
+                                          1000.0;
+
+    LOG(DEBUG_RELAY, "profile thread=", cfg_.thread_index, " uptime_s=", elapsed_s,
+        " loops=", profile_loops_, " epoll_wait=", profile_epoll_wait_calls_,
+        " epoll_ready=", profile_epoll_ready_events_, " epoll_timeouts=", profile_epoll_timeouts_,
+        " rx_packets=", profile_rx_packets_, " rx_mpps=", rx_mpps, " tx_frames=", profile_tx_frames_,
+        " tx_mbps=", tx_mbps, " tx_fallback=", profile_tx_fallback_frames_,
+        " parse_calls=", profile_parse_calls_, " parse_fail=", profile_parse_fail_,
+        " parse_avg_us=", parse_avg_us, " chain_calls=", profile_chain_calls_,
+        " chain_avg_us=", chain_avg_us, " fwd_local=", profile_forward_local_,
+        " fwd_remote=", profile_forward_remote_, " remote_batches=", profile_remote_batches_,
+        " remote_frames=", profile_remote_frames_, " remote_q=", remote_size_.load());
+
+    profile_last_dump_at_ = now;
 }
 
 void Worker::submit_remote_frame(FramePayload&& frame) {
