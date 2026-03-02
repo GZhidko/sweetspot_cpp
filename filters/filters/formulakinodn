@@ -1,0 +1,186 @@
+#
+# Downfilter for Atrium
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# loophole to Auth service
+pass in proto tcp to 194.67.1.40 port eq 80,443
+pass out proto tcp from 194.67.1.40 port eq 80,443
+# loophole to goldenwifi.ru.
+pass in proto tcp to 194.67.1.16 port eq 80,443,2443,8080
+pass out proto tcp from 194.67.1.16 port eq 80,443,2443,8080
+# loophole to startwifi.beeline.ru + test.startwifi.beeline.ru
+pass in proto tcp to 194.67.1.30 port eq 80,443,22443,8080
+pass out proto tcp from 194.67.1.30 port eq 80,443,22443,8080
+# chronopay.ru, requested by Strelbitski
+pass in proto tcp to 93.174.51.226 port eq 80,443
+pass out proto tcp from 93.174.51.226 port eq 80,443
+# loophole to registrarwifi.beeline.ru. 
+pass in proto tcp to 194.67.1.22 port eq 80,443
+pass out proto tcp from 194.67.1.22 port eq 80,443
+# loophole to mywifi.beeline.ru. 
+pass in proto tcp to 194.67.1.25 port eq 80,443
+pass out proto tcp from 194.67.1.25 port eq 80,443
+# loophole to cp.beelinewifi.ru
+pass in proto tcp to 194.67.1.37 port eq 80,443
+pass out proto tcp from 194.67.1.37 port eq 80,443
+# allow icmp to web farm
+pass in proto icmp to 194.67.1.0/24
+pass out proto icmp from 194.67.1.0/24
+# loophole to beeline (ask Strelbitski)
+pass in proto tcp to 217.118.84.0/24 port eq 80,443
+pass out proto tcp from 217.118.84.0/24 port eq 80,443
+pass in proto tcp to 217.118.87.98 port eq 80,443
+pass out proto tcp from 217.118.87.98 port eq 80,443
+pass in proto tcp to 217.118.87.98 port eq 80,443
+pass out proto tcp from 217.118.87.98 port eq 80,443
+# loophole to beeline banners
+pass in proto tcp to 194.67.18.95 port eq 80,443
+pass out proto tcp from 194.67.18.95 port eq 80,443
+pass in proto tcp to 194.67.18.96 port eq 80,443
+pass out proto tcp from 194.67.18.96 port eq 80,443
+# loophole to client's website
+#pass in proto tcp to auth.formulakino.ru port eq 80,443
+#pass out proto tcp from auth.formulakino.ru port eq 80,443
+# loophole to acs.sbrf.ru (ask Strelbitski)
+pass in proto tcp to 194.54.14.135 port eq 443
+pass out proto tcp from 194.54.14.135 port eq 443
+# loophole to https://www.ruru.ru/ (RfC 291107/13)
+#pass in proto tcp to www.ruru.ru port eq 443
+#pass out proto tcp from www.ruru.ru port eq 443
+# loophole to www.webmoney.ru (WebMoney)
+#pass in proto tcp to www.webmoney.ru port eq 80,443
+#pass out proto tcp from www.webmoney.ru port eq 80,443
+#pass in proto tcp to 212.118.48.0/24 port eq 80,443,2802,2803
+#pass out proto tcp from 212.118.48.0/24 port eq 80,443,2802,2803
+#pass in proto tcp to 212.158.173.0/24 port eq 80,443,2802,2803
+#pass out proto tcp from 212.158.173.0/24 port eq 80,443,2802,2803
+#pass in proto tcp to 91.200.28.0/24 port eq 80,443,2802,2803
+#pass out proto tcp from 91.200.28.0/24 port eq 80,443,2802,2803
+#pass in proto tcp to 91.227.52.0/24 port eq 80,443,2802,2803
+#pass out proto tcp from 91.227.52.0/24 port eq 80,443,2802,2803
+# loophole to click.alfabank.ru
+#pass in proto tcp to click.alfabank.ru port eq 80,443
+#pass out proto tcp from click.alfabank.ru port eq 80,443
+# loophole to alfabank.ru (ask Sokolov)
+#pass in proto tcp to alfabank.ru port eq 80,443
+#pass out proto tcp from alfabank.ru port eq 80,443
+# loophole to QIWI (CR 24435)
+#pass in proto tcp to mobw.ru port eq 80,443
+#pass out proto tcp from mobw.ru port eq 80,443
+#pass in proto tcp to mylk.qiwi.ru port eq 80,443
+#pass out proto tcp from mylk.qiwi.ru port eq 80,443
+#pass in proto tcp to old.qiwi.ru port eq 80,443
+#pass out proto tcp from old.qiwi.ru port eq 80,443
+# loophole to Yandex.Money
+#pass in proto tcp to 77.75.153.9 port eq 80
+#pass out proto tcp from 77.75.153.9 port eq 80
+#pass in proto tcp to 77.75.157.171 port eq 80
+#pass out proto tcp from 77.75.157.171 port eq 80
+#pass in proto tcp to 77.75.153.10 port eq 80,8128
+#pass out proto tcp from 77.75.153.10 port eq 80,8128
+#pass in proto tcp to 77.75.153.14 port eq 80,8128
+#pass out proto tcp from 77.75.153.14 port eq 80,8128
+#pass in proto tcp to 77.75.157.146 port eq 80,8128
+#pass out proto tcp from 77.75.157.146 port eq 80,8128
+#pass in proto tcp to 77.75.157.183 port eq 8128
+#pass out proto tcp from 77.75.157.183 port eq 8128
+#pass in proto tcp to 77.75.157.184 port eq 8128
+#pass out proto tcp from 77.75.157.184 port eq 8128
+#pass in proto tcp to bs.yandex.ru port eq 80,443
+#pass out proto tcp from bs.yandex.ru port eq 80,443
+#pass in proto tcp to yabs.yandex.ru port eq 80,443
+#pass out proto tcp from yabs.yandex.ru port eq 80,443
+#pass in proto tcp to css.yandex.ru port eq 80,443
+#pass out proto tcp from css.yandex.ru port eq 80,443
+#pass in proto tcp to img.yandex.net port eq 80,443
+#pass out proto tcp from img.yandex.net port eq 80,443
+#pass in proto tcp to img.yandex.ru port eq 80,443
+#pass out proto tcp from img.yandex.ru port eq 80,443
+#pass in proto tcp to yandex.st port eq 80,443
+#pass out proto tcp from yandex.st port eq 80,443
+#pass in proto tcp to passport.yandex.ru port eq 80,443
+#pass out proto tcp from passport.yandex.ru port eq 80,443
+#pass in proto tcp to pass.yandex.ru port eq 80,443
+#pass out proto tcp from pass.yandex.ru port eq 80,443
+#pass in proto tcp to sauth.yandex.ru port eq 80,443
+#pass out proto tcp from sauth.yandex.ru port eq 80,443
+#pass in proto tcp to money.yandex.ru port eq 80,443
+#pass out proto tcp from money.yandex.ru port eq 80,443
+#pass in proto tcp to sp-money.yandex.ru port eq 80,443
+#pass out proto tcp from sp-money.yandex.ru port eq 80,443
+# loophole to Adriver (ask Sorokin)
+#pass in proto tcp to ad.adriver.ru port eq 80
+#pass out proto tcp from ad.adriver.ru port eq 80
+# loophole to FSB
+pass in proto tcp to 81.13.97.68 port eq 1028
+pass out proto tcp from 81.13.97.68 port eq 1028
+# loopholes to Boingo servers
+#pass in proto tcp to signup.boingo.com port eq 443
+#pass out proto tcp from signup.boingo.com port eq 443
+#pass in proto tcp to c01.client.boingo.com port eq 443
+#pass out proto tcp from c01.client.boingo.com port eq 443
+#pass in proto tcp to c02.client.boingo.com port eq 443
+#pass out proto tcp from c02.client.boingo.com port eq 443
+#pass in proto tcp to c03.client.boingo.com port eq 7000 
+#pass out proto tcp from c03.client.boingo.com port eq 7000
+#pass in proto tcp to c04.client.boingo.com port eq 7001
+#pass out proto tcp from c04.client.boingo.com port eq 7001
+#pass in proto tcp to c05.client.boingo.com port eq 7002
+#pass out proto tcp from c05.client.boingo.com port eq 7002
+#pass in proto tcp to c06.client.boingo.com port eq 7003
+#pass out proto tcp from c06.client.boingo.com port eq 7003
+#pass in proto tcp to c07.client.boingo.com port eq 7004
+#pass out proto tcp from c07.client.boingo.com port eq 7004
+# loophole to WeRoam servers (login.weroam.com)
+#pass in proto tcp to 217.172.169.89  port eq 80,443
+#pass out proto tcp from 217.172.169.89 port eq 80,443
+# loophole to WeRoam SIM-auth servers
+#pass in proto udp to 195.141.161.195 port eq 1812
+#pass out proto udp from 195.141.161.195 port eq 1812
+#pass in proto udp to 62.2.179.19 port eq 1812
+#pass out proto udp from 62.2.179.19 port eq 1812
+# loophole to Trustive landing page (https://secure.trustive.com/wisp/)
+#pass in proto tcp to secure.trustive.com port eq 443
+#pass out proto tcp from secure.trustive.com port eq 443
+# loophole to Spotigo update server
+#pass in proto tcp to 80.190.241.109 port eq 81
+#pass out proto tcp from 80.190.241.109 port eq 81
+# loophole to iPass phonebook server
+#pass in proto tcp to pb.ipass.com port eq 80,443
+#pass out proto tcp from pb.ipass.com port eq 80,443
+# loophole to iPass (China Telecom) login portal
+#pass in proto tcp to 211.99.206.92 port eq 80,443
+#pass out proto tcp from 211.99.206.92 port eq 80,443
+# webmail.beelinewifi.ru loopholes
+pass in proto tcp to 194.67.1.205
+pass out proto tcp from 194.67.1.205
+# mail.beelinewifi.ru loopholes
+block in proto tcp to 194.67.1.206 port eq 465
+block out proto tcp from 194.67.1.206 port eq 465
+dnat in proto tcp to 194.67.1.206 port eq 25 redir to 194.67.1.206 port 587
+dnat out proto tcp from 194.67.1.206 port eq 587
+pass in proto tcp to 194.67.1.206
+pass out proto tcp from 194.67.1.206
+# Wi2Geo loopholes
+#pass in proto tcp to 79.125.48.130 port eq 80
+#pass out proto tcp from 79.125.48.130 port eq 80
+# loophole to am's video streaming tcp.beelinewifi.ru.
+pass in proto tcp to 194.67.1.21 port eq 80,443
+pass out proto tcp from 194.67.1.21 port eq 80,443
+# dnat DNS
+dnat in proto udp to port eq 53 redir to 169.254.128.255 port 53
+dnat out proto udp from 169.254.128.255 port eq 53
+dnat in proto tcp to port eq 53 redir to 169.254.128.255 port 53
+dnat out proto tcp from 169.254.128.255 port eq 53
+# dnat HTTP
+dnat in proto tcp to port eq 80 redir to 194.67.1.20 port 15080
+dnat out proto tcp from port eq 15080
+# dnat HTTPS
+dnat in proto tcp to port eq 443 redir to 194.67.1.20 port 15443
+dnat out proto tcp from port eq 15443
+# no connectivity beyond this point
+block in
+block out

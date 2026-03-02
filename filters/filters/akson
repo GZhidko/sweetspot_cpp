@@ -1,0 +1,38 @@
+#
+# akson-quick.ru up-filter - block all instead akson-quick.ru 
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# loophole to startwifi.beeline.ru
+pass in proto tcp to 194.67.1.30 port eq 80,443
+pass out proto tcp from 194.67.1.30 port eq 80,443
+# loophole to cp.beelinewifi.ru
+pass in proto tcp to 194.67.1.37 port eq 80,443
+pass out proto tcp from 194.67.1.37 port eq 80,443
+# loophole for DNS
+pass in proto udp to port eq 53
+pass out proto udp from port eq 53
+pass in proto tcp to port eq 53
+pass out proto tcp from port eq 53
+# loophole to akson-quick.ru 
+pass in proto tcp to 104.21.83.117 port eq 80,443
+pass in proto tcp to 172.67.175.143 port eq 80,443
+pass out proto tcp from 104.21.83.117 port eq 80,443
+pass out proto tcp from 172.67.175.143 port eq 80,443
+# dnat HTTP to an empty page and HTTPS to local RST reply
+dnat in proto tcp to port eq 80 redir to 194.67.1.20 port 8181
+dnat out proto tcp from 194.67.1.20 port eq 8181
+dnat in proto tcp to port eq 443 redir to 169.254.128.255 port 8123
+dnat out proto tcp from 169.254.128.255 port eq 8123
+# block ALL traffic 
+block in
+block out

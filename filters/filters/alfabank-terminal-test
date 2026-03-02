@@ -1,0 +1,136 @@
+#
+#  UP&DNfilter for alfabank terminals with certain loopholes
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# loophole to Auth service
+pass in proto tcp to 194.67.1.40 port eq 80,443
+pass out proto tcp from 194.67.1.40 port eq 80,443
+# loophole to goldenwifi.ru.
+pass in proto tcp to 194.67.1.16 port eq 80,443,2443,8080
+pass out proto tcp from 194.67.1.16 port eq 80,443,2443,8080
+# loophole to startwifi.beeline.ru + test.startwifi.beeline.ru
+#pass in proto tcp to 194.67.1.30 port eq 80,443,22443,8080
+#pass out proto tcp from 194.67.1.30 port eq 80,443,22443,8080
+# loophole to video CP
+pass in proto tcp to 194.67.1.37 port eq 80,443
+pass out proto tcp from 194.67.1.37 port eq 80,443
+# loophole to registrarwifi.beeline.ru. 
+pass in proto tcp to 194.67.1.22 port eq 80,443
+pass out proto tcp from 194.67.1.22 port eq 80,443
+# loophole to mywifi.beeline.ru. 
+pass in proto tcp to 194.67.1.25 port eq 80,443
+pass out proto tcp from 194.67.1.25 port eq 80,443
+# allow icmp to web farm
+pass in proto icmp to 194.67.1.0/24
+pass out proto icmp from 194.67.1.0/24
+# loophole for DNS
+pass in proto udp to port eq 53
+pass out proto udp from port eq 53
+pass in proto tcp to port eq 53
+pass out proto tcp from port eq 53
+# loopholes only to Alfabank servers
+pass in to 217.12.104.100
+pass out from 217.12.104.100
+pass in to 217.12.104.100
+pass out from 217.12.104.100
+pass in to 217.12.96.0/20
+pass out from 217.12.96.0/20
+pass in to 185.154.124.0/22
+pass out from 185.154.124.0/22
+pass in to 217.12.104.0/24
+pass out from 217.12.104.0/24
+pass in to 195.218.200.138
+pass out from 195.218.200.138
+pass in to 195.218.200.139
+pass out from 195.218.200.139
+# loophole to Apple servers
+pass in to 17.0.0.0/8
+pass out from 17.0.0.0/8
+pass in to 104.64.0.0/10
+pass out from 104.64.0.0/10
+pass in to 2.16.0.0/13
+pass out from 2.16.0.0/13
+pass in to 72.247.160.0/19
+pass out from 72.247.160.0/19
+pass in to 87.245.202.0/24
+pass out from 87.245.202.0/24
+pass in to 95.100.0.0/15
+pass out from 95.100.0.0/15
+pass in to 88.221.0.0/16
+pass out from 88.221.0.0/16
+pass in to 92.122.0.0/16
+pass out from 92.122.0.0/16
+pass in to 184.31.91.23
+pass out from 184.31.91.23
+# loophole to yandex services
+# maps.yandex.ru
+pass in to 213.180.193.0/24
+pass out from 213.180.193.0/24
+pass in to 213.180.204.0/24
+pass out from 213.180.204.0/24
+pass in to 87.250.250.0/23
+pass out from 87.250.250.0/23
+pass in to 77.88.21.0/24
+pass out from 77.88.21.0/24
+# other yandex
+pass in to 93.158.134.0/24
+pass out from 93.158.134.0/24
+# loophole to google services
+pass in to 23.0.0.0/8
+pass out from 23.0.0.0/8
+pass in to 74.125.0.0/16
+pass out from 74.125.0.0/16
+pass in to 173.194.220.0/24
+pass out from 173.194.220.0/24
+pass in to 108.177.14.0/24
+pass out from 108.177.14.0/24
+pass in to 172.217.194.0/24
+pass out from 172.217.194.0/24
+pass in to 173.194.0.0/16
+pass out from 173.194.0.0/16
+pass in to 172.217.16.0/21
+pass out from 172.217.16.0/21
+pass in to 64.233.160.0/21
+pass out from 64.233.160.0/21
+pass in to 216.58.192.0/19
+pass out from 216.58.192.0/19
+pass in to 108.177.112.0/20
+pass out from 108.177.112.0/20
+pass in to 209.85.233.0/24
+pass out from 209.85.233.0/24
+pass in to 216.239.38.120
+pass out from 216.239.38.120
+pass in to 104.155.10.15
+pass out from 104.155.10.15
+# loophole to other services
+pass in to 87.241.223.68
+pass out from 87.241.223.68
+pass in to 81.17.2.171
+pass out from 81.17.2.171
+pass in to 13.36.218.177
+pass in to 15.188.95.229
+pass in to 15.236.176.210
+pass out from 13.36.218.177
+pass out from 15.188.95.229
+pass out from 15.236.176.210
+pass in to 151.101.130.217
+pass in to 151.101.194.217
+pass in to 151.101.2.217
+pass in to 151.101.66.217
+pass out from 151.101.130.217
+pass out from 151.101.194.217
+pass out from 151.101.2.217
+pass out from 151.101.66.217
+# Anything else should be rejected
+dnat in proto tcp redir to 169.254.128.255 port 51
+dnat out proto tcp from 169.254.128.255 port eq 51

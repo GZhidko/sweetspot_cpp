@@ -1,0 +1,25 @@
+#
+# up-filter for sunlight
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# Pass  HTTP/HTTPS to/from sunlight.app.link only
+pass in proto tcp to 54.230.169.11 port eq 80,443
+pass in proto tcp to 54.230.169.18 port eq 80,443
+pass in proto tcp to 54.230.169.20 port eq 80,443
+pass in proto tcp to 54.230.169.21 port eq 80,443
+pass out proto tcp from 54.230.169.11 port eq 80,443
+pass out proto tcp from 54.230.169.18 port eq 80,443
+pass out proto tcp from 54.230.169.20 port eq 80,443
+pass out proto tcp from 54.230.169.21 port eq 80,443
+pass in proto tcp to 178.248.233.12 port eq 80,443
+pass out proto tcp from 178.248.233.12 port eq 80,443
+block in proto tcp to port eq 80,443
+block out proto tcp from port eq 80,443
+pass in
+pass out

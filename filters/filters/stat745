@@ -1,0 +1,50 @@
+#
+# Up-filter for HTTP statistics
+# Performs DNAT HTTP to WiFi proxy, attempting to gather some info
+# +yaDNS
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# loophole to startwifi.beeline.ru
+pass in proto tcp to 194.67.1.30 port eq 80,443
+pass out proto tcp from 194.67.1.30 port eq 80,443
+# loophole to cp.beelinewifi.ru
+pass in proto tcp to 194.67.1.37 port eq 80,443
+pass out proto tcp from 194.67.1.37 port eq 80,443
+# loophole to dpi.beelinewifi.ru and dpi2.beelinewifi.ru
+pass in proto tcp to 194.154.70.120 port eq 80,443
+pass out proto tcp from 194.154.70.120 port eq 80,443
+pass in proto tcp to 194.154.70.198 port eq 80,443
+pass out proto tcp from 194.154.70.198 port eq 80,443
+# dnat to Yandex DNS (Family) - local cache server
+dnat in proto udp to port eq 53 redir to 169.254.128.254 port 53
+dnat out proto udp from 169.254.128.254 port eq 53
+dnat in proto tcp to port eq 53 redir to 169.254.128.254 port 53
+dnat out proto tcp from 169.254.128.254 port eq 53
+# dnat yaDNS IP to our error page
+dnat in proto tcp to 93.158.134.250 port eq 80 redir to 194.154.70.198 port 87
+dnat out proto tcp from 194.154.70.198 port eq 87
+dnat in proto tcp to 93.158.134.250 port eq 443 redir to 194.154.70.198 port 450
+dnat out proto tcp from 194.154.70.198 port eq 450
+# dnat skyDNS IP to our error page (88+451)
+dnat in proto tcp to 193.58.251.1 port eq 80 redir to 194.154.70.198 port 88
+dnat out proto tcp from 194.154.70.198 port eq 88
+dnat in proto tcp to 193.58.251.1 port eq 443 redir to 194.154.70.198 port 451
+dnat out proto tcp from 194.154.70.198 port eq 451
+# dnat HTTP to WiFi proxy (transparent port)
+dnat in proto tcp to port eq 80 redir to 194.154.70.198 port 745
+dnat out proto tcp from 194.154.70.198 port eq 745
+# block all other services at proxy
+block in proto tcp to 194.154.70.120
+block in proto tcp to 194.154.70.198
+# allow non-HTTP traffic 
+pass in
+pass out

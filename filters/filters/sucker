@@ -1,0 +1,39 @@
+#
+# Simple filter for a typical webber.
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# dnat DNS
+dnat in proto udp to port eq 53 redir to 169.254.128.255 port 53
+dnat out proto udp from 169.254.128.255 port eq 53
+dnat in proto tcp to port eq 53 redir to 169.254.128.255 port 53
+dnat out proto tcp from 169.254.128.255 port eq 53
+block out proto tcp to port eq 135
+block out proto udp to port eq 135
+block out proto tcp to port 137:139
+block out proto udp to port 137:139
+block out proto tcp to port eq 445
+block out proto udp to port eq 445
+block out proto tcp to port eq 25
+block out proto tcp to port eq 80
+block out proto tcp to port eq 1080 flags S/SA
+block out proto tcp to port eq 8080 flags S/SA
+block out proto tcp to port eq 3128 flags S/SA
+block in proto tcp to port eq 135
+block in proto udp to port eq 135
+block in proto tcp to port 137:139
+block in proto udp to port 137:139
+block in proto tcp to port eq 445
+block in proto udp to port eq 445
+block in proto tcp to port eq 1433
+block in proto udp to port eq 1434
+# unmatched packets would pass through

@@ -1,0 +1,68 @@
+#
+# for special project with getwifi.com down-filter
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# loophole to Auth service
+pass in proto tcp to 194.67.1.40 port eq 80,443
+pass out proto tcp from 194.67.1.40 port eq 80,443
+# loophole to beeline API portal sources
+pass in proto tcp to 77.95.132.219 port eq 80,443
+pass out proto tcp from 77.95.132.219 port eq 80,443
+pass in proto tcp to 188.227.73.8 port eq 80,443
+pass out proto tcp from 188.227.73.8 port eq 80,443
+pass in proto tcp to 95.163.249.5 port eq 80,443
+pass out proto tcp from 95.163.249.5 port eq 80,443
+pass in proto tcp to 95.163.249.48 port eq 80,443
+pass out proto tcp from 95.163.249.48 port eq 80,443
+pass in proto tcp to 217.118.87.139 port eq 80,443
+pass out proto tcp from 217.118.87.139 port eq 80,443
+pass in proto tcp to 217.118.87.37 port eq 80,443
+pass out proto tcp from 217.118.87.37 port eq 80,443
+# loophole to goldenwifi.ru.
+pass in proto tcp to 194.67.1.16 port eq 80,443,2443,8080
+pass out proto tcp from 194.67.1.16 port eq 80,443,2443,8080
+# loophole to startwifi.beeline.ru + test.startwifi.beeline.ru
+#pass in proto tcp to 194.67.1.30 port eq 80,443,22443,8080
+#pass out proto tcp from 194.67.1.30 port eq 80,443,22443,8080
+# loophole to video CP
+pass in proto tcp to 194.67.1.37 port eq 80,443
+pass out proto tcp from 194.67.1.37 port eq 80,443
+# loophole to registrarwifi.beeline.ru. 
+pass in proto tcp to 194.67.1.22 port eq 80,443
+pass out proto tcp from 194.67.1.22 port eq 80,443
+# loophole to mywifi.beeline.ru. 
+pass in proto tcp to 194.67.1.25 port eq 80,443
+pass out proto tcp from 194.67.1.25 port eq 80,443
+# allow icmp to web farm
+pass in proto icmp to 194.67.1.0/24
+pass out proto icmp from 194.67.1.0/24
+# webmail.beelinewifi.ru loopholes
+pass in proto tcp to 194.67.1.205
+pass out proto tcp from 194.67.1.205
+# mail.beelinewifi.ru loopholes
+block in proto tcp to 194.67.1.206 port eq 465
+block out proto tcp from 194.67.1.206 port eq 465
+dnat in proto tcp to 194.67.1.206 port eq 25 redir to 194.67.1.206 port 587
+dnat out proto tcp from 194.67.1.206 port eq 587
+pass in proto tcp to 194.67.1.206
+pass out proto tcp from 194.67.1.206
+# loophole to am's test video streaming tcp.beelinewifi.ru.
+pass in proto tcp to 194.67.1.21 port eq 80,443
+pass out proto tcp from 194.67.1.21 port eq 80,443
+# dnat DNS
+dnat in proto udp to port eq 53 redir to 169.254.128.255 port 53
+dnat out proto udp from 169.254.128.255 port eq 53
+dnat in proto tcp to port eq 53 redir to 169.254.128.255 port 53
+dnat out proto tcp from 169.254.128.255 port eq 53
+# dnat HTTP
+dnat in proto tcp to port eq 80 redir to 194.67.1.20 port 15080
+dnat out proto tcp from 194.67.1.20 port eq 15080
+# dnat HTTPS
+dnat in proto tcp to port eq 443 redir to 194.67.1.20 port 15443
+dnat out proto tcp from 194.67.1.20 port eq 15443
+# no connectivity beyond this point
+block in
+block out

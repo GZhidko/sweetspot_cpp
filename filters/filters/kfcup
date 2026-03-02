@@ -1,0 +1,96 @@
+#
+# KFC up-filter 
+# Perform DNAT HTTP to KFC WiFi proxy
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# loophole to DNS servers
+pass in proto udp to 194.67.1.150 port eq 53
+pass out proto udp from 194.67.1.150 port eq 53
+pass in proto udp to 194.67.2.114 port eq 53
+pass out proto udp from 194.67.2.114 port eq 53
+pass in proto udp to 194.85.128.10 port eq 53
+pass out proto udp from 194.85.128.10 port eq 53
+pass in proto udp to 194.85.129.80 port eq 53
+pass out proto udp from 194.85.129.80 port eq 53
+pass in proto tcp to 194.67.1.150 port eq 53
+pass out proto tcp from 194.67.1.150 port eq 53
+pass in proto tcp to 194.67.2.114 port eq 53
+pass out proto tcp from 194.67.2.114 port eq 53
+pass in proto tcp to 194.85.128.10 port eq 53
+pass out proto tcp from 194.85.128.10 port eq 53
+pass in proto tcp to 194.85.129.80 port eq 53
+pass out proto tcp from 194.85.129.80 port eq 53
+# loophole to startwifi.beeline.ru
+pass in proto tcp to 194.67.1.30 port eq 80,443
+pass out proto tcp from 194.67.1.30 port eq 80,443
+# loophole to cp.beelinewifi.ru
+pass in proto tcp to 194.67.1.37 port eq 80,443
+pass out proto tcp from 194.67.1.37 port eq 80,443
+# loophole to KFC web
+pass in proto tcp to 185.99.9.23 port eq 80,443
+pass out proto tcp from 185.99.9.23 port eq 80,443
+pass in proto tcp to 198.50.220.29 port eq 80,443
+pass out proto tcp from 198.50.220.29 port eq 80,443
+# loophole to KFC stuff for staff
+pass in to 216.12.159.65
+pass out from 216.12.159.65
+#pass in to learningzoneqa.yum.com
+#pass out from learningzoneqa.yum.com
+pass in to 12.162.8.39
+pass out from 12.162.8.39
+pass in to 168.182.18.129
+pass out from 168.182.18.129
+#pass in to learningzonecms.yum.com
+#pass out from learningzonecms.yum.com
+pass in to 206.19.46.77
+pass out from 206.19.46.77
+pass in to 206.19.46.78
+pass out from 206.19.46.78
+pass in to 34.204.233.88
+pass in to 50.17.115.154
+pass out from 34.204.233.88
+pass out from 50.17.115.154
+pass in to 34.238.178.216
+pass in to 54.173.242.156
+pass out from 34.238.178.216
+pass out from 54.173.242.156
+#pass in to contentserver.elementk.com
+#pass out from contentserver.elementk.com
+pass in to 209.235.8.107
+pass out from 209.235.8.107
+pass in to 69.166.141.111
+pass out from 69.166.141.111
+pass in to 69.166.141.112
+pass out from 69.166.141.112
+pass in to 158.85.247.200
+pass out from 158.85.247.200
+pass in to 4.35.100.15
+pass out from 4.35.100.15
+pass in to 4.35.100.14
+pass out from 4.35.100.14
+#pass in to intralearn.nreaf.org
+#pass out from intralearn.nreaf.org
+pass in to 52.70.180.73
+pass out from 52.70.180.73
+# loophole to dpi.beelinewifi.ru
+pass in proto tcp to 194.154.70.120 port eq 80,443
+pass out proto tcp from 194.154.70.120 port eq 80,443
+# dnat HTTP to KFC proxy (transparent port)
+dnat in proto tcp to port eq 80,3128,8080 redir to 194.154.70.120 port 701
+dnat out proto tcp from 194.154.70.120 port eq 701
+# block all other services at proxy
+block in proto tcp to 194.154.70.120
+block out proto tcp from 194.154.70.120
+# allow non-HTTP traffic
+pass in
+pass out

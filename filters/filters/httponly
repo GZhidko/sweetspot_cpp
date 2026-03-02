@@ -1,0 +1,28 @@
+#
+# HTTP(S) only filter
+#
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# loophole for DNS
+pass in proto udp to port eq 53
+pass out proto udp from port eq 53
+pass in proto tcp to port eq 53
+pass out proto tcp from port eq 53
+# loophole to certain services
+pass in proto tcp to port eq 80,81,82,83,443,8080
+pass out proto tcp from port eq 80,81,82,83,443,8080
+#
+# Attempt to block all other services
+#
+block in
+block out

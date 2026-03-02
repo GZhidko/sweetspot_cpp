@@ -1,0 +1,25 @@
+#
+#  UP&DNfilter for SBRF terminals with certain loopholes
+#
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# loopholes only to SBRF servers
+pass in proto tcp to 195.43.144.50 port eq 666,668,670
+pass out proto tcp from 195.43.144.50 port eq 666,668,670
+pass in proto tcp to 194.186.207.162 port eq 666,668,670
+pass out proto tcp from 194.186.207.162 port eq 666,668,670
+pass in proto tcp to 193.143.119.233 port eq 666,668,670
+pass out proto tcp from 193.143.119.233 port eq 666,668,670
+pass in proto tcp to 194.54.14.162 port eq 666,668,670
+pass out proto tcp from 194.54.14.162 port eq 666,668,670
+# loopholes to 8.8.8.8 by SBRF request
+pass in proto tcp to 8.8.8.8
+pass out proto tcp from 8.8.8.8
+# Anything else should be blocked 
+block in
+block out

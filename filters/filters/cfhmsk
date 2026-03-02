@@ -1,0 +1,56 @@
+#
+# CoffeeHouseMsk up-filter
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# loophole to Auth service
+pass in proto tcp to 194.67.1.40 port eq 80,443
+pass out proto tcp from 194.67.1.40 port eq 80,443
+# requested by Beeline RfC 271381/12 
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# loophole by CoffeeHouse (MSK) request
+pass in to 85.21.206.0/24
+pass out from 85.21.206.0/24
+pass in to 195.239.244.128/25
+pass out from 195.239.244.128/25
+pass in to 91.220.188.0/24
+pass out from 91.220.188.0/24
+### required by notifier ###
+# loophole to cp.beelinewifi.ru
+#pass in proto tcp to 194.67.1.37 port eq 80,443
+#pass out proto tcp from 194.67.1.37 port eq 80,443
+# loophole to test video CP
+#pass in proto tcp to 194.67.1.21 port eq 80,443
+#pass out proto tcp from 194.67.1.21 port eq 80,443
+# loophole to dpi.beelinewifi.ru
+#pass in proto tcp to 194.154.70.120 port eq 80,443
+#pass out proto tcp from 194.154.70.120 port eq 80,443
+# dnat HTTP to WiFi proxy (transparent port with notifier)
+#dnat in proto tcp to port eq 80,3128,8080 redir to 194.154.70.120 port 1061
+#dnat out proto tcp from 194.154.70.120 port eq 1061
+# block all other services at proxy
+#block in proto tcp to 194.154.70.120
+#block out proto tcp from 194.154.70.120
+###
+# loophole by CoffeeHouse (MSK) request
+pass in proto tcp to port eq 20,21,25,80,110,143,443,465
+pass out proto tcp from port eq 20,21,25,80,110,143,443,465
+pass in proto tcp to port eq 993,2195,2196,3389,3390,4433,5222,5223
+pass out proto tcp from port eq 993,2195,2196,3389,3390,4433,5222,5223
+pass in proto tcp to port eq 5228,5229,5230,8080,9900,20020,20021,65333
+pass out proto tcp from port eq 5228,5229,5230,8080,9900,20020,20021,65333
+pass in proto udp to port eq 53,465,3389,3390,4433,65333
+pass out proto udp from port eq 53,465,3389,3390,4433,65333
+#
+# Attempt to block torrents
+#
+block in
+block out
+# unmatched packets would pass through

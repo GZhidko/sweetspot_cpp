@@ -1,0 +1,35 @@
+# pass tcp packets anywhere
+pass in proto tcp
+pass out proto tcp
+
+# pass any packets to&from localhost
+pass in to 127.0.0.1
+pass out from 127.0.0.1
+
+# pass tcp packets to&from 123.45.67.89 only ports in range 22-80
+pass in proto tcp to 123.45.67.89 port 22:80
+pass out proto tcp from 123.45.67.89 port 22:80
+
+# pass udp packets from any source, port 80 to localhost port 8080
+pass in proto udp from port eq 80 to 127.0.0.1 port eq 8080
+# pass udp packets from localhost port 8080 to any destination, port 80
+pass out proto udp from 127.0.0.1 port eq 8080 to port eq 80
+
+# redirect tcp packets to 123.45.67.89 port 80
+pass in proto tcp redir to 123.45.67.89 port 80
+# pass tcp packets from 123.45.67.89 port eq 80
+pass out proto tcp from 123.45.67.89 port eq 80
+
+# block tcp packets with flags FSR/U
+block in proto 6 flags FSR/U
+block out proto 6 flags FSR/U
+
+# dnat udp packets from subnet 194.2.34.0/24 port < 80 and 
+# redirect them to 123.45.67.8 port 80 
+dnat in proto udp from 194.2.34.0/24 port le 80 redir to 123.45.67.8 port 80
+# dnat udp packets from 123.45.67.8 port 80 to 194.2.34.0/24 port < 80 
+dnat out proto udp from 127.0.0.1 port eq 80 to 194.2.34.0/24 port le 80
+
+# dnat any packet in any direction
+dnat in
+dnat out

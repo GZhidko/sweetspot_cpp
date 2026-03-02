@@ -1,0 +1,81 @@
+#
+# Up-filter for devices at Beeline offices 
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# loophole to Auth service
+pass in proto tcp to 194.67.1.40 port eq 80,443
+pass out proto tcp from 194.67.1.40 port eq 80,443
+# loophole to DNS servers
+pass in proto udp to 194.67.1.150 port eq 53
+pass out proto udp from 194.67.1.150 port eq 53
+pass in proto udp to 194.67.2.114 port eq 53
+pass out proto udp from 194.67.2.114 port eq 53
+pass in proto udp to 194.85.128.10 port eq 53
+pass out proto udp from 194.85.128.10 port eq 53
+pass in proto udp to 194.85.129.80 port eq 53
+pass out proto udp from 194.85.129.80 port eq 53
+pass in proto tcp to 194.67.1.150 port eq 53
+pass out proto tcp from 194.67.1.150 port eq 53
+pass in proto tcp to 194.67.2.114 port eq 53
+pass out proto tcp from 194.67.2.114 port eq 53
+pass in proto tcp to 194.85.128.10 port eq 53
+pass out proto tcp from 194.85.128.10 port eq 53
+pass in proto tcp to 194.85.129.80 port eq 53
+pass out proto tcp from 194.85.129.80 port eq 53
+# loophole to requested Beeline sites
+pass in proto tcp to 217.118.84.0/24 port eq 80,443
+pass out proto tcp from 217.118.84.0/24 port eq 80,443
+pass in proto tcp to 194.67.1.38 port eq 80,443
+pass out proto tcp from 194.67.1.38 port eq 80,443
+pass in proto tcp to 217.118.87.98 port eq 80,443
+pass out proto tcp from 217.118.87.98 port eq 80,443
+pass in proto tcp to 217.118.87.98 port eq 80,443
+pass out proto tcp from 217.118.87.98 port eq 80,443
+pass in proto tcp to 194.67.18.95 port eq 80,443
+pass out proto tcp from 194.67.18.95 port eq 80,443
+pass in proto tcp to 194.67.18.96 port eq 80,443
+pass out proto tcp from 194.67.18.96 port eq 80,443
+pass in proto tcp to 217.118.87.98 port eq 80,443
+pass out proto tcp from 217.118.87.98 port eq 80,443
+# loophole to Adriver
+pass in proto tcp to 195.209.108.35 port eq 80,443
+pass in proto tcp to 195.209.108.36 port eq 80,443
+pass in proto tcp to 195.209.108.37 port eq 80,443
+pass in proto tcp to 195.209.108.38 port eq 80,443
+pass in proto tcp to 195.209.108.39 port eq 80,443
+pass in proto tcp to 195.209.108.46 port eq 80,443
+pass in proto tcp to 195.209.108.47 port eq 80,443
+pass in proto tcp to 195.209.108.48 port eq 80,443
+pass in proto tcp to 195.209.108.49 port eq 80,443
+pass out proto tcp from 195.209.108.35 port eq 80,443
+pass out proto tcp from 195.209.108.36 port eq 80,443
+pass out proto tcp from 195.209.108.37 port eq 80,443
+pass out proto tcp from 195.209.108.38 port eq 80,443
+pass out proto tcp from 195.209.108.39 port eq 80,443
+pass out proto tcp from 195.209.108.46 port eq 80,443
+pass out proto tcp from 195.209.108.47 port eq 80,443
+pass out proto tcp from 195.209.108.48 port eq 80,443
+pass out proto tcp from 195.209.108.49 port eq 80,443
+# loophole to Yandex Metrics
+pass in proto tcp to 77.88.21.119 port eq 80,443
+pass in proto tcp to 87.250.250.119 port eq 80,443
+pass in proto tcp to 87.250.251.119 port eq 80,443
+pass in proto tcp to 93.158.134.119 port eq 80,443
+pass out proto tcp from 77.88.21.119 port eq 80,443
+pass out proto tcp from 87.250.250.119 port eq 80,443
+pass out proto tcp from 87.250.251.119 port eq 80,443
+pass out proto tcp from 93.158.134.119 port eq 80,443
+# loophole to Google Analytics
+pass in proto tcp to 173.194.71.0/24 port eq 80,443
+pass out proto tcp from 173.194.71.0/24 port eq 80,443
+# dnat http/https to access denied page
+dnat in proto tcp to port eq 80 redir to 194.154.70.120 port 83
+dnat out proto tcp from 194.154.70.120 port eq 83
+dnat in proto tcp to port eq 443 redir to 194.154.70.120 port 446
+dnat out proto tcp from 194.154.70.120 port eq 446
+# other packets will be blocked
+block in
+block out

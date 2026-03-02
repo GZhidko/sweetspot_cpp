@@ -1,0 +1,21 @@
+#
+# Default up-filter
+#
+# *** Every single filter must have this loophole to our static content
+#pass in proto tcp to 194.67.1.117 port eq 80,443
+#pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+#dnat in to 11.0.0.5 proto icmp redir to 22.0.0.5 
+dnat in proto icmp to 20.0.0.5 redir to 11.0.0.5 port 0
+dnat out proto icmp from 11.0.0.5
+# ***
+#
+# requested by Beeline RfC 271381/12
+#block in proto tcp to beeterminal.ru
+#block out proto tcp from beeterminal.ru
+pass in
+pass out
+

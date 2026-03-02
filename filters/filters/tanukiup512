@@ -1,0 +1,34 @@
+#
+# Tanuki up-filter - most ports closed, 512 rate
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# loophole for DNS
+pass in proto udp to port eq 53
+pass out proto udp from port eq 53
+pass in proto tcp to port eq 53
+pass out proto tcp from port eq 53
+# loophole to certain services
+pass in proto tcp to port eq 20,21,25,80,110,143,443,465 rate 512
+pass out proto tcp from port eq 20,21,25,80,110,143,443,465 rate 512
+pass in proto tcp to port eq 993,995,3389,5190,5222,8080,8100,9100 rate 512
+pass out proto tcp from port eq 993,995,3389,5190,5222,8080,8100,9100 rate 512
+# loophole for IPSec needs (IKE, Kerberos, NAT-T)
+pass in proto tcp to port eq 88 rate 512
+pass out proto tcp from port eq 88 rate 512
+pass in proto udp to port eq 88,500,4500 rate 512
+pass out proto udp from port eq 88,500,4500 rate 512
+#
+# Attempt to block torrents
+#
+block in
+block out

@@ -1,0 +1,117 @@
+#
+# Tanuki up-filter - most ports closed
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# loophole for DNS
+pass in proto udp to port eq 53
+pass out proto udp from port eq 53
+pass in proto tcp to port eq 53
+pass out proto tcp from port eq 53
+# block some ports by client request
+block in proto tcp to port eq 20,21,25,587,465,6881
+block out proto tcp from port eq 20,21,25,587,465,6881
+block in proto tcp to port eq 6882,6883,6884,6885,6886,6887,6888,6889
+block out proto tcp from port eq 6882,6883,6884,6885,6886,6887,6888,6889
+block in proto udp to port eq 69,6881,6882,6883,6884,6885,6886,6887
+block out proto udp from port eq 69,6881,6882,6883,6884,6885,6886,6887
+block in proto udp to port eq 6888,6889
+block out proto udp from port eq 6888,6889
+# block some web services
+# Yandex.ru
+block in proto tcp to 77.88.55.0/24 port eq 80,443
+block out proto tcp from 77.88.55.0/24 port eq 80,443
+block in proto tcp to 5.255.255.0/24 port eq 80,443
+block out proto tcp from 5.255.255.0/24 port eq 80,443
+# Google
+block in proto tcp to 35.190.247.0/24 port eq 80,443
+block out proto tcp from 35.190.247.0/24 port eq 80,443
+block in proto tcp to 35.191.0.0/16 port eq 80,443
+block out proto tcp from 35.191.0.0/16 port eq 80,443
+block in proto tcp to 64.233.160.0/19 port eq 80,443
+block out proto tcp from 64.233.160.0/19 port eq 80,443
+block in proto tcp to 66.102.0.0/20 port eq 80,443
+block out proto tcp from 66.102.0.0/20 port eq 80,443
+block in proto tcp to 66.249.80.0/20 port eq 80,443
+block out proto tcp from 66.249.80.0/20 port eq 80,443
+block in proto tcp to 72.14.192.0/18 port eq 80,443
+block out proto tcp from 72.14.192.0/18 port eq 80,443
+block in proto tcp to 74.125.0.0/16 port eq 80,443
+block out proto tcp from 74.125.0.0/16 port eq 80,443
+block in proto tcp to 108.177.0.0/16 port eq 80,443
+block out proto tcp from 108.177.0.0/16 port eq 80,443
+block in proto tcp to 130.211.0.0/22 port eq 80,443
+block out proto tcp from 130.211.0.0/22 port eq 80,443
+block in proto tcp to 172.217.0.0/16 port eq 80,443
+block out proto tcp from 172.217.0.0/16 port eq 80,443
+block in proto tcp to 172.253.0.0/16 port eq 80,443
+block out proto tcp from 172.253.0.0/16 port eq 80,443
+block in proto tcp to 173.194.0.0/16 port eq 80,443
+block out proto tcp from 173.194.0.0/16 port eq 80,443
+block in proto tcp to 209.85.128.0/17 port eq 80,443
+block out proto tcp from 209.85.128.0/17 port eq 80,443
+block in proto tcp to 216.58.192.0/19 port eq 80,443
+block out proto tcp from 216.58.192.0/19 port eq 80,443
+block in proto tcp to 216.239.32.0/19 port eq 80,443
+block out proto tcp from 216.239.32.0/19 port eq 80,443
+# Rambler.ru
+block in proto tcp to 81.19.82.0/24 port eq 80,443
+block out proto tcp from 81.19.82.0/24 port eq 80,443
+# Vk.com
+block in proto tcp to 93.186.224.0/22 port eq 80,443
+block out proto tcp from 93.186.224.0/22 port eq 80,443
+block in proto tcp to 87.240.128.0/18 port eq 80,443
+block out proto tcp from 87.240.128.0/18 port eq 80,443
+# Facebook.com
+block in proto tcp to 31.13.64.0/18 port eq 80,443
+block out proto tcp from 31.13.64.0/18 port eq 80,443
+block in proto tcp to 157.240.0.0/16 port eq 80,443
+block out proto tcp from 157.240.0.0/16 port eq 80,443
+# Youtube.com
+block in proto tcp to 216.58.192.0/19 port eq 80,443
+block out proto tcp from 216.58.192.0/19 port eq 80,443
+# Microsoft, Xerox, Amazon
+block in proto tcp to 13.0.0.0/8 port eq 80,443
+block out proto tcp from 13.0.0.0/8 port eq 80,443
+block in proto tcp to 107.20.0.0/14 port eq 80,443
+block out proto tcp from 107.20.0.0/14 port eq 80,443
+# OK.ru
+block in proto tcp to 217.20.152.0/21 port eq 80,443
+block out proto tcp from 217.20.152.0/21 port eq 80,443
+block in proto tcp to 5.61.23.0/24 port eq 80,443
+block out proto tcp from 5.61.23.0/24 port eq 80,443
+# Twiiter
+block in proto tcp to 104.244.40.0/21 port eq 80,443
+block out proto tcp from 104.244.40.0/21 port eq 80,443
+# Twich.com
+block in proto tcp to 75.126.0.0/16 port eq 80,443
+block out proto tcp from 75.126.0.0/16 port eq 80,443
+# Mail.ru
+block in proto tcp to 217.69.136.0/21 port eq 80,443
+block out proto tcp from 217.69.136.0/21 port eq 80,443
+block in proto tcp to 94.100.176.0/21 port eq 80,443
+block out proto tcp from 94.100.176.0/21 port eq 80,443
+# Avito.ru
+block in proto tcp to 185.89.12.0/23 port eq 80,443
+block out proto tcp from 185.89.12.0/23 port eq 80,443
+# moevideo.biz
+block in proto tcp to 92.38.136.0/22 port eq 80,443
+block out proto tcp from 92.38.136.0/22 port eq 80,443
+# Vimeo.com
+block in proto tcp to 151.101.0.0/16 port eq 80,443
+block out proto tcp from 151.101.0.0/16 port eq 80,443
+# Okko.tv
+block in proto tcp to 185.32.70.0/24 port eq 80,443
+block out proto tcp from 185.32.70.0/24 port eq 80,443
+pass in
+pass out
+# unmatched packets would pass through

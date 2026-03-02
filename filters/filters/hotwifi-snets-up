@@ -1,0 +1,144 @@
+#
+# SocialNetworks only filter + Hot-WiFi
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# loophole for DNS
+pass in proto udp to port eq 53
+pass out proto udp from port eq 53
+pass in proto tcp to port eq 53
+pass out proto tcp from port eq 53
+# loophole to Auth service
+pass in proto tcp to 194.67.1.40 port eq 80,443
+pass out proto tcp from 194.67.1.40 port eq 80,443
+# loophole to goldenwifi.ru.
+pass in proto tcp to 194.67.1.16 port eq 80,443,2443,8080
+pass out proto tcp from 194.67.1.16 port eq 80,443,2443,8080
+# loophole to startwifi.beeline.ru + test.startwifi.beeline.ru
+#pass in proto tcp to 194.67.1.30 port eq 80,443,22443,8080
+#pass out proto tcp from 194.67.1.30 port eq 80,443,22443,8080
+# loophole to video CP
+pass in proto tcp to 194.67.1.37 port eq 80,443
+pass out proto tcp from 194.67.1.37 port eq 80,443
+# loophole to registrarwifi.beeline.ru. 
+pass in proto tcp to 194.67.1.22 port eq 80,443
+pass out proto tcp from 194.67.1.22 port eq 80,443
+# loophole to mywifi.beeline.ru. 
+pass in proto tcp to 194.67.1.25 port eq 80,443
+pass out proto tcp from 194.67.1.25 port eq 80,443
+# allow icmp to web farm
+pass in proto icmp to 194.67.1.0/24
+pass out proto icmp from 194.67.1.0/24
+# loophole to oauth.hot-wifi.ru 
+pass in proto tcp to 78.155.202.186 port eq 80,443
+pass out proto tcp from 78.155.202.186 port eq 80,443
+# loophole to oauth.wifibeeline.ru
+pass in proto tcp to 78.155.202.186 port eq 80,443
+pass out proto tcp from 78.155.202.186 port eq 80,443
+# loophole to certain services
+pass in proto tcp to 95.213.0.0/18 port eq 80,443
+pass out proto tcp from 95.213.0.0/18 port eq 80,443
+pass in proto tcp to 95.142.192.0/20 port eq 80,443
+pass out proto tcp from 95.142.192.0/20 port eq 80,443
+pass in proto tcp to 93.186.224.0/20 port eq 80,443
+pass out proto tcp from 93.186.224.0/20 port eq 80,443
+pass in proto tcp to 87.240.128.0/18 port eq 80,443
+pass out proto tcp from 87.240.128.0/18 port eq 80,443
+pass in proto tcp to 185.32.248.0/22 port eq 80,443
+pass out proto tcp from 185.32.248.0/22 port eq 80,443
+pass in proto tcp to 185.29.130.0/24 port eq 80,443
+pass out proto tcp from 185.29.130.0/24 port eq 80,443
+pass in proto tcp to 74.119.76.0/22 port eq 80,443
+pass out proto tcp from 74.119.76.0/22 port eq 80,443
+pass in proto tcp to 69.63.176.0/20 port eq 80,443
+pass out proto tcp from 69.63.176.0/20 port eq 80,443
+pass in proto tcp to 69.171.224.0/19 port eq 80,443
+pass out proto tcp from 69.171.224.0/19 port eq 80,443
+pass in proto tcp to 66.220.144.0/20 port eq 80,443
+pass out proto tcp from 66.220.144.0/20 port eq 80,443
+pass in proto tcp to 45.64.40.0/22 port eq 80,443
+pass out proto tcp from 45.64.40.0/22 port eq 80,443
+pass in proto tcp to 103.4.96.0/22 port eq 80,443
+pass out proto tcp from 103.4.96.0/22 port eq 80,443
+pass in proto tcp to 204.15.20.0/22 port eq 80,443
+pass out proto tcp from 204.15.20.0/22 port eq 80,443
+pass in proto tcp to 31.13.64.0/18 port eq 80,443
+pass out proto tcp from 31.13.64.0/18 port eq 80,443
+pass in proto tcp to 31.13.24.0/21 port eq 80,443
+pass out proto tcp from 31.13.24.0/21 port eq 80,443
+pass in proto tcp to 204.15.20.0/22 port eq 80,443
+pass out proto tcp from 204.15.20.0/22 port eq 80,443
+pass in proto tcp to 199.201.64.0/22 port eq 80,443
+pass out proto tcp from 199.201.64.0/22 port eq 80,443
+pass in proto tcp to 173.252.64.0/18 port eq 80,443
+pass out proto tcp from 173.252.64.0/18 port eq 80,443
+pass in proto tcp to 157.240.0.0/16 port eq 80,443
+pass out proto tcp from 157.240.0.0/16 port eq 80,443
+pass in proto tcp to 8.25.197.0/24 port eq 80,443
+pass out proto tcp from 8.25.197.0/24 port eq 80,443
+pass in proto tcp to 8.25.196.0/24 port eq 80,443
+pass out proto tcp from 8.25.196.0/24 port eq 80,443
+pass in proto tcp to 8.25.195.0/24 port eq 80,443
+pass out proto tcp from 8.25.195.0/24 port eq 80,443
+pass in proto tcp to 199.96.56.0/21 port eq 80,443
+pass out proto tcp from 199.96.56.0/21 port eq 80,443
+pass in proto tcp to 199.16.156.0/22 port eq 80,443
+pass out proto tcp from 199.16.156.0/22 port eq 80,443
+pass in proto tcp to 192.133.76.0/22 port eq 80,443
+pass out proto tcp from 192.133.76.0/22 port eq 80,443
+pass in proto tcp to 185.45.4.0/22 port eq 80,443
+pass out proto tcp from 185.45.4.0/22 port eq 80,443
+pass in proto tcp to 104.244.40.0/21 port eq 80,443
+pass out proto tcp from 104.244.40.0/21 port eq 80,443
+pass in proto tcp to 5.61.16.0/21 port eq 80,443
+pass out proto tcp from 5.61.16.0/21 port eq 80,443
+pass in proto tcp to 217.20.144.0/20 port eq 80,443
+pass out proto tcp from 217.20.144.0/20 port eq 80,443
+pass in proto tcp to 185.16.244.0/22 port eq 80,443
+pass out proto tcp from 185.16.244.0/22 port eq 80,443
+pass in proto tcp to 54.144.0.0/12 port eq 80,443
+pass out proto tcp from 54.144.0.0/12 port eq 80,443
+pass in proto tcp to 54.160.0.0/12 port eq 80,443
+pass out proto tcp from 54.160.0.0/12 port eq 80,443
+pass in proto tcp to 52.0.0.0/11 port eq 80,443
+pass out proto tcp from 52.0.0.0/11 port eq 80,443
+pass in proto tcp to 54.208.0.0/13 port eq 80,443
+pass out proto tcp from 54.208.0.0/13 port eq 80,443
+pass in proto tcp to 54.216.0.0/14 port eq 80,443
+pass out proto tcp from 54.216.0.0/14 port eq 80,443
+pass in proto tcp to 54.220.0.0/15 port eq 80,443
+pass out proto tcp from 54.220.0.0/15 port eq 80,443
+pass in proto tcp to 107.20.0.0/14 port eq 80,443
+pass out proto tcp from 107.20.0.0/14 port eq 80,443
+pass in proto tcp to 31.13.93.0/24 port eq 80,443
+pass out proto tcp from 31.13.93.0/24 port eq 80,443
+pass in proto tcp to 212.30.134.0/24 port eq 80,443
+pass out proto tcp from 212.30.134.0/24 port eq 80,443
+pass in proto tcp to 173.194.0.0/16 port eq 80,443
+pass out proto tcp from 173.194.0.0/16 port eq 80,443
+pass in proto tcp to 64.233.160.0/19 port eq 80,443
+pass out proto tcp from 64.233.160.0/19 port eq 80,443
+pass in proto tcp to 74.125.0.0/16 port eq 80,443
+pass out proto tcp from 74.125.0.0/16 port eq 80,443
+pass in proto tcp to 184.84.0.0/14 port eq 80,443
+pass out proto tcp from 184.84.0.0/14 port eq 80,443
+pass in proto tcp to 104.108.32.0/20 port eq 80,443
+pass out proto tcp from 104.108.32.0/20 port eq 80,443
+pass in proto tcp to 199.59.148.0/22 port eq 80,443
+pass out proto tcp from 199.59.148.0/22 port eq 80,443
+pass in proto tcp to 199.59.148.0/22 port eq 80,443
+pass out proto tcp from 199.59.148.0/22 port eq 80,443
+#
+# Attempt to block all other services
+#
+block in
+block out

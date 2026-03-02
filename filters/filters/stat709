@@ -1,0 +1,32 @@
+#
+# Up-filter for HTTP statistics
+# Performs DNAT HTTP to WiFi proxy, attempting to gather some info
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# loophole to startwifi.beeline.ru
+pass in proto tcp to 194.67.1.30 port eq 80,443
+pass out proto tcp from 194.67.1.30 port eq 80,443
+# loophole to cp.beelinewifi.ru
+pass in proto tcp to 194.67.1.37 port eq 80,443
+pass out proto tcp from 194.67.1.37 port eq 80,443
+# loophole to dpi.beelinewifi.ru
+pass in proto tcp to 194.154.70.120 port eq 80,443
+pass out proto tcp from 194.154.70.120 port eq 80,443
+# dnat HTTP to WiFi proxy (transparent port)
+dnat in proto tcp to port eq 80 redir to 194.154.70.120 port 709
+dnat out proto tcp from 194.154.70.120 port eq 709
+# block all other services at proxy
+block in proto tcp to 194.154.70.120
+# allow non-HTTP traffic 
+pass in
+pass out

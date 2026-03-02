@@ -1,0 +1,27 @@
+#
+# If this filter is configured as a "filter-anonymous" to Sweetspot
+# daemon, it will be automatically assigned to captured sessions what
+# would cause certain services (HTTP, HTTPS, DNS) to be forced to
+# a Captive Portal authentication page.
+#
+
+# WARNING: replace 192.168.1.1 with IP address of your DNS and 
+#          authentication server (possibly, sweetspot outer interface
+#          address if your DNS and HTTP server live on sweetspot machine)
+#          to make this filter working!
+
+# DNS loophole
+pass in proto udp to 192.168.1.1 port eq 53
+pass out proto udp from 192.168.1.1 port eq 53
+
+# dnat HTTP
+dnat in proto tcp to port eq 80 redir to 192.168.1.1 port 80
+dnat out proto tcp from 192.168.1.1 port eq 80
+
+# dnat HTTPS
+dnat in proto tcp to port eq 443 redir to 192.168.1.1 port 443
+dnat out proto tcp from 192.168.1.1 port eq 443
+
+# no connectivity beyond this point
+pass in
+pass out

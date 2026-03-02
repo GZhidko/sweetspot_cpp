@@ -1,0 +1,31 @@
+#
+# Dnfilter for users without CTN+MAC information DEV 
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# loophole to dev Auth service
+pass in proto tcp to 194.67.1.39 port eq 80,443
+pass out proto tcp from 194.67.1.39 port eq 80,443
+# loophole to DIT Auth service
+# test
+pass in proto tcp to 79.137.220.55 port eq 80,443
+pass out proto tcp from 79.137.220.55 port eq 80,443
+# prod
+pass in proto tcp to 212.11.151.98 port eq 80,443
+pass out proto tcp from 212.11.151.98 port eq 80,443
+# dnat DNS
+dnat in proto udp to port eq 53 redir to 169.254.128.255 port 53
+dnat out proto udp from 169.254.128.255 port eq 53
+dnat in proto tcp to port eq 53 redir to 169.254.128.255 port 53
+dnat out proto tcp from 169.254.128.255 port eq 53
+# dnat HTTP
+dnat in proto tcp to port eq 80 redir to 194.67.1.39 port 8081
+dnat out proto tcp from 194.67.1.39 port eq 8081
+# dnat HTTPS
+dnat in proto tcp to port eq 443 redir to 194.67.1.39 port 8444
+dnat out proto tcp from 194.67.1.39 port eq 8444
+# everything else should be blocked 
+block in
+block out

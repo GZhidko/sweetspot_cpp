@@ -1,0 +1,51 @@
+#
+# notorrent filter
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# loophole for DNS
+pass in proto udp to port eq 53
+pass out proto udp from port eq 53
+pass in proto tcp to port eq 53
+pass out proto tcp from port eq 53
+# loophole for http traffic only for notorrents 
+pass in proto tcp to port eq 80,3128,8080
+pass out proto tcp from port eq 80,3128,8080
+#
+# loophole to certain services
+pass in proto tcp to port eq 20,21,22,25,88,110,143,333
+pass out proto tcp from port eq 20,21,22,25,88,110,143,333
+pass in proto tcp to port eq 443,465,555,587,777,587,993,995
+pass out proto tcp from port eq 443,465,555,587,777,587,993,995
+pass in proto tcp to port eq 1194,2195,2196,3389,3478,4090,4244,4433
+pass out proto tcp from port eq 1194,2195,2196,3389,3478,4090,4244,4433
+pass in proto tcp to port eq 4477,5190,5222,5223,5228,5242,6443,7000
+pass out proto tcp from port eq 4477,5190,5222,5223,5228,5242,6443,7000
+pass in proto tcp to port eq 8000,8443,8446,33880,45395,50318,59234
+pass out proto tcp from port eq 8000,8443,8446,33880,45395,50318,59234
+pass in proto udp to port eq 88,500,1194,2189,3478,4500,4090,4244
+pass out proto udp from port eq 88,500,1194,2189,3478,4500,4090,4244
+pass in proto udp to port eq 5222,5223,5228,5242,5243,9785,33880,45395
+pass out proto udp from port eq 5222,5223,5228,5242,5243,9785,33880,45395
+pass in proto udp to port eq 50318,59234
+pass out proto udp from port eq 50318,59234
+# loophole for VoIP WhatsApp service
+pass in proto tcp to 208.43.122.0/24
+pass out proto tcp from 208.43.122.0/24
+pass in proto udp to 208.43.122.0/24
+pass out proto udp from 208.43.122.0/24
+#
+# Attempt to block torrents
+#
+block in
+block out
+# unmatched packets would pass through

@@ -1,0 +1,147 @@
+#
+# MosGU dn-filter
+# This filter would cause most, but not all, services (HTTP, HTTPS, DNS) to
+# be forced to a Captive Portal authentication page.
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# loophole to Auth service
+pass in proto tcp to 194.67.1.40 port eq 80,443
+pass out proto tcp from 194.67.1.40 port eq 80,443
+# loophole to goldenwifi.ru.
+pass in proto tcp to 194.67.1.16 port eq 80,443,2443,8080
+pass out proto tcp from 194.67.1.16 port eq 80,443,2443,8080
+# loophole to startwifi.beeline.ru + test.startwifi.beeline.ru
+pass in proto tcp to 194.67.1.30 port eq 80,443,22443,8080
+pass out proto tcp from 194.67.1.30 port eq 80,443,22443,8080
+# chronopay.ru, requested by Strelbitski
+pass in proto tcp to 93.174.51.226 port eq 80,443
+pass out proto tcp from 93.174.51.226 port eq 80,443
+# loophole to registrarwifi.beeline.ru. 
+pass in proto tcp to 194.67.1.22 port eq 80,443
+pass out proto tcp from 194.67.1.22 port eq 80,443
+# loophole to mywifi.beeline.ru. 
+pass in proto tcp to 194.67.1.25 port eq 80,443
+pass out proto tcp from 194.67.1.25 port eq 80,443
+# loophole to cp.beelinewifi.ru
+pass in proto tcp to 194.67.1.37 port eq 80,443
+pass out proto tcp from 194.67.1.37 port eq 80,443
+# dnat DNS
+dnat in proto udp to port eq 53 redir to 169.254.128.255 port 53
+dnat out proto udp from 169.254.128.255 port eq 53
+dnat in proto tcp to port eq 53 redir to 169.254.128.255 port 53
+dnat out proto tcp from 169.254.128.255 port eq 53
+# MosGU sites loopholes
+pass in proto tcp to 83.102.155.49 port eq 80,443
+pass out proto tcp from 83.102.155.49 port eq 80,443
+pass in proto tcp to 83.102.155.49 port eq 80,443
+pass out proto tcp from 83.102.155.49 port eq 80,443
+#pass in proto tcp to reklama.mosgu.ru port eq 80,443
+#pass out proto tcp from reklama.mosgu.ru port eq 80,443
+pass in proto tcp to 83.102.155.49 port eq 80,443
+pass out proto tcp from 83.102.155.49 port eq 80,443
+pass in proto tcp to 83.102.155.49 port eq 80,443
+pass out proto tcp from 83.102.155.49 port eq 80,443
+pass in proto tcp to 83.102.155.49 port eq 80,443
+pass out proto tcp from 83.102.155.49 port eq 80,443
+pass in proto tcp to 83.102.155.49 port eq 80,443
+pass out proto tcp from 83.102.155.49 port eq 80,443
+pass in proto tcp to 83.102.155.49 port eq 80,443
+pass out proto tcp from 83.102.155.49 port eq 80,443
+pass in proto tcp to 83.102.155.49 port eq 80,443
+pass out proto tcp from 83.102.155.49 port eq 80,443
+pass in proto tcp to 83.102.155.49 port eq 80,443
+pass out proto tcp from 83.102.155.49 port eq 80,443
+pass in proto tcp to 83.102.155.49 port eq 80,443
+pass out proto tcp from 83.102.155.49 port eq 80,443
+pass in proto tcp to 83.102.155.37 port eq 80,443
+pass out proto tcp from 83.102.155.37 port eq 80,443
+pass in proto tcp to 83.102.155.37 port eq 80,443
+pass out proto tcp from 83.102.155.37 port eq 80,443
+# loophole to QIWI (CR 24435)
+pass in proto tcp to 91.232.230.41 port eq 80,443
+pass out proto tcp from 91.232.230.41 port eq 80,443
+pass in proto tcp to 91.232.230.41 port eq 80,443
+pass out proto tcp from 91.232.230.41 port eq 80,443
+pass in proto tcp to 91.232.230.48 port eq 80,443
+pass out proto tcp from 91.232.230.48 port eq 80,443
+# dengi.yandex.ru loopholes
+pass in proto tcp to 77.75.153.9 port eq 80
+pass out proto tcp from 77.75.153.9 port eq 80
+pass in proto tcp to 77.75.157.171 port eq 80
+pass out proto tcp from 77.75.157.171 port eq 80
+pass in proto tcp to 77.75.153.10 port eq 80,8128
+pass out proto tcp from 77.75.153.10 port eq 80,8128
+pass in proto tcp to 77.75.153.14 port eq 80,8128
+pass out proto tcp from 77.75.153.14 port eq 80,8128
+pass in proto tcp to 77.75.157.146 port eq 80,8128
+pass out proto tcp from 77.75.157.146 port eq 80,8128
+pass in proto tcp to 77.75.157.183 port eq 8128
+pass out proto tcp from 77.75.157.183 port eq 8128
+pass in proto tcp to 77.75.157.184 port eq 8128
+pass out proto tcp from 77.75.157.184 port eq 8128
+pass in proto tcp to 213.180.193.90 port eq 80,443
+pass in proto tcp to 213.180.204.90 port eq 80,443
+pass in proto tcp to 77.88.21.90 port eq 80,443
+pass in proto tcp to 87.250.250.90 port eq 80,443
+pass in proto tcp to 93.158.134.90 port eq 80,443
+pass out proto tcp from 213.180.193.90 port eq 80,443
+pass out proto tcp from 213.180.204.90 port eq 80,443
+pass out proto tcp from 77.88.21.90 port eq 80,443
+pass out proto tcp from 87.250.250.90 port eq 80,443
+pass out proto tcp from 93.158.134.90 port eq 80,443
+pass in proto tcp to 213.180.204.91 port eq 80,443
+pass in proto tcp to 87.250.250.91 port eq 80,443
+pass in proto tcp to 93.158.134.91 port eq 80,443
+pass out proto tcp from 213.180.204.91 port eq 80,443
+pass out proto tcp from 87.250.250.91 port eq 80,443
+pass out proto tcp from 93.158.134.91 port eq 80,443
+pass in proto tcp to 213.180.204.21 port eq 80,443
+pass in proto tcp to 77.88.21.21 port eq 80,443
+pass out proto tcp from 213.180.204.21 port eq 80,443
+pass out proto tcp from 77.88.21.21 port eq 80,443
+pass in proto tcp to 213.180.204.44 port eq 80,443
+pass in proto tcp to 77.88.21.44 port eq 80,443
+pass out proto tcp from 213.180.204.44 port eq 80,443
+pass out proto tcp from 77.88.21.44 port eq 80,443
+pass in proto tcp to 213.180.204.19 port eq 80,443
+pass in proto tcp to 77.88.21.19 port eq 80,443
+pass out proto tcp from 213.180.204.19 port eq 80,443
+pass out proto tcp from 77.88.21.19 port eq 80,443
+pass in proto tcp to 178.154.131.215 port eq 80,443
+pass in proto tcp to 178.154.131.216 port eq 80,443
+pass in proto tcp to 178.154.131.217 port eq 80,443
+pass out proto tcp from 178.154.131.215 port eq 80,443
+pass out proto tcp from 178.154.131.216 port eq 80,443
+pass out proto tcp from 178.154.131.217 port eq 80,443
+pass in proto tcp to 213.180.204.24 port eq 80,443
+pass out proto tcp from 213.180.204.24 port eq 80,443
+pass in proto tcp to 213.180.204.51 port eq 80,443
+pass out proto tcp from 213.180.204.51 port eq 80,443
+pass in proto tcp to 213.180.204.242 port eq 80,443
+pass out proto tcp from 213.180.204.242 port eq 80,443
+pass in proto tcp to 87.250.250.66 port eq 80,443
+pass out proto tcp from 87.250.250.66 port eq 80,443
+pass in proto tcp to 87.250.250.66 port eq 80,443
+pass out proto tcp from 87.250.250.66 port eq 80,443
+# webmail.beelinewifi.ru loopholes
+pass in proto tcp to 194.67.1.205
+pass out proto tcp from 194.67.1.205
+# mail.beelinewifi.ru loopholes
+block in proto tcp to 194.67.1.206 port eq 465
+block out proto tcp from 194.67.1.206 port eq 465
+dnat in proto tcp to 194.67.1.206 port eq 25 redir to 194.67.1.206 port 587
+dnat out proto tcp from 194.67.1.206 port eq 587
+pass in proto tcp to 194.67.1.206
+pass out proto tcp from 194.67.1.206
+# dnat HTTP
+dnat in proto tcp to port eq 80 redir to 194.67.1.20 port 80
+dnat out proto tcp from 194.67.1.20 port eq 80
+# dnat HTTPS
+dnat in proto tcp to port eq 443 redir to 194.67.1.20 port 443
+dnat out proto tcp from port eq 443
+# no connectivity beyond this point
+block in
+block out

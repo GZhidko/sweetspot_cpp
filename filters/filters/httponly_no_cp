@@ -1,0 +1,55 @@
+#
+# HTTP(S) only filter
+#
+# Block access captive portal check pages iOS and Android
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# block iOS CP check
+block in proto tcp to 17.253.142.4
+block out proto tcp from 17.253.142.4
+block in proto tcp to 17.253.142.4
+block out proto tcp from 17.253.142.4
+block in proto tcp to 17.253.142.4
+block out proto tcp from 17.253.142.4
+block in proto tcp to 17.253.142.4
+block out proto tcp from 17.253.142.4
+block in proto tcp to 17.253.142.4
+block out proto tcp from 17.253.142.4
+block in proto tcp to 17.253.39.202
+block in proto tcp to 17.253.39.203
+block out proto tcp from 17.253.39.202
+block out proto tcp from 17.253.39.203
+block in proto tcp to 17.253.144.10
+block out proto tcp from 17.253.144.10
+# block Android CP check
+block in proto tcp to 172.217.23.110
+block out proto tcp from 172.217.23.110
+block in proto tcp to 142.250.186.46
+block out proto tcp from 142.250.186.46
+block in proto tcp to 216.58.212.131
+block out proto tcp from 216.58.212.131
+block in proto tcp to 213.180.193.234
+block out proto tcp from 213.180.193.234
+# loophole for DNS
+pass in proto udp to port eq 53
+pass out proto udp from port eq 53
+pass in proto tcp to port eq 53
+pass out proto tcp from port eq 53
+# loophole to certain services
+pass in proto tcp to port eq 80,81,82,83,443,8080
+pass out proto tcp from port eq 80,81,82,83,443,8080
+#
+# Attempt to block all other services
+#
+block in
+block out

@@ -1,0 +1,17 @@
+#
+# Up-filter with blacklist for KFC
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# *** Special blacklist for KFC
+block in proto tcp to 68.177.189.214 port eq 80,443
+block out proto tcp from 68.177.189.214 port eq 80,443
+# requested by Beeline RfC 271381/12
+#block in proto tcp to beeterminal.ru
+#block out proto tcp from beeterminal.ru

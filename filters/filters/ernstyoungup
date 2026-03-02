@@ -1,0 +1,36 @@
+#
+# ERNST_&_YOUNG up-filter - most ports closed
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# loophole for DNS
+pass in proto udp to port eq 53
+pass out proto udp from port eq 53
+pass in proto tcp to port eq 53
+pass out proto tcp from port eq 53
+# loophole to certain services
+pass in proto tcp to port eq 20,21,22,80,110,143,443,465
+pass out proto tcp from port eq 20,21,22,80,110,143,443,465
+pass in proto tcp to port eq 220,389,587,636,993,995,500,1723
+pass out proto tcp from port eq 220,389,587,636,993,995,500,1723
+pass in proto tcp to port eq 4101,10000,15000,123,554,5190,5191,5192
+pass out proto tcp from port eq 4101,10000,15000,123,554,5190,5191,5192
+pass in proto tcp to port eq 5193,1494,1863,5050
+pass out proto tcp from port eq 5193,1494,1863,5050
+pass in proto udp to port eq 500,1723,4500,10000,12000,15000,123,554
+pass out proto udp from port eq 500,1723,4500,10000,12000,15000,123,554
+# allow icmp
+pass in proto icmp
+pass out proto icmp
+# block all other
+block in
+block out

@@ -1,0 +1,24 @@
+#
+# Default up-filter
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# dnat to Yandex DNS (Family) - local cache server
+dnat in proto udp to port eq 53 redir to 169.254.128.254 port 53
+dnat out proto udp from 169.254.128.254 port eq 53
+dnat in proto tcp to port eq 53 redir to 169.254.128.254 port 53
+dnat out proto tcp from 169.254.128.254 port eq 53
+#
+#dnat in proto udp to port eq 53 redir to 77.88.8.7 port 53
+#dnat out proto udp from 77.88.8.7 port eq 53
+#dnat in proto tcp to port eq 53 redir to 77.88.8.7 port 53
+#dnat out proto tcp from 77.88.8.7 port eq 53

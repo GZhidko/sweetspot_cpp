@@ -1,0 +1,44 @@
+#
+# No porno & social networks up-filter (proxy port 704) 
+# Performs DNAT HTTP to WiFi proxy, attempting to protect from porno
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# loophole to startwifi.beeline.ru
+pass in proto tcp to 194.67.1.30 port eq 80,443
+pass out proto tcp from 194.67.1.30 port eq 80,443
+# loophole to cp.beelinewifi.ru
+pass in proto tcp to 194.67.1.37 port eq 80,443
+pass out proto tcp from 194.67.1.37 port eq 80,443
+# loophole to dpi.beelinewifi.ru
+shape rate 10240 in proto tcp to 194.154.70.120 port eq 80,443
+shape rate 10240 out proto tcp from 194.154.70.120 port eq 80,443
+# dnat DNS to nopornoDNS (fake 194.67.1.1 for BLOCK host)
+dnat in proto udp to port eq 53 redir to 194.154.70.120 port 54
+dnat out proto udp from 194.154.70.120 port eq 54
+dnat in proto tcp to port eq 53 redir to 194.154.70.120 port 54
+dnat out proto tcp from 194.154.70.120 port eq 54
+# and dnat fake IP to error page
+dnat in proto tcp to 194.67.1.1 port eq 80 redir to 194.154.70.120 port 81
+dnat out proto tcp from 194.154.70.120 port eq 81
+dnat in proto tcp to 194.67.1.1 port eq 443 redir to 194.154.70.120 port 444
+dnat out proto tcp from 194.154.70.120 port eq 444
+# block all other services at fake IP 
+block in proto tcp to 194.67.1.1
+# dnat HTTP to WiFi proxy (transparent port)
+dnat in proto tcp to port eq 80,3128,8080 redir to 194.154.70.120 port 704 rate 10240
+dnat out proto tcp from 194.154.70.120 port eq 704 rate 10240
+# block all other services at proxy
+block in proto tcp to 194.154.70.120
+# allow non-HTTP traffic 
+shape rate 10240 in
+shape rate 10240 out

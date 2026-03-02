@@ -1,0 +1,33 @@
+#
+#  upfilter for blocking torrents + shaping 5120 kbps 
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# loophole to Auth service
+pass in proto tcp to 194.67.1.40 port eq 80,443
+pass out proto tcp from 194.67.1.40 port eq 80,443
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# loophole for DNS
+pass in proto udp to port eq 53
+pass out proto udp from port eq 53
+pass in proto tcp to port eq 53
+pass out proto tcp from port eq 53
+# loophole to certain services + shaping
+shape rate 5120 in proto tcp to port eq 20,21,25,80,110,143,443,465
+shape rate 5120 out proto tcp from port eq 20,21,25,80,110,143,443,465
+shape rate 5120 in proto tcp to port eq 993,995,5190,5222,8080
+shape rate 5120 out proto tcp from port eq 993,995,5190,5222,8080
+#
+# Attempt to block torrents
+#
+block in
+block out
+# unmatched packets would pass through

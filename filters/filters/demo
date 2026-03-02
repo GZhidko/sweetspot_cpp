@@ -1,0 +1,34 @@
+#
+# Demonstrates ruleset syntax features, No other meaning beyond that.
+#
+# The syntax (src/filter_p.y is the primary source for it)
+#
+# ruleset = [ rule | [ rule ruleset ]
+# rule = action in-out [ proto ] [ srcdst ] [ flags ] [ redir ]
+# action = "block" | "pass" | "dnat"
+# in-out = "in" | "out"
+# proto = "proto" protocol
+# protocol = string | number
+# srcdst = [ "from" object] [ "to" object ]
+# object = [ network ] [ port-comp | port-range ]
+# flags = "flags" flags-set [ "/" flags-mask ]
+# flags-set = "F" | "S" | "R" | "P" | "A" | "U"
+# flags-mask = "F" | "S" | "R" | "P" | "A" | "U"
+# redir = "redir" "to" host-name "port" number
+# network = nummask | host-name [ "mask" ipaddr ]
+# port-comp = "port" compare number
+# port-range = "port" number range number
+# nummask = host-name [ "/" number ]
+# host-name = ipaddr
+# ipaddr  = number "." number "." number "." number
+#
+pass out proto tcp
+pass out from 69.25.142.0/24
+dnat in to 69.25.142.0 mask 255.255.255.0 redir to 127.0.0.1 port 80
+dnat out from 69.25.142.0 mask 255.255.255.0
+pass out proto udp from 69.25.142.3 port lt 80 to 69.25.142.3 port 80:90
+pass in proto gre
+# block inward TCP connections
+block out proto tcp flags S/SA
+block in
+block out from port eq 80

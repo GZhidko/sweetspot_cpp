@@ -1,0 +1,77 @@
+#
+# Up-filter for HTTP statistics
+# Performs DNAT HTTP to WiFi proxy, attempting to gather some info
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# loophole to startwifi.beeline.ru
+pass in proto tcp to 194.67.1.30 port eq 80,443
+pass out proto tcp from 194.67.1.30 port eq 80,443
+# loophole to cp.beelinewifi.ru
+pass in proto tcp to 194.67.1.37 port eq 80,443
+pass out proto tcp from 194.67.1.37 port eq 80,443
+# loophole to dpi.beelinewifi.ru
+pass in proto tcp to 194.154.70.120 port eq 80,443
+pass out proto tcp from 194.154.70.120 port eq 80,443
+# dnat HTTP to WiFi proxy (transparent port)
+#dnat in proto tcp to port eq 80 redir to 194.154.70.120 port 724
+#dnat out proto tcp from 194.154.70.120 port eq 724
+# block all other services at proxy
+#block in proto tcp to 194.154.70.120
+### notorrent part ###
+# loophole for DNS
+pass in proto udp to port eq 53
+pass out proto udp from port eq 53
+pass in proto tcp to port eq 53
+pass out proto tcp from port eq 53
+# loophole to certain services
+pass in proto tcp to port eq 20,21,25,80,85,110,143,443
+pass out proto tcp from port eq 20,21,25,80,85,110,143,443
+pass in proto tcp to port eq 465,993,995,3389,4090,4244,5190,5222
+pass out proto tcp from port eq 465,993,995,3389,4090,4244,5190,5222
+pass in proto tcp to port eq 5223,5228,5242,5651,7443,8080,8443,33022
+pass out proto tcp from port eq 5223,5228,5242,5651,7443,8080,8443,33022
+pass in proto tcp to port eq 59234,50318
+pass out proto tcp from port eq 59234,50318
+pass in proto udp to port eq 123,3478,4090,5651,45395,59234,50318
+pass out proto udp from port eq 123,3478,4090,5651,45395,59234,50318
+# loophole special for AfiMall but it can be frequently used option
+pass in proto tcp to port eq 22,23,6443,990
+pass out proto tcp from port eq 22,23,6443,990
+pass in proto udp to port eq 990
+pass out proto udp from port eq 990
+# loophole for IPSec needs (IKE, Kerberos, NAT-T), TeamViewer
+pass in proto tcp to port eq 88,1194,5001,5060,5938,9997,65534
+pass out proto tcp from port eq 88,1194,5001,5060,5938,9997,65534
+pass in proto udp to port eq 88,500,1194,4500,5060,5938,65534
+pass out proto udp from port eq 88,500,1194,4500,5060,5938,65534
+# loophole for VW special request
+pass in proto tcp to port eq 5004,5005,5006,5007,5008,5009,5010,5011
+pass out proto tcp from port eq 5004,5005,5006,5007,5008,5009,5010,5011
+pass in proto tcp to port eq 5012,5013,5014,5015,5016,5017,5018,5019
+pass out proto tcp from port eq 5012,5013,5014,5015,5016,5017,5018,5019
+pass in proto tcp to port eq 5020
+pass out proto tcp from port eq 5020
+pass in proto udp to port eq 5004,5005,5006,5007,5008,5009,5010,5011
+pass out proto udp from port eq 5004,5005,5006,5007,5008,5009,5010,5011
+pass in proto udp to port eq 5012,5013,5014,5015,5016,5017,5018,5019
+pass out proto udp from port eq 5012,5013,5014,5015,5016,5017,5018,5019
+pass in proto udp to port eq 5020
+pass out proto udp from port eq 5020
+# loophole for icmp
+pass in proto icmp
+pass out proto icmp
+#
+# Attempt to block torrents
+#
+block in
+block out

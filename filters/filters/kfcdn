@@ -1,0 +1,144 @@
+#
+# KFC dn-filter
+# Allow direct access to KFC web
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# loophole to Auth service
+pass in proto tcp to 194.67.1.40 port eq 80,443
+pass out proto tcp from 194.67.1.40 port eq 80,443
+# loophole to startwifi.beeline.ru
+pass in proto tcp to 194.67.1.30 port eq 80,443
+pass out proto tcp from 194.67.1.30 port eq 80,443
+# loophole to cp.beelinewifi.ru
+pass in proto tcp to 194.67.1.37 port eq 80,443
+pass out proto tcp from 194.67.1.37 port eq 80,443
+# loophole to app.goldenwifi.ru
+pass in proto tcp to 194.67.1.16 port eq 80,443
+pass out proto tcp from 194.67.1.16 port eq 80,443
+# loophole to KFC web
+pass in proto tcp to 185.99.9.23 port eq 80,443
+pass out proto tcp from 185.99.9.23 port eq 80,443
+pass in proto tcp to 185.99.9.23 port eq 80,443
+pass out proto tcp from 185.99.9.23 port eq 80,443
+# loopholes to e-mail services
+pass in proto tcp to port eq 25,88,110,123,135,143,389,445
+pass out proto tcp from port eq 25,88,110,123,135,143,389,445
+pass in proto tcp to port eq 587,993,1025,1026,3268
+pass out proto tcp from port eq 587,993,1025,1026,3268
+pass in proto udp to port eq 25,88,110,123,135,143,389,445
+pass out proto udp from port eq 25,88,110,123,135,143,389,445
+pass in proto udp to port eq 587,993,1025,1026,3268
+pass out proto udp from port eq 587,993,1025,1026,3268
+# loophole to Yandex.Maps API (requested by KFC)
+pass in proto tcp to 87.250.251.134 port eq 80
+pass out proto tcp from 87.250.251.134 port eq 80
+pass in proto tcp to 77.88.21.119 port eq 80
+pass in proto tcp to 87.250.250.119 port eq 80
+pass in proto tcp to 87.250.251.119 port eq 80
+pass in proto tcp to 93.158.134.119 port eq 80
+pass out proto tcp from 77.88.21.119 port eq 80
+pass out proto tcp from 87.250.250.119 port eq 80
+pass out proto tcp from 87.250.251.119 port eq 80
+pass out proto tcp from 93.158.134.119 port eq 80
+pass in proto tcp to 5.45.196.61 port eq 80
+pass in proto tcp to 5.45.196.92 port eq 80
+pass in proto tcp to 5.45.196.93 port eq 80
+pass in proto tcp to 5.45.196.94 port eq 80
+pass out proto tcp from 5.45.196.61 port eq 80
+pass out proto tcp from 5.45.196.92 port eq 80
+pass out proto tcp from 5.45.196.93 port eq 80
+pass out proto tcp from 5.45.196.94 port eq 80
+# loophole to KFC stuff for staff
+pass in to 216.12.159.65
+pass out from 216.12.159.65
+#pass in to learningzoneqa.yum.com
+#pass out from learningzoneqa.yum.com
+pass in to 12.162.8.39
+pass out from 12.162.8.39
+pass in to 168.182.18.129
+pass out from 168.182.18.129
+#pass in to learningzonecms.yum.com
+#pass out from learningzonecms.yum.com
+pass in to 206.19.46.77
+pass out from 206.19.46.77
+pass in to 206.19.46.78
+pass out from 206.19.46.78
+pass in to 34.204.233.88
+pass in to 50.17.115.154
+pass out from 34.204.233.88
+pass out from 50.17.115.154
+pass in to 34.238.178.216
+pass in to 54.173.242.156
+pass out from 34.238.178.216
+pass out from 54.173.242.156
+#pass in to contentserver.elementk.com
+#pass out from contentserver.elementk.com
+pass in to 209.235.8.107
+pass out from 209.235.8.107
+pass in to 69.166.141.111
+pass out from 69.166.141.111
+pass in to 69.166.141.112
+pass out from 69.166.141.112
+pass in to 158.85.247.200
+pass out from 158.85.247.200
+pass in to 4.35.100.15
+pass out from 4.35.100.15
+pass in to 4.35.100.14
+pass out from 4.35.100.14
+#pass in to intralearn.nreaf.org
+#pass out from intralearn.nreaf.org
+pass in to 52.70.180.73
+pass out from 52.70.180.73
+#pass in to learningzone.tacobell.yum.com
+#pass out from learningzone.tacobell.yum.com
+#pass in to learningzone.pizzahut.yum.com
+#pass out from learningzone.pizzahut.yum.com
+#pass in to learningzone.kfc.yum.com
+#pass out from learningzone.kfc.yum.com
+#pass in to learningzone.yum.com
+#pass out from learningzone.yum.com
+#pass in to sso.learningzone.yum.com
+#pass out from sso.learningzone.yum.com
+#pass in to ssotbc.learningzone.yum.com
+#pass out from ssotbc.learningzone.yum.com
+#pass in to ssoph.learningzone.yum.com
+#pass out from ssoph.learningzone.yum.com
+#pass in to ssokfc.learningzone.yum.com
+#pass out from ssokfc.learningzone.yum.com
+#pass in to 216.247.254.18
+#pass out from 216.247.254.18
+#pass in to 205.247.223.128/25
+#pass out from 205.247.223.128/25
+# loophole to beeline (ask Strelbitski)
+pass in proto tcp to 217.118.84.0/24 port eq 80,443
+pass out proto tcp from 217.118.84.0/24 port eq 80,443
+# allow icmp to web farm
+pass in proto icmp to 194.67.1.0/24
+pass out proto icmp from 194.67.1.0/24
+# webmail.beelinewifi.ru loopholes
+pass in proto tcp to 194.67.1.205
+pass out proto tcp from 194.67.1.205
+# mail.beelinewifi.ru loopholes
+block in proto tcp to 194.67.1.206 port eq 465
+block out proto tcp from 194.67.1.206 port eq 465
+dnat in proto tcp to 194.67.1.206 port eq 25 redir to 194.67.1.206 port 587
+dnat out proto tcp from 194.67.1.206 port eq 587
+pass in proto tcp to 194.67.1.206
+pass out proto tcp from 194.67.1.206
+# dnat DNS
+dnat in proto udp to port eq 53 redir to 169.254.128.255 port 53
+dnat out proto udp from 169.254.128.255 port eq 53
+dnat in proto tcp to port eq 53 redir to 169.254.128.255 port 53
+dnat out proto tcp from 169.254.128.255 port eq 53
+# dnat HTTP
+dnat in proto tcp to port eq 80 redir to 194.67.1.20 port 80
+dnat out proto tcp from 194.67.1.20 port eq 80
+# dnat HTTPS
+dnat in proto tcp to port eq 443 redir to 194.67.1.20 port 443
+dnat out proto tcp from 194.67.1.20 port eq 443
+# no connectivity beyond this point
+block in
+block out

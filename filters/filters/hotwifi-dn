@@ -1,0 +1,122 @@
+#
+# for special project with hot-wifi.ru down-filter
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# loophole to Auth service
+pass in proto tcp to 194.67.1.40 port eq 80,443
+pass out proto tcp from 194.67.1.40 port eq 80,443
+# loophole to oauth.hot-wifi.ru 
+pass in proto tcp to 78.155.202.186 port eq 80,443
+pass out proto tcp from 78.155.202.186 port eq 80,443
+# loophole to oauth.wifibeeline.ru 
+pass in proto tcp to 78.155.202.186 port eq 80,443
+pass out proto tcp from 78.155.202.186 port eq 80,443
+# loophole to Yandex cloud for banners accessible
+pass in proto tcp to 93.158.134.163 port eq 80,443
+pass out proto tcp from 93.158.134.163 port eq 80,443
+# loophole to hotwifi new server.
+pass in proto tcp to 78.155.202.186 port eq 80,443
+pass out proto tcp from 78.155.202.186 port eq 80,443
+# loophole to leroymerlin.ru 
+pass in proto tcp to 178.248.235.219 port eq 80,443
+pass out proto tcp from 178.248.235.219 port eq 80,443
+# loophole to vk.com
+#pass in proto tcp to 87.240.128.0/18 port eq 80,443
+#pass out proto tcp from 87.240.128.0/18 port eq 80,443
+pass in proto tcp to 87.240.137.137 port eq 80,443
+pass in proto tcp to 87.240.190.77 port eq 80,443
+pass in proto tcp to 93.186.225.200 port eq 80,443
+pass out proto tcp from 87.240.137.137 port eq 80,443
+pass out proto tcp from 87.240.190.77 port eq 80,443
+pass out proto tcp from 93.186.225.200 port eq 80,443
+# loophole to goldenwifi.ru.
+pass in proto tcp to 194.67.1.16 port eq 80,443,2443,8080
+pass out proto tcp from 194.67.1.16 port eq 80,443,2443,8080
+# loophole to startwifi.beeline.ru + test.startwifi.beeline.ru
+#pass in proto tcp to 194.67.1.30 port eq 80,443,22443,8080
+#pass out proto tcp from 194.67.1.30 port eq 80,443,22443,8080
+# loophole to video CP
+pass in proto tcp to 194.67.1.37 port eq 80,443
+pass out proto tcp from 194.67.1.37 port eq 80,443
+# loophole to registrarwifi.beeline.ru. 
+pass in proto tcp to 194.67.1.22 port eq 80,443
+pass out proto tcp from 194.67.1.22 port eq 80,443
+# loophole to mywifi.beeline.ru. 
+pass in proto tcp to 194.67.1.25 port eq 80,443
+pass out proto tcp from 194.67.1.25 port eq 80,443
+# allow icmp to web farm
+pass in proto icmp to 194.67.1.0/24
+pass out proto icmp from 194.67.1.0/24
+# loophole to FSB
+#pass in proto tcp to 81.13.97.68 port eq 1028
+#pass out proto tcp from 81.13.97.68 port eq 1028
+# loopholes to Boingo servers
+#pass in proto tcp to signup.boingo.com port eq 443
+#pass out proto tcp from signup.boingo.com port eq 443
+#pass in proto tcp to c01.client.boingo.com port eq 443
+#pass out proto tcp from c01.client.boingo.com port eq 443
+#pass in proto tcp to c02.client.boingo.com port eq 443
+#pass out proto tcp from c02.client.boingo.com port eq 443
+#pass in proto tcp to c03.client.boingo.com port eq 7000 
+#pass out proto tcp from c03.client.boingo.com port eq 7000
+#pass in proto tcp to c04.client.boingo.com port eq 7001
+#pass out proto tcp from c04.client.boingo.com port eq 7001
+#pass in proto tcp to c05.client.boingo.com port eq 7002
+#pass out proto tcp from c05.client.boingo.com port eq 7002
+#pass in proto tcp to c06.client.boingo.com port eq 7003
+#pass out proto tcp from c06.client.boingo.com port eq 7003
+#pass in proto tcp to c07.client.boingo.com port eq 7004
+#pass out proto tcp from c07.client.boingo.com port eq 7004
+# loophole to WeRoam servers (login.weroam.com)
+#pass in proto tcp to 217.172.169.89  port eq 80,443
+#pass out proto tcp from 217.172.169.89 port eq 80,443
+# loophole to WeRoam SIM-auth servers
+#pass in proto udp to 195.141.161.195 port eq 1812
+#pass out proto udp from 195.141.161.195 port eq 1812
+#pass in proto udp to 62.2.179.19 port eq 1812
+#pass out proto udp from 62.2.179.19 port eq 1812
+# loophole to Trustive landing page (https://secure.trustive.com/wisp/)
+#pass in proto tcp to secure.trustive.com port eq 443
+#pass out proto tcp from secure.trustive.com port eq 443
+# loophole to Spotigo update server
+#pass in proto tcp to 80.190.241.109 port eq 81
+#pass out proto tcp from 80.190.241.109 port eq 81
+# loophole to iPass phonebook server
+#pass in proto tcp to pb.ipass.com port eq 80,443
+#pass out proto tcp from pb.ipass.com port eq 80,443
+# loophole to iPass (China Telecom) login portal
+#pass in proto tcp to 211.99.206.92 port eq 80,443
+#pass out proto tcp from 211.99.206.92 port eq 80,443
+# webmail.beelinewifi.ru loopholes
+pass in proto tcp to 194.67.1.205
+pass out proto tcp from 194.67.1.205
+# mail.beelinewifi.ru loopholes
+block in proto tcp to 194.67.1.206 port eq 465
+block out proto tcp from 194.67.1.206 port eq 465
+dnat in proto tcp to 194.67.1.206 port eq 25 redir to 194.67.1.206 port 587
+dnat out proto tcp from 194.67.1.206 port eq 587
+pass in proto tcp to 194.67.1.206
+pass out proto tcp from 194.67.1.206
+# Wi2Geo loopholes
+pass in proto tcp to 79.125.48.130 port eq 80
+pass out proto tcp from 79.125.48.130 port eq 80
+# loophole to am's test video streaming tcp.beelinewifi.ru.
+pass in proto tcp to 194.67.1.21 port eq 80,443
+pass out proto tcp from 194.67.1.21 port eq 80,443
+# dnat DNS
+dnat in proto udp to port eq 53 redir to 169.254.128.255 port 53
+dnat out proto udp from 169.254.128.255 port eq 53
+dnat in proto tcp to port eq 53 redir to 169.254.128.255 port 53
+dnat out proto tcp from 169.254.128.255 port eq 53
+# dnat HTTP
+dnat in proto tcp to port eq 80 redir to 194.67.1.20 port 15080
+dnat out proto tcp from 194.67.1.20 port eq 15080
+# dnat HTTPS
+dnat in proto tcp to port eq 443 redir to 194.67.1.20 port 15443
+dnat out proto tcp from 194.67.1.20 port eq 15443
+# no connectivity beyond this point
+block in
+block out

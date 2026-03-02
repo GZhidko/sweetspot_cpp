@@ -1,0 +1,57 @@
+#
+# Perform DNAT to ROL transparent proxy which only proxies ctc-tv.ru site
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# loophole to Auth service
+pass in proto tcp to 194.67.1.40 port eq 80,443
+pass out proto tcp from 194.67.1.40 port eq 80,443
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# loophole to goldenwifi.ru.
+pass in proto tcp to 194.67.1.16 port eq 80,443,2443,8080
+pass out proto tcp from 194.67.1.16 port eq 80,443,2443,8080
+# loophole to startwifi.beeline.ru + test.startwifi.beeline.ru
+pass in proto tcp to 194.67.1.30 port eq 80,443,22443,8080
+pass out proto tcp from 194.67.1.30 port eq 80,443,22443,8080
+# chronopay.ru, requested by Strelbitski
+pass in proto tcp to 93.174.51.226 port eq 80,443
+pass out proto tcp from 93.174.51.226 port eq 80,443
+# loophole to registrarwifi.beeline.ru. 
+pass in proto tcp to 194.67.1.22 port eq 80,443
+pass out proto tcp from 194.67.1.22 port eq 80,443
+# loophole to mywifi.beeline.ru. 
+pass in proto tcp to 194.67.1.25 port eq 80,443
+pass out proto tcp from 194.67.1.25 port eq 80,443
+# loophole to DNS servers
+pass in proto udp to 194.67.1.150 port eq 53
+pass out proto udp from 194.67.1.150 port eq 53
+pass in proto udp to 194.67.2.114 port eq 53
+pass out proto udp from 194.67.2.114 port eq 53
+pass in proto udp to 194.85.128.10 port eq 53
+pass out proto udp from 194.85.128.10 port eq 53
+pass in proto udp to 194.85.129.80 port eq 53
+pass out proto udp from 194.85.129.80 port eq 53
+# allow icmp to web farm
+pass in proto icmp to 194.67.1.0/24
+pass out proto icmp from 194.67.1.0/24
+# loophole to beeline (ask Strelbitski)
+pass in proto tcp to 217.118.84.0/24 port eq 80
+pass out proto tcp from 217.118.84.0/24 port eq 80
+pass in proto tcp to 217.118.84.0/24 port eq 443
+pass out proto tcp from 217.118.84.0/24 port eq 443
+# webmail.beelinewifi.ru loopholes
+pass in proto tcp to 194.67.1.205
+pass out proto tcp from 194.67.1.205
+# dnat DNS
+dnat in proto udp to port eq 53 redir to 194.67.2.114 port 53
+dnat out proto udp from 194.67.2.114 port eq 53
+# dnat HTTP to ROL proxy
+dnat in proto tcp to port eq 80 redir to 194.67.2.155 port 3129
+dnat out proto tcp from 194.67.2.155 port eq 3129
+# no connectivity beyond this point
+block in
+block out

@@ -1,0 +1,46 @@
+#
+# CoffeeHouseSpb up-filter 
+#
+# *** Every single filter must have this loophole to our static content
+pass in proto tcp to 194.67.1.117 port eq 80,443
+pass out proto tcp from 194.67.1.117 port eq 80,443
+# ***
+# *** Every upfilter must have blocking to dev Auth service
+block in proto tcp to 194.67.1.39
+block out proto tcp from 194.67.1.39
+# ***
+# loophole to Auth service
+pass in proto tcp to 194.67.1.40 port eq 80,443
+pass out proto tcp from 194.67.1.40 port eq 80,443
+# requested by Beeline RfC 271381/12
+block in proto tcp to 194.67.1.38
+block out proto tcp from 194.67.1.38
+# loophole by CoffeeHouse (SPB) request
+#pass in to 85.21.206.0/26
+pass out from 85.21.206.0/26
+pass in to 195.218.236.0/29
+pass out from 195.218.236.0/29
+pass in to 195.239.244.128/25
+pass out from 195.239.244.128/25
+pass in to 176.32.186.198
+pass out from 176.32.186.198
+pass in to 94.139.120.146
+pass out from 94.139.120.146
+pass in to 91.220.188.0/24
+pass out from 91.220.188.0/24
+pass in proto tcp to port eq 22,25,80,110,143,443,465,993
+pass out proto tcp from port eq 22,25,80,110,143,443,465,993
+pass in proto tcp to port eq 1194,1443,3333,3389,3390,4090,4433,4899
+pass out proto tcp from port eq 1194,1443,3333,3389,3390,4090,4433,4899
+pass in proto tcp to port eq 4990,5060,5061,5190,5222,5223,8080,9900
+pass out proto tcp from port eq 4990,5060,5061,5190,5222,5223,8080,9900
+pass in proto tcp to port eq 65123,65333
+pass out proto tcp from port eq 65123,65333
+pass in proto udp to port eq 53,123,500,4500,5060
+pass out proto udp from port eq 53,123,500,4500,5060
+#
+# Attempt to block torrents
+#
+block in
+block out
+# unmatched packets would pass through
