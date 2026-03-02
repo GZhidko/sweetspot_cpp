@@ -11,6 +11,7 @@
 #include "jenkins_hash.hpp"
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <linux/if_ether.h>
@@ -1006,16 +1007,27 @@ void Worker::maybe_dump_profile(bool force) {
                                        static_cast<double>(profile_chain_calls_)) /
                                           1000.0;
 
-    LOG(DEBUG_RELAY, "profile thread=", cfg_.thread_index, " uptime_s=", elapsed_s,
-        " loops=", profile_loops_, " epoll_wait=", profile_epoll_wait_calls_,
-        " epoll_ready=", profile_epoll_ready_events_, " epoll_timeouts=", profile_epoll_timeouts_,
-        " rx_packets=", profile_rx_packets_, " rx_mpps=", rx_mpps, " tx_frames=", profile_tx_frames_,
-        " tx_mbps=", tx_mbps, " tx_fallback=", profile_tx_fallback_frames_,
-        " parse_calls=", profile_parse_calls_, " parse_fail=", profile_parse_fail_,
-        " parse_avg_us=", parse_avg_us, " chain_calls=", profile_chain_calls_,
-        " chain_avg_us=", chain_avg_us, " fwd_local=", profile_forward_local_,
-        " fwd_remote=", profile_forward_remote_, " remote_batches=", profile_remote_batches_,
-        " remote_frames=", profile_remote_frames_, " remote_q=", remote_size_.load());
+    std::fprintf(
+        stderr,
+        "PROFILE thread=%u uptime_s=%.3f loops=%llu epoll_wait=%llu epoll_ready=%llu "
+        "epoll_to=%llu rx_pkts=%llu rx_mpps=%.3f tx_frames=%llu tx_mbps=%.3f tx_fallback=%llu "
+        "parse_calls=%llu parse_fail=%llu parse_avg_us=%.3f chain_calls=%llu chain_avg_us=%.3f "
+        "fwd_local=%llu fwd_remote=%llu remote_batches=%llu remote_frames=%llu remote_q=%u\n",
+        cfg_.thread_index, elapsed_s, static_cast<unsigned long long>(profile_loops_),
+        static_cast<unsigned long long>(profile_epoll_wait_calls_),
+        static_cast<unsigned long long>(profile_epoll_ready_events_),
+        static_cast<unsigned long long>(profile_epoll_timeouts_),
+        static_cast<unsigned long long>(profile_rx_packets_), rx_mpps,
+        static_cast<unsigned long long>(profile_tx_frames_), tx_mbps,
+        static_cast<unsigned long long>(profile_tx_fallback_frames_),
+        static_cast<unsigned long long>(profile_parse_calls_),
+        static_cast<unsigned long long>(profile_parse_fail_), parse_avg_us,
+        static_cast<unsigned long long>(profile_chain_calls_), chain_avg_us,
+        static_cast<unsigned long long>(profile_forward_local_),
+        static_cast<unsigned long long>(profile_forward_remote_),
+        static_cast<unsigned long long>(profile_remote_batches_),
+        static_cast<unsigned long long>(profile_remote_frames_), remote_size_.load());
+    std::fflush(stderr);
 
     profile_last_dump_at_ = now;
 }
