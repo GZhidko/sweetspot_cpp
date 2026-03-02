@@ -5,7 +5,6 @@
 #include <cerrno>
 #include <cstring>
 #include <linux/if_ether.h>
-#include <linux/filter.h>
 #include <linux/if_packet.h>
 #include <net/if.h>
 #include <netinet/in.h>
@@ -23,22 +22,6 @@ int to_native_protocol(int protocol) {
         protocol = ETH_P_ALL;
     }
     return htons(protocol);
-}
-
-bool attach_ignore_outgoing_bpf(int fd) {
-    // Drop PACKET_OUTGOING frames at socket ingress.
-    static const sock_filter kFilter[] = {
-        BPF_STMT(BPF_LD | BPF_W | BPF_ABS,
-                 static_cast<uint32_t>(SKF_AD_OFF + SKF_AD_PKTTYPE)),
-        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, PACKET_OUTGOING, 0, 1),
-        BPF_STMT(BPF_RET | BPF_K, 0),
-        BPF_STMT(BPF_RET | BPF_K, 0xffffffff),
-    };
-    static const sock_fprog kProg = {
-        static_cast<unsigned short>(sizeof(kFilter) / sizeof(kFilter[0])),
-        const_cast<sock_filter*>(kFilter),
-    };
-    return ::setsockopt(fd, SOL_SOCKET, SO_ATTACH_FILTER, &kProg, sizeof(kProg)) == 0;
 }
 
 } // namespace
@@ -91,12 +74,6 @@ void PacketSocket::open(int protocol) {
                      sizeof(ignore_outgoing)) < 0) {
         LOG(DEBUG_ERROR, "PacketSocket fd=", fd_,
             " PACKET_IGNORE_OUTGOING failed errno=", errno);
-        if (!attach_ignore_outgoing_bpf(fd_)) {
-            LOG(DEBUG_ERROR, "PacketSocket fd=", fd_,
-                " SO_ATTACH_FILTER(ignore outgoing) failed errno=", errno);
-        } else {
-            LOG(DEBUG_IO, "PacketSocket fd=", fd_, " attached BPF ignore-outgoing filter");
-        }
     }
 #endif
     LOG(DEBUG_IO, "PacketSocket opened fd=", fd_, " protocol=", protocol);
