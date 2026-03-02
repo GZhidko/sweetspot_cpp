@@ -194,8 +194,8 @@ int main(int argc, char** argv) {
 
     af_packet_io::IoConfig io_priv;
     af_packet_io::IoConfig io_pub;
-    configure_io(io_priv, priv_iface, pub_iface, priv_fanout);
-    configure_io(io_pub, pub_iface, priv_iface, pub_fanout);
+    configure_io(io_priv, priv_iface, priv_iface, priv_fanout);
+    configure_io(io_pub, pub_iface, pub_iface, pub_fanout);
 
     std::vector<std::unique_ptr<Worker>> workers;
     workers.reserve(worker_count);

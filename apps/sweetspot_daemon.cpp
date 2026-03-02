@@ -363,8 +363,8 @@ int main(int argc, char** argv) {
 
     af_packet_io::IoConfig io_priv;
     af_packet_io::IoConfig io_pub;
-    configure_interface(io_priv, config.inner_interface, config.outer_interface, priv_group);
-    configure_interface(io_pub, config.outer_interface, config.inner_interface, pub_group);
+    configure_interface(io_priv, config.inner_interface, config.inner_interface, priv_group);
+    configure_interface(io_pub, config.outer_interface, config.outer_interface, pub_group);
 
     std::vector<std::unique_ptr<Worker>> workers;
     workers.reserve(worker_count);
