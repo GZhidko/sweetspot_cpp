@@ -77,6 +77,7 @@ struct AppConfig {
     uint16_t uam_port = 0;
     std::string uam_secret;
     uint32_t thread_count = 0;
+    bool forward_pool_enabled = false;
     std::optional<uint32_t> acct_interim_interval;
     std::string acct_detail_file;
 };
@@ -176,6 +177,15 @@ class ConfigLoader {
                         throw std::runtime_error("missing value");
                     }
                     cfg.thread_count = static_cast<uint32_t>(std::stoul(tokens.front()));
+                } else if (lower_key == "forward-pool-enabled") {
+                    if (tokens.empty()) {
+                        throw std::runtime_error("missing value");
+                    }
+                    std::string v = tokens.front();
+                    std::transform(v.begin(), v.end(), v.begin(),
+                                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+                    cfg.forward_pool_enabled =
+                        (v == "1" || v == "true" || v == "yes" || v == "on");
                 } else {
                     // ignore unknown keys but log for visibility
                     LOG(DEBUG_SESSION, "Ignoring config key ", key, " at line ", line_no);
@@ -377,6 +387,7 @@ int main(int argc, char** argv) {
         pipeline_cfg.thread_index = i;
         pipeline_cfg.thread_count = worker_count;
         pipeline_cfg.enable_io = true;
+        pipeline_cfg.forward_pool_enabled = config.forward_pool_enabled;
         try {
             auto worker = std::make_unique<Worker>(pipeline_cfg);
             workers.push_back(std::move(worker));

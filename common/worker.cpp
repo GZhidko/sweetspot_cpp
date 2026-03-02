@@ -53,6 +53,7 @@ const char* interface_kind_to_string(Worker::InterfaceKind kind) {
 
 Worker::Worker(const WorkerPipelineConfig& cfg)
     : cfg_(cfg), nat_(cfg.nat, cfg.thread_index, cfg.thread_count) {
+    forward_pool_enabled_ = cfg.forward_pool_enabled;
     remote_event_fd_ = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
     if (remote_event_fd_ < 0) {
         LOG(DEBUG_ERROR, "Worker", cfg_.thread_index, ": eventfd create failed errno=", errno);
@@ -115,6 +116,31 @@ Worker::~Worker() {
     }
 }
 
+std::vector<uint8_t> Worker::acquire_forward_buffer(size_t len) {
+    std::lock_guard<std::mutex> lock(forward_pool_mutex_);
+    if (!forward_pool_.empty()) {
+        std::vector<uint8_t> buffer = std::move(forward_pool_.back());
+        forward_pool_.pop_back();
+        if (buffer.capacity() < len) {
+            buffer.reserve(len);
+        }
+        buffer.resize(len);
+        return buffer;
+    }
+    return std::vector<uint8_t>(len);
+}
+
+void Worker::recycle_forward_buffer(std::vector<uint8_t>&& buffer) {
+    if (!forward_pool_enabled_ || buffer.capacity() == 0) {
+        return;
+    }
+    buffer.clear();
+    std::lock_guard<std::mutex> lock(forward_pool_mutex_);
+    if (forward_pool_.size() < 4096) {
+        forward_pool_.push_back(std::move(buffer));
+    }
+}
+
 Worker::RemoteNode* Worker::acquire_remote_node() {
     RemoteNode* head = remote_free_.load(std::memory_order_acquire);
     while (head &&
@@ -132,8 +158,12 @@ void Worker::recycle_remote_node(RemoteNode* node) {
     if (!node) {
         return;
     }
+    if (forward_pool_enabled_) {
+        recycle_forward_buffer(std::move(node->payload.buffer));
+    } else {
+        node->payload.buffer.clear();
+    }
     node->payload.parsed_chain.reset();
-    node->payload.buffer.clear();
     node->payload.net_offset = 0;
     node->payload.origin = FramePayload::Origin::Private;
 
@@ -389,7 +419,12 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
                 " origin=", origin_to_string(origin), " len=", len);
             FramePayload payload;
             payload.origin = origin;
-            payload.buffer.assign(data, data + len);
+            if (forward_pool_enabled_) {
+                payload.buffer = acquire_forward_buffer(len);
+                std::memcpy(payload.buffer.data(), data, len);
+            } else {
+                payload.buffer.assign(data, data + len);
+            }
             payload.net_offset = net_offset;
             payload.parsed_chain.emplace(std::move(chain));
             forward_fn_(target, std::move(payload));

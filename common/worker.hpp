@@ -27,6 +27,7 @@ struct WorkerPipelineConfig {
     uint32_t thread_index = 0;
     uint32_t thread_count = 1;
     bool enable_io = true;
+    bool forward_pool_enabled = false;
     std::vector<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>> static_tcp;
     std::vector<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>> static_udp;
     std::vector<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>> static_icmp;
@@ -69,6 +70,9 @@ class Worker {
     void enqueue_shaped_frame(InterfaceKind kind, std::vector<uint8_t>&& frame, size_t net_offset);
 
   private:
+    std::vector<uint8_t> acquire_forward_buffer(size_t len);
+    void recycle_forward_buffer(std::vector<uint8_t>&& buffer);
+
     struct RemoteNode {
         FramePayload payload;
         RemoteNode* next = nullptr;
@@ -104,6 +108,7 @@ class Worker {
     InterfaceContext priv_ctx_;
     InterfaceContext pub_ctx_;
     bool io_enabled_ = true;
+    bool forward_pool_enabled_ = false;
     Nat nat_;
     std::thread thread_;
     std::atomic<bool> running_{false};
@@ -114,6 +119,8 @@ class Worker {
     std::atomic<RemoteNode*> remote_free_{nullptr};
     std::atomic<uint32_t> remote_size_{0};
     int remote_event_fd_ = -1;
+    std::mutex forward_pool_mutex_;
+    std::deque<std::vector<uint8_t>> forward_pool_;
 
     std::unique_ptr<shape::ShapeController> shape_controller_;
     DnatTable dnat_table_;
