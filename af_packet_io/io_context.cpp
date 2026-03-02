@@ -109,7 +109,7 @@ bool IoContext::send_frame(const uint8_t* data, size_t length, size_t net_offset
             if (tot_len >= iph->ihl * 4 && tot_len <= ip_len) {
                 sockaddr_in dst{};
                 dst.sin_family = AF_INET;
-                dst.sin_addr.s_addr = 0;//iph->daddr;
+                dst.sin_addr.s_addr = iph->daddr;
 
                 ssize_t sent = ::sendto(ip_tx_fd_, data + net_offset, tot_len, 0,
                                         reinterpret_cast<const sockaddr*>(&dst), sizeof(dst));
@@ -117,7 +117,10 @@ bool IoContext::send_frame(const uint8_t* data, size_t length, size_t net_offset
                     uint32_t d_addr = (iph->daddr);
                     uint32_t s_addr = (iph->saddr);
                     LOG(DEBUG_IO, "IoContext", ": RAW IP send ok (", tag,
-                        ") bytes=", tot_len," src=", IPv4Header::ip_to_string(s_addr) , " dst=", IPv4Header::ip_to_string(d_addr));
+                        ") fd=", ip_tx_fd_, " iface=",
+                        (cfg_.tx_interface.empty() ? cfg_.rx_interface : cfg_.tx_interface),
+                        " bytes=", tot_len, " src=", IPv4Header::ip_to_string(s_addr),
+                        " dst=", IPv4Header::ip_to_string(d_addr));
                     return true;
                 }
                 int err = errno;
