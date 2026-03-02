@@ -69,6 +69,15 @@ class Worker {
     void enqueue_shaped_frame(InterfaceKind kind, std::vector<uint8_t>&& frame, size_t net_offset);
 
   private:
+    struct RemoteNode {
+        FramePayload payload;
+        RemoteNode* next = nullptr;
+    };
+
+    RemoteNode* acquire_remote_node();
+    void recycle_remote_node(RemoteNode* node);
+    RemoteNode* pop_all_remote_nodes();
+
     void run();
     void process_interface(InterfaceContext& src_ctx, af_packet_io::RingView& view,
                            FramePayload::Origin origin);
@@ -101,8 +110,10 @@ class Worker {
 
     std::function<void(uint32_t, FramePayload&&)> forward_fn_;
 
-    std::mutex remote_mutex_;
-    std::deque<FramePayload> remote_queue_;
+    std::atomic<RemoteNode*> remote_head_{nullptr};
+    std::atomic<RemoteNode*> remote_free_{nullptr};
+    std::atomic<uint32_t> remote_size_{0};
+    int remote_event_fd_ = -1;
 
     std::unique_ptr<shape::ShapeController> shape_controller_;
     DnatTable dnat_table_;

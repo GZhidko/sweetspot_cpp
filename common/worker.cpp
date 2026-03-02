@@ -20,6 +20,7 @@
 #include <netinet/ip_icmp.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
+#include <sys/eventfd.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <tuple>
@@ -52,6 +53,11 @@ const char* interface_kind_to_string(Worker::InterfaceKind kind) {
 
 Worker::Worker(const WorkerPipelineConfig& cfg)
     : cfg_(cfg), nat_(cfg.nat, cfg.thread_index, cfg.thread_count) {
+    remote_event_fd_ = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    if (remote_event_fd_ < 0) {
+        LOG(DEBUG_ERROR, "Worker", cfg_.thread_index, ": eventfd create failed errno=", errno);
+    }
+
     io_enabled_ = cfg.enable_io;
     if (io_enabled_) {
         if (!cfg.io_priv.rx_interface.empty()) {
@@ -89,6 +95,57 @@ Worker::Worker(const WorkerPipelineConfig& cfg)
 
 Worker::~Worker() {
     stop();
+
+    RemoteNode* pending = pop_all_remote_nodes();
+    while (pending) {
+        RemoteNode* next = pending->next;
+        delete pending;
+        pending = next;
+    }
+    RemoteNode* free_head = remote_free_.exchange(nullptr, std::memory_order_acquire);
+    while (free_head) {
+        RemoteNode* next = free_head->next;
+        delete free_head;
+        free_head = next;
+    }
+
+    if (remote_event_fd_ >= 0) {
+        ::close(remote_event_fd_);
+        remote_event_fd_ = -1;
+    }
+}
+
+Worker::RemoteNode* Worker::acquire_remote_node() {
+    RemoteNode* head = remote_free_.load(std::memory_order_acquire);
+    while (head &&
+           !remote_free_.compare_exchange_weak(head, head->next, std::memory_order_acq_rel,
+                                               std::memory_order_acquire)) {
+    }
+    if (!head) {
+        return new RemoteNode();
+    }
+    head->next = nullptr;
+    return head;
+}
+
+void Worker::recycle_remote_node(RemoteNode* node) {
+    if (!node) {
+        return;
+    }
+    node->payload.parsed_chain.reset();
+    node->payload.buffer.clear();
+    node->payload.net_offset = 0;
+    node->payload.origin = FramePayload::Origin::Private;
+
+    RemoteNode* head = remote_free_.load(std::memory_order_relaxed);
+    do {
+        node->next = head;
+    } while (!remote_free_.compare_exchange_weak(head, node, std::memory_order_release,
+                                                 std::memory_order_relaxed));
+}
+
+Worker::RemoteNode* Worker::pop_all_remote_nodes() {
+    return remote_head_.exchange(nullptr, std::memory_order_acquire);
 }
 
 void Worker::start() {
@@ -157,17 +214,13 @@ void Worker::run() {
             if (pub_fd != priv_fd) {
                 register_fd(pub_fd, 2);
             }
+            register_fd(remote_event_fd_, 3);
         }
     }
 
     size_t iteration = 0;
     while (running_) {
         ++iteration;
-        bool has_remote = false;
-        {
-            std::lock_guard<std::mutex> lock(remote_mutex_);
-            has_remote = !remote_queue_.empty();
-        }
         bool has_priv_tx = false;
         bool has_pub_tx = false;
         {
@@ -181,10 +234,11 @@ void Worker::run() {
 
         bool priv_ready = false;
         bool pub_ready = false;
+        bool remote_ready = false;
 
         if (epfd >= 0) {
             // Block when fully idle; run immediately when local work is queued.
-            int timeout_ms = (has_remote || has_priv_tx || has_pub_tx) ? 0 : 5;
+            int timeout_ms = (has_priv_tx || has_pub_tx) ? 0 : 5;
             epoll_event events[4]{};
             int ready = ::epoll_wait(epfd, events, 4, timeout_ms);
             if (ready < 0) {
@@ -199,6 +253,8 @@ void Worker::run() {
                         priv_ready = true;
                     } else if (token == 2) {
                         pub_ready = true;
+                    } else if (token == 3) {
+                        remote_ready = true;
                     }
                 }
             }
@@ -206,9 +262,18 @@ void Worker::run() {
             // Fallback behavior on systems where epoll init failed.
             priv_ready = priv_ctx_.io != nullptr;
             pub_ready = pub_ctx_.io != nullptr;
+            remote_ready = (remote_head_.load(std::memory_order_acquire) != nullptr);
         }
 
-        process_remote_frames();
+        if (remote_ready && remote_event_fd_ >= 0) {
+            uint64_t counter = 0;
+            while (::read(remote_event_fd_, &counter, sizeof(counter)) == sizeof(counter)) {
+            }
+        }
+
+        if (remote_ready) {
+            process_remote_frames();
+        }
         if (priv_ctx_.io && priv_ready) {
             process_interface(priv_ctx_, priv_view, FramePayload::Origin::Private);
         }
@@ -762,21 +827,49 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
 }
 
 void Worker::process_remote_frames() {
-    std::deque<FramePayload> local;
-    {
-        std::lock_guard<std::mutex> lock(remote_mutex_);
-        local.swap(remote_queue_);
+    RemoteNode* list = pop_all_remote_nodes();
+    if (!list) {
+        return;
     }
-    for (auto& frame : local) {
-        handle_forwarded(std::move(frame));
+
+    // Producers push to stack; reverse once to preserve FIFO-ish processing order.
+    RemoteNode* rev = nullptr;
+    uint32_t count = 0;
+    while (list) {
+        RemoteNode* next = list->next;
+        list->next = rev;
+        rev = list;
+        list = next;
+        ++count;
+    }
+    remote_size_.fetch_sub(count, std::memory_order_relaxed);
+
+    while (rev) {
+        RemoteNode* next = rev->next;
+        handle_forwarded(std::move(rev->payload));
+        recycle_remote_node(rev);
+        rev = next;
     }
 }
 
 void Worker::submit_remote_frame(FramePayload&& frame) {
-    std::lock_guard<std::mutex> lock(remote_mutex_);
-    remote_queue_.emplace_back(std::move(frame));
+    RemoteNode* node = acquire_remote_node();
+    node->payload = std::move(frame);
+    RemoteNode* head = remote_head_.load(std::memory_order_relaxed);
+    do {
+        node->next = head;
+    } while (!remote_head_.compare_exchange_weak(head, node, std::memory_order_release,
+                                                 std::memory_order_relaxed));
+    uint32_t q = remote_size_.fetch_add(1, std::memory_order_relaxed) + 1;
+    if (remote_event_fd_ >= 0) {
+        const uint64_t one = 1;
+        if (::write(remote_event_fd_, &one, sizeof(one)) < 0 && errno != EAGAIN) {
+            LOG(DEBUG_ERROR, "Worker", cfg_.thread_index,
+                ": eventfd write failed errno=", errno);
+        }
+    }
     LOG(DEBUG_RELAY, "relay submit_remote thread=", cfg_.thread_index,
-        " queue_size=", remote_queue_.size());
+        " queue_size=", q);
 }
 
 std::vector<std::vector<uint8_t>> Worker::collect_tx_frames() {
