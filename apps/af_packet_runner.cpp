@@ -52,24 +52,63 @@ NatConfig build_nat_config(const std::string& priv, const std::string& pub) {
 } // namespace
 
 int main(int argc, char** argv) {
-    if (argc < 6) {
+    int argi = 1;
+    std::string debug_spec = "all";
+    while (argi < argc) {
+        std::string arg = argv[argi];
+        if (arg == "-h" || arg == "--help") {
+            std::cout << "Usage: " << argv[0]
+                      << " [--debug <modules|mask>] <priv_iface> <pub_iface> "
+                         "<private_net> <public_net> <worker_count>\n";
+            return 0;
+        }
+        if (arg == "--debug-help") {
+            std::cout << Logger::debug_keywords() << std::endl;
+            return 0;
+        }
+        if (arg == "--debug" || arg == "-d") {
+            if (argi + 1 >= argc) {
+                std::cerr << "Missing value for " << arg << std::endl;
+                return 1;
+            }
+            debug_spec = argv[argi + 1];
+            argi += 2;
+            continue;
+        }
+        if (arg.rfind("--debug=", 0) == 0) {
+            debug_spec = arg.substr(8);
+            ++argi;
+            continue;
+        }
+        break;
+    }
+
+    if (argc - argi < 5) {
         std::cerr << "Usage: " << argv[0]
-                  << " <priv_iface> <pub_iface> <private_net> <public_net> <worker_count>"
+                  << " [--debug <modules|mask>] <priv_iface> <pub_iface> "
+                     "<private_net> <public_net> <worker_count>"
                   << std::endl;
         return 1;
     }
 
-    std::string priv_iface = argv[1];
-    std::string pub_iface = argv[2];
-    std::string priv_net = argv[3];
-    std::string pub_net = argv[4];
-    uint32_t worker_count = static_cast<uint32_t>(std::stoul(argv[5]));
+    std::string priv_iface = argv[argi++];
+    std::string pub_iface = argv[argi++];
+    std::string priv_net = argv[argi++];
+    std::string pub_net = argv[argi++];
+    uint32_t worker_count = static_cast<uint32_t>(std::stoul(argv[argi++]));
     if (worker_count == 0) {
         std::cerr << "worker_count must be > 0" << std::endl;
         return 1;
     }
 
-    Logger::setFlags(DEBUG_ALL);
+    uint32_t debug_flags = 0;
+    std::string parse_error;
+    if (!Logger::parse_flags_spec(debug_spec, debug_flags, &parse_error)) {
+        std::cerr << "Invalid --debug value '" << debug_spec << "': " << parse_error
+                  << "\nAvailable: " << Logger::debug_keywords() << std::endl;
+        return 1;
+    }
+    Logger::setFlags(debug_flags);
 
     NatConfig nat_cfg;
     try {
@@ -84,7 +123,7 @@ int main(int argc, char** argv) {
     std::vector<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>> static_icmp;
     std::vector<std::pair<uint32_t, uint32_t>> static_ip;
 
-    for (int i = 6; i < argc;) {
+    for (int i = argi; i < argc;) {
         std::string opt = argv[i];
         try {
             if (opt == "--static-tcp" && i + 4 < argc) {

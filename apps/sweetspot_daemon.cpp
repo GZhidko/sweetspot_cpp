@@ -248,16 +248,62 @@ void configure_interface(af_packet_io::IoConfig& config, const std::string& rx_i
 } // namespace
 
 int main(int argc, char** argv) {
-    if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <config_path>" << std::endl;
+    std::string config_path;
+    std::string debug_spec = "all";
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "-h" || arg == "--help") {
+            std::cout << "Usage: " << argv[0]
+                      << " [--debug <modules|mask>] <config_path>\n"
+                      << "  --debug, -d      Comma-separated modules or numeric mask\n"
+                      << "  --debug-help     Show available debug module keywords\n";
+            return 0;
+        }
+        if (arg == "--debug-help") {
+            std::cout << Logger::debug_keywords() << std::endl;
+            return 0;
+        }
+        if (arg == "--debug" || arg == "-d") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for " << arg << std::endl;
+                return 1;
+            }
+            debug_spec = argv[++i];
+            continue;
+        }
+        if (arg.rfind("--debug=", 0) == 0) {
+            debug_spec = arg.substr(8);
+            continue;
+        }
+        if (!arg.empty() && arg[0] == '-') {
+            std::cerr << "Unknown option: " << arg << std::endl;
+            return 1;
+        }
+        if (!config_path.empty()) {
+            std::cerr << "Unexpected positional argument: " << arg << std::endl;
+            return 1;
+        }
+        config_path = arg;
+    }
+
+    if (config_path.empty()) {
+        std::cerr << "Usage: " << argv[0] << " [--debug <modules|mask>] <config_path>"
+                  << std::endl;
         return 1;
     }
 
-    Logger::setFlags(DEBUG_ALL);
+    uint32_t debug_flags = 0;
+    std::string parse_error;
+    if (!Logger::parse_flags_spec(debug_spec, debug_flags, &parse_error)) {
+        std::cerr << "Invalid --debug value '" << debug_spec << "': " << parse_error
+                  << "\nAvailable: " << Logger::debug_keywords() << std::endl;
+        return 1;
+    }
+    Logger::setFlags(debug_flags);
 
     AppConfig config;
     try {
-        config = ConfigLoader::load(argv[1]);
+        config = ConfigLoader::load(config_path);
     } catch (const std::exception& ex) {
         std::cerr << ex.what() << std::endl;
         return 1;
