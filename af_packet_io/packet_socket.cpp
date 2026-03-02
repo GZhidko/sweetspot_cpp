@@ -59,6 +59,15 @@ void PacketSocket::open(int protocol) {
     if (fd_ < 0) {
         throw make_sys_error("socket(AF_PACKET)");
     }
+    // Keep socket buffers on par with legacy sweetspot settings.
+    int rcvbuf = 65536 * 60;
+    if (::setsockopt(fd_, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf)) < 0) {
+        LOG(DEBUG_ERROR, "PacketSocket fd=", fd_, " SO_RCVBUF failed errno=", errno);
+    }
+    int sndbuf = 65536 * 60;
+    if (::setsockopt(fd_, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf)) < 0) {
+        LOG(DEBUG_ERROR, "PacketSocket fd=", fd_, " SO_SNDBUF failed errno=", errno);
+    }
     int ignore_outgoing = 1;
 #ifdef PACKET_IGNORE_OUTGOING
     if (::setsockopt(fd_, SOL_PACKET, PACKET_IGNORE_OUTGOING, &ignore_outgoing,

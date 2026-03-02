@@ -173,7 +173,8 @@ void IoContext::init_tx_socket() {
         }
     }
 
-    int sndbuf = 65536 * 8;
+    // Legacy daemon used significantly larger TX buffer; keep same scale.
+    int sndbuf = 65536 * 60;
     ::setsockopt(ip_tx_fd_, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf));
     LOG(DEBUG_IO, "IoContext", ": raw IP TX socket opened fd=", ip_tx_fd_,
         " iface=", (cfg_.tx_interface.empty() ? cfg_.rx_interface : cfg_.tx_interface));
