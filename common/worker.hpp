@@ -74,9 +74,6 @@ class Worker {
         RemoteNode* next = nullptr;
     };
 
-    std::vector<uint8_t> acquire_forward_buffer(size_t len);
-    void recycle_forward_buffer(std::vector<uint8_t>&& buffer);
-
     RemoteNode* acquire_remote_node();
     void recycle_remote_node(RemoteNode* node);
     RemoteNode* pop_all_remote_nodes();
@@ -117,8 +114,6 @@ class Worker {
     std::atomic<RemoteNode*> remote_free_{nullptr};
     std::atomic<uint32_t> remote_size_{0};
     int remote_event_fd_ = -1;
-    std::mutex forward_pool_mutex_;
-    std::deque<std::vector<uint8_t>> forward_pool_;
 
     std::unique_ptr<shape::ShapeController> shape_controller_;
     DnatTable dnat_table_;
