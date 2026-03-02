@@ -20,6 +20,7 @@
 #include <netinet/ip_icmp.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
+#include <sys/epoll.h>
 #include <sys/socket.h>
 #include <tuple>
 #include <unistd.h>
@@ -130,29 +131,88 @@ void Worker::run() {
     LOG(DEBUG_RELAY, "relay loop enter thread=", cfg_.thread_index,
         " priv_blocks=", priv_view.block_count(), " pub_blocks=", pub_view.block_count());
 
+    int epfd = -1;
+    int priv_fd = priv_ctx_.io ? priv_ctx_.io->socket().fd() : -1;
+    int pub_fd = pub_ctx_.io ? pub_ctx_.io->socket().fd() : -1;
+
+    if (priv_fd >= 0 || pub_fd >= 0) {
+        epfd = ::epoll_create1(EPOLL_CLOEXEC);
+        if (epfd < 0) {
+            LOG(DEBUG_ERROR, "Worker", cfg_.thread_index,
+                ": epoll_create1 failed errno=", errno, " fallback to polling");
+        } else {
+            auto register_fd = [&](int fd, uint32_t token) {
+                if (fd < 0) {
+                    return;
+                }
+                epoll_event ev{};
+                ev.events = EPOLLIN;
+                ev.data.u32 = token;
+                if (::epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) < 0) {
+                    LOG(DEBUG_ERROR, "Worker", cfg_.thread_index,
+                        ": epoll_ctl add failed fd=", fd, " errno=", errno);
+                }
+            };
+            register_fd(priv_fd, 1);
+            if (pub_fd != priv_fd) {
+                register_fd(pub_fd, 2);
+            }
+        }
+    }
+
     size_t iteration = 0;
     while (running_) {
         ++iteration;
-        size_t remote_pending = 0;
+        bool has_remote = false;
         {
             std::lock_guard<std::mutex> lock(remote_mutex_);
-            remote_pending = remote_queue_.size();
+            has_remote = !remote_queue_.empty();
         }
-        size_t priv_tx = 0;
-        size_t pub_tx = 0;
+        bool has_priv_tx = false;
+        bool has_pub_tx = false;
         {
             std::lock_guard<std::mutex> lock(priv_ctx_.tx_mutex);
-            priv_tx = priv_ctx_.tx_queue.size();
+            has_priv_tx = !priv_ctx_.tx_queue.empty();
         }
         {
             std::lock_guard<std::mutex> lock(pub_ctx_.tx_mutex);
-            pub_tx = pub_ctx_.tx_queue.size();
+            has_pub_tx = !pub_ctx_.tx_queue.empty();
         }
+
+        bool priv_ready = false;
+        bool pub_ready = false;
+
+        if (epfd >= 0) {
+            // Block when fully idle; run immediately when local work is queued.
+            int timeout_ms = (has_remote || has_priv_tx || has_pub_tx) ? 0 : 5;
+            epoll_event events[4]{};
+            int ready = ::epoll_wait(epfd, events, 4, timeout_ms);
+            if (ready < 0) {
+                if (errno != EINTR) {
+                    LOG(DEBUG_ERROR, "Worker", cfg_.thread_index,
+                        ": epoll_wait failed errno=", errno);
+                }
+            } else {
+                for (int i = 0; i < ready; ++i) {
+                    const uint32_t token = events[i].data.u32;
+                    if (token == 1) {
+                        priv_ready = true;
+                    } else if (token == 2) {
+                        pub_ready = true;
+                    }
+                }
+            }
+        } else {
+            // Fallback behavior on systems where epoll init failed.
+            priv_ready = priv_ctx_.io != nullptr;
+            pub_ready = pub_ctx_.io != nullptr;
+        }
+
         process_remote_frames();
-        if (priv_ctx_.io) {
+        if (priv_ctx_.io && priv_ready) {
             process_interface(priv_ctx_, priv_view, FramePayload::Origin::Private);
         }
-        if (pub_ctx_.io) {
+        if (pub_ctx_.io && pub_ready) {
             process_interface(pub_ctx_, pub_view, FramePayload::Origin::Public);
         }
         transmit_pending(priv_ctx_);
@@ -160,6 +220,9 @@ void Worker::run() {
         if (!priv_ctx_.io && !pub_ctx_.io) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
+    }
+    if (epfd >= 0) {
+        ::close(epfd);
     }
     LOG(DEBUG_RELAY, "relay loop exit thread=", cfg_.thread_index, " iterations=", iteration);
 }
