@@ -59,7 +59,11 @@ public:
     }
 
     static void setFlags(uint32_t flags) {
-        instance().flags_ = flags;
+        instance().flags_.store(flags, std::memory_order_relaxed);
+    }
+
+    static bool enabled(uint32_t flag) {
+        return (instance().flags_.load(std::memory_order_relaxed) & flag) != 0;
     }
 
     static std::string debug_keywords() {
@@ -149,7 +153,7 @@ public:
     }
     template<typename... Args>
     static void log(uint32_t flag, const char* file, int line, const char* func, Args&&... args) {
-        if (!(instance().flags_ & flag)) return;
+        if (!enabled(flag)) return;
 
         std::ostringstream oss;
         (oss << ... << std::forward<Args>(args));
@@ -244,7 +248,7 @@ private:
         }
     }
 
-    uint32_t flags_ = DEBUG_ALL;
+    std::atomic<uint32_t> flags_{DEBUG_ALL};
     std::mutex mutex_;
     std::condition_variable cv_;
     std::queue<std::pair<uint32_t,std::string>> queue_;
@@ -256,4 +260,8 @@ private:
 };
 
 // Макрос для удобства
-#define LOG(flag, ...) Logger::log(flag, __FILE__, __LINE__, __func__, __VA_ARGS__)
+#define LOG(flag, ...)                                                                          \
+    do {                                                                                        \
+        if (Logger::enabled(flag))                                                              \
+            Logger::log(flag, __FILE__, __LINE__, __func__, __VA_ARGS__);                      \
+    } while (0)
