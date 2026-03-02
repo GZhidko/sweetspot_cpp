@@ -233,8 +233,8 @@ void configure_interface(af_packet_io::IoConfig& config, const std::string& rx_i
     config.rx_interface = rx_iface;
     config.tx_interface = tx_iface;
     config.protocol = ETH_P_ALL;
-    config.rx_ring.block_size = 1 << 20;
-    config.rx_ring.block_count = 64;
+    config.rx_ring.block_size = 1 << 19;
+    config.rx_ring.block_count = 128;
     config.rx_ring.frame_size = 1 << 11;
     config.rx_ring.timeout_ns = 1ULL * 1000ULL * 1000ULL;
     config.tx_ring.block_size = 0;
