@@ -317,6 +317,13 @@ void Worker::process_rx_block(InterfaceContext& src_ctx, FramePayload::Origin or
         uint8_t* data = reinterpret_cast<uint8_t*>(hdr) + hdr->tp_mac;
         size_t len = hdr->tp_snaplen;
         size_t net_offset = 0;
+        if (hdr->tp_status & TP_STATUS_OUTGOING) {
+            LOG(DEBUG_RELAY, "relay skip outgoing thread=", cfg_.thread_index,
+                " origin=", origin_to_string(origin), " block_packet_index=", i, " len=", len);
+            hdr =
+                reinterpret_cast<tpacket3_hdr*>(reinterpret_cast<uint8_t*>(hdr) + hdr->tp_next_offset);
+            continue;
+        }
         if (hdr->tp_net >= hdr->tp_mac && hdr->tp_net != 0) {
             net_offset = static_cast<size_t>(hdr->tp_net - hdr->tp_mac);
             if (net_offset > len) {
