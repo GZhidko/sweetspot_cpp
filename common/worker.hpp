@@ -165,6 +165,11 @@ class Worker {
     uint64_t profile_parse_ns_ = 0;
     uint64_t profile_chain_calls_ = 0;
     uint64_t profile_chain_ns_ = 0;
+    uint64_t profile_filter_ns_ = 0;
+    uint64_t profile_nat_ns_ = 0;
+    uint64_t profile_commit_ns_ = 0;
+    uint64_t profile_gauge_ns_ = 0;
+    uint64_t profile_enqueue_ns_ = 0;
     uint64_t profile_forward_remote_ = 0;
     uint64_t profile_forward_local_ = 0;
     uint64_t profile_remote_batches_ = 0;

@@ -715,11 +715,19 @@ void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t le
         " session_ip=", session_ip, " drop_for_status=", drop_for_status);
 
     bool ok = true;
+    const auto filter_started =
+        profile_enabled_ ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     chain.for_each([&](auto& hdr) {
         if (!Filter<std::decay_t<decltype(hdr)>>{}(hdr)) {
             ok = false;
         }
     });
+    if (profile_enabled_) {
+        profile_filter_ns_ += static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now() - filter_started)
+                .count());
+    }
     if (!ok) {
         LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": filtered");
         LOG(DEBUG_RELAY, "relay filter drop thread=", cfg_.thread_index,
@@ -1160,12 +1168,39 @@ void Worker::maybe_dump_profile(bool force) {
                                     : (static_cast<double>(profile_chain_ns_) /
                                        static_cast<double>(profile_chain_calls_)) /
                                           1000.0;
+    const double filter_avg_us = profile_chain_calls_ == 0
+                                     ? 0.0
+                                     : (static_cast<double>(profile_filter_ns_) /
+                                        static_cast<double>(profile_chain_calls_)) /
+                                           1000.0;
+    const double nat_avg_us = profile_chain_calls_ == 0
+                                  ? 0.0
+                                  : (static_cast<double>(profile_nat_ns_) /
+                                     static_cast<double>(profile_chain_calls_)) /
+                                        1000.0;
+    const double commit_avg_us = profile_chain_calls_ == 0
+                                     ? 0.0
+                                     : (static_cast<double>(profile_commit_ns_) /
+                                        static_cast<double>(profile_chain_calls_)) /
+                                           1000.0;
+    const double gauge_avg_us = profile_chain_calls_ == 0
+                                    ? 0.0
+                                    : (static_cast<double>(profile_gauge_ns_) /
+                                       static_cast<double>(profile_chain_calls_)) /
+                                          1000.0;
+    const double enqueue_avg_us = profile_chain_calls_ == 0
+                                      ? 0.0
+                                      : (static_cast<double>(profile_enqueue_ns_) /
+                                         static_cast<double>(profile_chain_calls_)) /
+                                            1000.0;
 
     std::fprintf(
         stderr,
         "PROFILE thread=%u uptime_s=%.3f loops=%llu epoll_wait=%llu epoll_ready=%llu "
         "epoll_to=%llu rx_pkts=%llu rx_mpps=%.3f tx_frames=%llu tx_mbps=%.3f tx_fallback=%llu "
         "parse_calls=%llu parse_fail=%llu parse_avg_us=%.3f chain_calls=%llu chain_avg_us=%.3f "
+        "filter_avg_us=%.3f nat_avg_us=%.3f commit_avg_us=%.3f gauge_avg_us=%.3f "
+        "enqueue_avg_us=%.3f "
         "fwd_local=%llu fwd_remote=%llu remote_batches=%llu remote_frames=%llu remote_q=%u\n",
         cfg_.thread_index, elapsed_s, static_cast<unsigned long long>(profile_loops_),
         static_cast<unsigned long long>(profile_epoll_wait_calls_),
@@ -1177,6 +1212,7 @@ void Worker::maybe_dump_profile(bool force) {
         static_cast<unsigned long long>(profile_parse_calls_),
         static_cast<unsigned long long>(profile_parse_fail_), parse_avg_us,
         static_cast<unsigned long long>(profile_chain_calls_), chain_avg_us,
+        filter_avg_us, nat_avg_us, commit_avg_us, gauge_avg_us, enqueue_avg_us,
         static_cast<unsigned long long>(profile_forward_local_),
         static_cast<unsigned long long>(profile_forward_remote_),
         static_cast<unsigned long long>(profile_remote_batches_),
@@ -1248,8 +1284,18 @@ void Worker::finish_frame(Chain& chain, const filters::Decision& decision,
     uint8_t* l3_data = data + net_offset;
     size_t l3_len = len > net_offset ? len - net_offset : 0;
 
+    const auto nat_started =
+        profile_enabled_ ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     chain.for_each([&](auto& hdr) { nat_.process(hdr); });
+    if (profile_enabled_) {
+        profile_nat_ns_ += static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now() - nat_started)
+                .count());
+    }
 
+    const auto commit_started =
+        profile_enabled_ ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     if (has_flag(decision.actions, filters::ActionFlag::Dnat) &&
         origin == FramePayload::Origin::Public) {
         if (auto* ipv4_after_nat = chain.get<IPv4Header>()) {
@@ -1267,6 +1313,12 @@ void Worker::finish_frame(Chain& chain, const filters::Decision& decision,
             Committer<Header>{}(&hdr, l3_data, l3_len, offset, ipv4);
         }
     });
+    if (profile_enabled_) {
+        profile_commit_ns_ += static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now() - commit_started)
+                .count());
+    }
 
     uint32_t gauge_ip = session_ip;
     if (gauge_ip == 0) {
@@ -1276,11 +1328,19 @@ void Worker::finish_frame(Chain& chain, const filters::Decision& decision,
             gauge_ip = 0;
         }
     }
+    const auto gauge_started =
+        profile_enabled_ ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     if (gauge_ip != 0) {
         auto direction = (origin == FramePayload::Origin::Private)
                              ? accounting::GaugeTracker::Direction::Outbound
                              : accounting::GaugeTracker::Direction::Inbound;
         accounting::GaugeTracker::instance().record(gauge_ip, l3_len, direction);
+    }
+    if (profile_enabled_) {
+        profile_gauge_ns_ += static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now() - gauge_started)
+                .count());
     }
 
     LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
@@ -1326,6 +1386,8 @@ void Worker::finish_frame(Chain& chain, const filters::Decision& decision,
         " dst=", IPv4Header::ip_to_string(ipv4->iph.daddr), ":", log_dst_port,
         " icmp_id=", log_icmp_id, " via=", (dest_ctx == &pub_ctx_ ? "pub" : "priv"));
 
+    const auto enqueue_started =
+        profile_enabled_ ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     std::vector<uint8_t> tx_buffer(data, data + len);
     bool shaped = has_flag(decision.actions, filters::ActionFlag::Shape) && decision.shape_rate > 0;
     if (shaped && shape_controller_) {
@@ -1339,5 +1401,11 @@ void Worker::finish_frame(Chain& chain, const filters::Decision& decision,
         LOG(DEBUG_RELAY, "relay direct enqueue thread=", cfg_.thread_index,
             " target=", (dest_ctx == &pub_ctx_ ? "pub" : "priv"), " bytes=", tx_buffer.size());
         enqueue_tx(*dest_ctx, std::move(tx_buffer), net_offset, "direct");
+    }
+    if (profile_enabled_) {
+        profile_enqueue_ns_ += static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now() - enqueue_started)
+                .count());
     }
 }
