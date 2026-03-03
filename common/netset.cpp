@@ -183,6 +183,26 @@ uint32_t Netset::idx(uint32_t ip) const {
     throw std::out_of_range("IP not found in netset: " + ip_to_string(ip));
 }
 
+bool Netset::try_idx(uint32_t ip, uint32_t& out_idx) const {
+    uint32_t index = 0;
+    auto current = head;
+
+    while (current) {
+        if (ip >= current->ip_min && ip <= current->ip_max) {
+            out_idx = index + (ip - current->ip_min);
+            return true;
+        }
+        if (ip > current->ip_max) {
+            index += current->ip_max - current->ip_min + 1;
+            current = current->next;
+            continue;
+        }
+        break;
+    }
+
+    return false;
+}
+
 // Получение IP адреса по индексу
 uint32_t Netset::ip(uint32_t ip_idx) const {
     uint32_t current_idx = 0;

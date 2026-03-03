@@ -693,13 +693,19 @@ void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t le
     std::string selected_filter = filters::Engine::instance().default_filter_name();
     bool drop_for_status = false;
     if (session_ip != 0) {
-        if (auto session = sessions::SessionManager::instance().find_session(session_ip)) {
+        sessions::SessionStatus session_status = sessions::SessionStatus::Captured;
+        std::shared_ptr<const std::string> session_filter_name;
+        auto& sm = sessions::SessionManager::instance();
+        if (sm.find_session_fast(session_ip, session_status, session_filter_name)) {
+            if (session_filter_name && !session_filter_name->empty()) {
+                selected_filter = *session_filter_name;
+            }
+            drop_for_status = (session_status == sessions::SessionStatus::Captured);
+        } else if (auto session = sm.find_session(session_ip)) {
             if (!session->filter_name.empty()) {
                 selected_filter = session->filter_name;
             }
-            if (session->status == sessions::SessionStatus::Captured) {
-                drop_for_status = true;
-            }
+            drop_for_status = (session->status == sessions::SessionStatus::Captured);
         }
     }
 

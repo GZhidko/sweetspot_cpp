@@ -2,7 +2,9 @@
 
 #include "session.hpp"
 
+#include <atomic>
 #include <optional>
+#include <memory>
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
@@ -29,6 +31,8 @@ class SessionManager {
     bool remove_session(uint32_t ip);
 
     std::optional<Session> find_session(uint32_t ip) const;
+    bool find_session_fast(uint32_t ip, SessionStatus& status,
+                           std::shared_ptr<const std::string>& filter_name) const;
     std::vector<Session> snapshot() const;
 
     void set_default_filter(const std::string& filter_name);
@@ -51,6 +55,8 @@ class SessionManager {
 
     void ensure_filter_loaded(const std::string& filter_name);
     void schedule_times(Session& session, Clock::time_point now);
+    std::shared_ptr<const std::string> intern_filter_name_unlocked(const std::string& filter_name);
+    void update_fast_slot_unlocked(const Session& session);
 
     mutable std::shared_mutex mutex_;
     std::unordered_map<uint32_t, Session> sessions_;
@@ -61,6 +67,11 @@ class SessionManager {
     std::function<void(const Session&)> interim_callback_;
     std::function<void(const Session&)> expire_callback_;
     std::shared_ptr<Netset> netset_;
+    std::unique_ptr<std::atomic<uint8_t>[]> fast_status_;
+    size_t fast_status_size_ = 0;
+    std::vector<std::shared_ptr<const std::string>> fast_filter_ptrs_;
+    std::unordered_map<std::string, std::shared_ptr<const std::string>> filter_name_pool_;
+    std::atomic<bool> fast_ready_{false};
     bool initialized_ = false;
 };
 

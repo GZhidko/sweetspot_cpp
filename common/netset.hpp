@@ -32,6 +32,9 @@ public:
     
     // Получение индекса для IP адреса
     uint32_t idx(uint32_t ip) const;
+
+    // Небросающий вариант поиска индекса для hot path
+    bool try_idx(uint32_t ip, uint32_t& out_idx) const;
     
     // Получение IP адреса по индексу
     uint32_t ip(uint32_t ip_idx) const;

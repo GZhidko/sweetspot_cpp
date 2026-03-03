@@ -96,6 +96,7 @@ Session SessionManager::start_session(uint32_t ip, const std::string& filter_nam
     if (default_filter_name_.empty()) {
         default_filter_name_ = session.filter_name;
     }
+    update_fast_slot_unlocked(session);
 
     LOG(DEBUG_SESSION, "start created ip=", ip_to_string(ip), " filter=", session.filter_name,
         " session_id=", session.session_id, " status=", static_cast<int>(session.status));
@@ -130,6 +131,7 @@ void SessionManager::stop_session(uint32_t ip, TerminationCause cause) {
     it->second.status = SessionStatus::Captured;
     it->second.termination_cause = cause;
     schedule_times(it->second, Clock::now());
+    update_fast_slot_unlocked(it->second);
 
     Session result = it->second;
 
@@ -158,6 +160,7 @@ bool SessionManager::remove_session(uint32_t ip) {
     it->second.session_context.clear();
     it->second.event_context.clear();
     schedule_times(it->second, Clock::now());
+    update_fast_slot_unlocked(it->second);
     Session result = it->second;
 
     LOG(DEBUG_SESSION, "remove reset session ip=", ip_to_string(ip));
@@ -179,6 +182,28 @@ std::optional<Session> SessionManager::find_session(uint32_t ip) const {
     LOG(DEBUG_SESSION, "find hit ip=", ip_to_string(ip), " status=",
         static_cast<int>(it->second.status), " filter=", it->second.filter_name);
     return it->second;
+}
+
+bool SessionManager::find_session_fast(uint32_t ip, SessionStatus& status,
+                                       std::shared_ptr<const std::string>& filter_name) const {
+    if (!fast_ready_.load(std::memory_order_acquire) || !netset_) {
+        return false;
+    }
+
+    uint32_t idx = 0;
+    if (!netset_->try_idx(ip, idx)) {
+        return false;
+    }
+    if (idx >= fast_status_size_ || idx >= fast_filter_ptrs_.size() || !fast_status_) {
+        return false;
+    }
+
+    const uint8_t status_raw = fast_status_[idx].load(std::memory_order_relaxed);
+    status = (status_raw == static_cast<uint8_t>(SessionStatus::Released))
+                 ? SessionStatus::Released
+                 : SessionStatus::Captured;
+    filter_name = std::atomic_load_explicit(&fast_filter_ptrs_[idx], std::memory_order_acquire);
+    return static_cast<bool>(filter_name);
 }
 
 std::vector<Session> SessionManager::snapshot() const {
@@ -290,6 +315,7 @@ void SessionManager::initialize_from_netset(std::shared_ptr<Netset> netset,
         LOG(DEBUG_SESSION, "initialize_from_netset skipped already initialized");
         return;
     }
+    fast_ready_.store(false, std::memory_order_release);
     netset_ = netset;
     if (!default_filter.empty()) {
         ensure_filter_loaded(default_filter);
@@ -305,7 +331,16 @@ void SessionManager::initialize_from_netset(std::shared_ptr<Netset> netset,
     LOG(DEBUG_SESSION, "initialize_from_netset total=", total,
         " default_filter=", default_filter_name_);
     sessions_.reserve(total);
+    fast_status_.reset();
+    fast_status_size_ = static_cast<size_t>(total);
+    if (fast_status_size_ > 0) {
+        fast_status_ = std::make_unique<std::atomic<uint8_t>[]>(fast_status_size_);
+    }
+    fast_filter_ptrs_.clear();
+    fast_filter_ptrs_.resize(static_cast<size_t>(total));
+    filter_name_pool_.clear();
     auto now = Clock::now();
+    auto default_filter_ptr = intern_filter_name_unlocked(default_filter_name_);
     for (uint32_t idx = 0; idx < total; ++idx) {
         uint32_t ip = netset_->ip(idx);
         Session session;
@@ -316,7 +351,12 @@ void SessionManager::initialize_from_netset(std::shared_ptr<Netset> netset,
         session.retention = std::chrono::hours(1);
         schedule_times(session, now);
         sessions_.emplace(ip, std::move(session));
+        fast_status_[static_cast<size_t>(idx)].store(static_cast<uint8_t>(SessionStatus::Captured),
+                                std::memory_order_relaxed);
+        std::atomic_store_explicit(&fast_filter_ptrs_[static_cast<size_t>(idx)], default_filter_ptr,
+                                   std::memory_order_release);
     }
+    fast_ready_.store(true, std::memory_order_release);
     initialized_ = true;
     LOG(DEBUG_SESSION, "initialize_from_netset complete sessions=", sessions_.size());
 }
@@ -408,6 +448,37 @@ void SessionManager::schedule_times(Session& session, Clock::time_point now) {
         " status=", static_cast<int>(session.status),
         " retention=", session.retention.count(),
         " interim=", session.interim_interval.count());
+}
+
+std::shared_ptr<const std::string> SessionManager::intern_filter_name_unlocked(
+    const std::string& filter_name) {
+    auto it = filter_name_pool_.find(filter_name);
+    if (it != filter_name_pool_.end()) {
+        return it->second;
+    }
+    auto ptr = std::make_shared<const std::string>(filter_name);
+    filter_name_pool_.emplace(*ptr, ptr);
+    return ptr;
+}
+
+void SessionManager::update_fast_slot_unlocked(const Session& session) {
+    if (!fast_ready_.load(std::memory_order_relaxed) || !netset_) {
+        return;
+    }
+
+    uint32_t idx = 0;
+    if (!netset_->try_idx(session.ip, idx)) {
+        return;
+    }
+    if (idx >= fast_status_size_ || idx >= fast_filter_ptrs_.size() || !fast_status_) {
+        return;
+    }
+
+    auto filter_ptr = intern_filter_name_unlocked(session.filter_name);
+    std::atomic_store_explicit(&fast_filter_ptrs_[static_cast<size_t>(idx)], std::move(filter_ptr),
+                               std::memory_order_release);
+    fast_status_[static_cast<size_t>(idx)].store(static_cast<uint8_t>(session.status),
+                                                 std::memory_order_release);
 }
 
 } // namespace sessions
