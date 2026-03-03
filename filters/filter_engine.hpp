@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -126,15 +127,19 @@ class Engine {
         std::filesystem::path source;
     };
 
+    struct EngineState {
+        std::unordered_map<std::string, FilterSet> filters;
+        std::string default_filter;
+        std::filesystem::path default_path;
+    };
+
     Decision evaluate_rules(const PacketState& state, const std::string& filter_name,
                             const std::vector<Rule>& rules) const;
     std::vector<Rule> parse_file(const std::filesystem::path& path) const;
     static std::string derive_name_from_path(const std::filesystem::path& path);
 
     mutable std::mutex mutex_;
-    mutable std::unordered_map<std::string, FilterSet> filters_;
-    mutable std::string default_filter_;
-    mutable std::filesystem::path default_path_;
+    std::shared_ptr<const EngineState> state_;
 };
 
 } // namespace filters

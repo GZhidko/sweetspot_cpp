@@ -5,7 +5,9 @@
 #include <netinet/in.h>
 
 #include <cctype>
+#include <memory>
 #include <cstdlib>
+#include <atomic>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -655,6 +657,7 @@ bool Engine::PortCondition::is_active() const {
 }
 
 Engine::Engine() {
+    state_ = std::make_shared<const EngineState>();
     if (const char* env = std::getenv("SWEETSPOT_FILTER_PATH")) {
         set_config_path(env);
     }
@@ -679,8 +682,12 @@ void Engine::set_config_path(const std::string& path) {
     LOG(DEBUG_FILTER, "filter set_config_path updating name=", name, " path=", p.string());
     load_filter(name, p);
     std::lock_guard<std::mutex> guard(mutex_);
-    default_filter_ = name;
-    default_path_ = p;
+    auto current = std::atomic_load_explicit(&state_, std::memory_order_acquire);
+    EngineState next = current ? *current : EngineState{};
+    next.default_filter = name;
+    next.default_path = p;
+    std::atomic_store_explicit(&state_, std::make_shared<const EngineState>(std::move(next)),
+                               std::memory_order_release);
 }
 
 void Engine::load_filter(const std::string& name, const std::filesystem::path& path) {
@@ -694,13 +701,20 @@ void Engine::load_filter(const std::string& name, const std::filesystem::path& p
     if (rules.empty()) {
         std::cerr << "Filter warning: no rules loaded from '" << path << "'" << std::endl;
     }
-    std::lock_guard<std::mutex> guard(mutex_);
-    filters_[name] = FilterSet{std::move(rules), path};
-    if (default_filter_.empty()) {
-        default_filter_ = name;
-        default_path_ = path;
+    std::size_t rules_count = rules.size();
+    {
+        std::lock_guard<std::mutex> guard(mutex_);
+        auto current = std::atomic_load_explicit(&state_, std::memory_order_acquire);
+        EngineState next = current ? *current : EngineState{};
+        next.filters[name] = FilterSet{std::move(rules), path};
+        if (next.default_filter.empty()) {
+            next.default_filter = name;
+            next.default_path = path;
+        }
+        std::atomic_store_explicit(&state_, std::make_shared<const EngineState>(std::move(next)),
+                                   std::memory_order_release);
     }
-    LOG(DEBUG_FILTER, "filter load complete name=", name, " rules=", filters_[name].rules.size(),
+    LOG(DEBUG_FILTER, "filter load complete name=", name, " rules=", rules_count,
         " path=", path.string());
 }
 
@@ -734,15 +748,15 @@ void Engine::load_directory(const std::filesystem::path& dir, bool recursive) {
 
 void Engine::reload() {
     std::vector<std::pair<std::string, std::filesystem::path>> to_reload;
-    {
-        std::lock_guard<std::mutex> guard(mutex_);
-        for (const auto& [name, set] : filters_) {
+    auto snapshot = std::atomic_load_explicit(&state_, std::memory_order_acquire);
+    if (snapshot) {
+        for (const auto& [name, set] : snapshot->filters) {
             if (!set.source.empty()) {
                 to_reload.emplace_back(name, set.source);
             }
         }
-        if (to_reload.empty() && !default_path_.empty()) {
-            to_reload.emplace_back(default_filter_, default_path_);
+        if (to_reload.empty() && !snapshot->default_path.empty()) {
+            to_reload.emplace_back(snapshot->default_filter, snapshot->default_path);
         }
     }
     LOG(DEBUG_FILTER, "filter reload targets=", to_reload.size());
@@ -753,21 +767,23 @@ void Engine::reload() {
 }
 
 Decision Engine::evaluate(const PacketState& state) const {
-    std::string filter_name;
-    {
-        std::lock_guard<std::mutex> guard(mutex_);
-        filter_name = default_filter_;
+    auto snapshot = std::atomic_load_explicit(&state_, std::memory_order_acquire);
+    if (!snapshot) {
+        return Decision{};
     }
-    return evaluate(state, filter_name);
+    return evaluate(state, snapshot->default_filter);
 }
 
 Decision Engine::evaluate(const PacketState& state, const std::string& filter_name) const {
     if (filter_name.empty()) {
         return Decision{};
     }
-    std::lock_guard<std::mutex> guard(mutex_);
-    auto it = filters_.find(filter_name);
-    if (it == filters_.end()) {
+    auto snapshot = std::atomic_load_explicit(&state_, std::memory_order_acquire);
+    if (!snapshot) {
+        return Decision{};
+    }
+    auto it = snapshot->filters.find(filter_name);
+    if (it == snapshot->filters.end()) {
         LOG(DEBUG_FILTER, "filter evaluate missing name=", filter_name);
         return Decision{};
     }
@@ -780,33 +796,39 @@ Decision Engine::evaluate(const PacketState& state, const std::string& filter_na
 }
 
 std::size_t Engine::rule_count() const {
-    std::lock_guard<std::mutex> guard(mutex_);
-    if (default_filter_.empty()) {
+    auto snapshot = std::atomic_load_explicit(&state_, std::memory_order_acquire);
+    if (!snapshot || snapshot->default_filter.empty()) {
         return 0;
     }
-    auto it = filters_.find(default_filter_);
-    return it != filters_.end() ? it->second.rules.size() : 0;
+    auto it = snapshot->filters.find(snapshot->default_filter);
+    return it != snapshot->filters.end() ? it->second.rules.size() : 0;
 }
 
 std::size_t Engine::rule_count(const std::string& filter_name) const {
-    std::lock_guard<std::mutex> guard(mutex_);
-    auto it = filters_.find(filter_name);
-    return it != filters_.end() ? it->second.rules.size() : 0;
+    auto snapshot = std::atomic_load_explicit(&state_, std::memory_order_acquire);
+    if (!snapshot) {
+        return 0;
+    }
+    auto it = snapshot->filters.find(filter_name);
+    return it != snapshot->filters.end() ? it->second.rules.size() : 0;
 }
 
 std::vector<std::string> Engine::list_filters() const {
     std::vector<std::string> names;
-    std::lock_guard<std::mutex> guard(mutex_);
-    names.reserve(filters_.size());
-    for (const auto& [name, _] : filters_) {
+    auto snapshot = std::atomic_load_explicit(&state_, std::memory_order_acquire);
+    if (!snapshot) {
+        return names;
+    }
+    names.reserve(snapshot->filters.size());
+    for (const auto& [name, _] : snapshot->filters) {
         names.push_back(name);
     }
     return names;
 }
 
 std::string Engine::default_filter_name() const {
-    std::lock_guard<std::mutex> guard(mutex_);
-    return default_filter_;
+    auto snapshot = std::atomic_load_explicit(&state_, std::memory_order_acquire);
+    return snapshot ? snapshot->default_filter : std::string{};
 }
 
 Decision Engine::evaluate_rules(const PacketState& state, const std::string& filter_name,
