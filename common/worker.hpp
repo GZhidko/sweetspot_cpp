@@ -58,11 +58,16 @@ class Worker {
         const char* reason = "direct";
     };
 
+    struct TxNode {
+        TxFrame frame;
+        TxNode* next = nullptr;
+    };
+
     struct InterfaceContext {
         std::unique_ptr<af_packet_io::IoContext> io;
-        std::vector<TxFrame> tx_queue;
         size_t tx_ring_index = 0;
-        std::mutex tx_mutex;
+        std::atomic<TxNode*> tx_head{nullptr};
+        std::atomic<uint32_t> tx_pending{0};
         std::unique_ptr<std::atomic<uint8_t>[]> rx_block_inflight;
         size_t rx_block_inflight_count = 0;
     };
@@ -87,6 +92,9 @@ class Worker {
   private:
     std::vector<uint8_t> acquire_forward_buffer(size_t len);
     void recycle_forward_buffer(std::vector<uint8_t>&& buffer);
+    TxNode* acquire_tx_node();
+    void recycle_tx_node(TxNode* node);
+    TxNode* pop_all_tx_nodes(InterfaceContext& ctx);
 
     struct RemoteNode {
         FramePayload payload;
@@ -136,6 +144,7 @@ class Worker {
 
     std::atomic<RemoteNode*> remote_head_{nullptr};
     std::atomic<RemoteNode*> remote_free_{nullptr};
+    std::atomic<TxNode*> tx_free_{nullptr};
     std::atomic<uint32_t> remote_size_{0};
     int remote_event_fd_ = -1;
     std::mutex forward_pool_mutex_;

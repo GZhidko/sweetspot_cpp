@@ -145,6 +145,24 @@ Worker::~Worker() {
         ::close(remote_event_fd_);
         remote_event_fd_ = -1;
     }
+
+    TxNode* tx_free = tx_free_.exchange(nullptr, std::memory_order_acquire);
+    while (tx_free) {
+        TxNode* next = tx_free->next;
+        delete tx_free;
+        tx_free = next;
+    }
+
+    auto drain_ctx = [](InterfaceContext& ctx) {
+        TxNode* list = ctx.tx_head.exchange(nullptr, std::memory_order_acquire);
+        while (list) {
+            TxNode* next = list->next;
+            delete list;
+            list = next;
+        }
+    };
+    drain_ctx(priv_ctx_);
+    drain_ctx(pub_ctx_);
 }
 
 std::vector<uint8_t> Worker::acquire_forward_buffer(size_t len) {
@@ -210,6 +228,37 @@ void Worker::recycle_remote_node(RemoteNode* node) {
 
 Worker::RemoteNode* Worker::pop_all_remote_nodes() {
     return remote_head_.exchange(nullptr, std::memory_order_acquire);
+}
+
+Worker::TxNode* Worker::acquire_tx_node() {
+    TxNode* head = tx_free_.load(std::memory_order_acquire);
+    while (head &&
+           !tx_free_.compare_exchange_weak(head, head->next, std::memory_order_acq_rel,
+                                           std::memory_order_acquire)) {
+    }
+    if (!head) {
+        return new TxNode();
+    }
+    head->next = nullptr;
+    return head;
+}
+
+void Worker::recycle_tx_node(TxNode* node) {
+    if (!node) {
+        return;
+    }
+    node->frame.buffer.clear();
+    node->frame.net_offset = 0;
+    node->frame.reason = "direct";
+    TxNode* head = tx_free_.load(std::memory_order_relaxed);
+    do {
+        node->next = head;
+    } while (!tx_free_.compare_exchange_weak(head, node, std::memory_order_release,
+                                             std::memory_order_relaxed));
+}
+
+Worker::TxNode* Worker::pop_all_tx_nodes(InterfaceContext& ctx) {
+    return ctx.tx_head.exchange(nullptr, std::memory_order_acquire);
 }
 
 void Worker::start() {
@@ -321,14 +370,8 @@ void Worker::run() {
         }
         bool has_priv_tx = false;
         bool has_pub_tx = false;
-        {
-            std::lock_guard<std::mutex> lock(priv_ctx_.tx_mutex);
-            has_priv_tx = !priv_ctx_.tx_queue.empty();
-        }
-        {
-            std::lock_guard<std::mutex> lock(pub_ctx_.tx_mutex);
-            has_pub_tx = !pub_ctx_.tx_queue.empty();
-        }
+        has_priv_tx = (priv_ctx_.tx_head.load(std::memory_order_acquire) != nullptr);
+        has_pub_tx = (pub_ctx_.tx_head.load(std::memory_order_acquire) != nullptr);
 
         bool priv_ready = false;
         bool pub_ready = false;
@@ -915,35 +958,46 @@ bool Worker::apply_outbound_dnat(FramePayload::Origin origin, Chain& chain, IPv4
 
 void Worker::enqueue_tx(InterfaceContext& ctx, std::vector<uint8_t>&& frame, size_t net_offset,
                         const char* reason) {
-    std::lock_guard<std::mutex> lock(ctx.tx_mutex);
-    ctx.tx_queue.push_back({});
-    ctx.tx_queue.back().buffer = std::move(frame);
-    ctx.tx_queue.back().net_offset = net_offset;
-    ctx.tx_queue.back().reason = reason;
+    TxNode* node = acquire_tx_node();
+    node->frame.buffer = std::move(frame);
+    node->frame.net_offset = net_offset;
+    node->frame.reason = reason;
+    TxNode* head = ctx.tx_head.load(std::memory_order_relaxed);
+    do {
+        node->next = head;
+    } while (!ctx.tx_head.compare_exchange_weak(head, node, std::memory_order_release,
+                                                std::memory_order_relaxed));
+    uint32_t q = ctx.tx_pending.fetch_add(1, std::memory_order_relaxed) + 1;
     LOG(DEBUG_RELAY, "relay enqueue_tx thread=", cfg_.thread_index,
         " origin_ctx=", (&ctx == &priv_ctx_) ? "priv" : "pub", " reason=", reason,
-        " bytes=", ctx.tx_queue.back().buffer.size(), " queue_size=", ctx.tx_queue.size());
+        " bytes=", node->frame.buffer.size(), " queue_size=", q);
     LOG(DEBUG_NAT, "Worker", cfg_.thread_index,
-        ": enqueue TX frame bytes=", ctx.tx_queue.back().buffer.size(), " net_offset=", net_offset,
-        " reason=", reason, " queue_size=", ctx.tx_queue.size());
+        ": enqueue TX frame bytes=", node->frame.buffer.size(), " net_offset=", net_offset,
+        " reason=", reason, " queue_size=", q);
 }
 
 void Worker::transmit_pending(InterfaceContext& ctx) {
-    std::vector<TxFrame> frames;
-    {
-        std::lock_guard<std::mutex> lock(ctx.tx_mutex);
-        if (ctx.tx_queue.empty()) {
-            return;
-        }
-        frames.swap(ctx.tx_queue);
+    TxNode* list = pop_all_tx_nodes(ctx);
+    if (!list) {
+        return;
     }
+    TxNode* rev = nullptr;
+    uint32_t count = 0;
+    while (list) {
+        TxNode* next = list->next;
+        list->next = rev;
+        rev = list;
+        list = next;
+        ++count;
+    }
+    ctx.tx_pending.fetch_sub(count, std::memory_order_relaxed);
 
     LOG(DEBUG_RELAY, "relay transmit_pending thread=", cfg_.thread_index,
-        " origin_ctx=", (&ctx == &priv_ctx_) ? "priv" : "pub", " frames=", frames.size());
+        " origin_ctx=", (&ctx == &priv_ctx_) ? "priv" : "pub", " frames=", count);
     if (profile_enabled_) {
-        profile_tx_frames_ += static_cast<uint64_t>(frames.size());
-        for (const auto& frame : frames) {
-            profile_tx_bytes_ += static_cast<uint64_t>(frame.buffer.size());
+        profile_tx_frames_ += static_cast<uint64_t>(count);
+        for (TxNode* it = rev; it; it = it->next) {
+            profile_tx_bytes_ += static_cast<uint64_t>(it->frame.buffer.size());
         }
     }
 
@@ -965,12 +1019,15 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
     if (!tx_view.valid()) {
         LOG(DEBUG_IO, "Worker", cfg_.thread_index,
             ": TX ring not mapped origin=", (&ctx == &priv_ctx_) ? "priv" : "pub", " fallback for ",
-            frames.size(), " frames");
-        for (auto& frame : frames) {
-            send_frame(frame, frame.reason);
+            count, " frames");
+        for (TxNode* it = rev; it;) {
+            TxNode* next = it->next;
+            send_frame(it->frame, it->frame.reason);
+            recycle_tx_node(it);
+            it = next;
         }
         if (profile_enabled_) {
-            profile_tx_fallback_frames_ += static_cast<uint64_t>(frames.size());
+            profile_tx_fallback_frames_ += static_cast<uint64_t>(count);
         }
         return;
     }
@@ -979,12 +1036,15 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
     if (frame_count == 0) {
         LOG(DEBUG_IO, "Worker", cfg_.thread_index,
             ": TX ring empty origin=", (&ctx == &priv_ctx_) ? "priv" : "pub", " fallback for ",
-            frames.size(), " frames");
-        for (auto& frame : frames) {
-            send_frame(frame, frame.reason);
+            count, " frames");
+        for (TxNode* it = rev; it;) {
+            TxNode* next = it->next;
+            send_frame(it->frame, it->frame.reason);
+            recycle_tx_node(it);
+            it = next;
         }
         if (profile_enabled_) {
-            profile_tx_fallback_frames_ += static_cast<uint64_t>(frames.size());
+            profile_tx_fallback_frames_ += static_cast<uint64_t>(count);
         }
         return;
     }
@@ -993,7 +1053,9 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
     size_t frame_size = tx_view.frame_size();
     constexpr size_t hdr_size = TPACKET_ALIGN(sizeof(tpacket3_hdr));
 
-    for (auto& frame : frames) {
+    for (TxNode* it = rev; it;) {
+        TxNode* next = it->next;
+        TxFrame& frame = it->frame;
         bool written = false;
         for (size_t attempt = 0; attempt < frame_count; ++attempt) {
             size_t idx = ctx.tx_ring_index % frame_count;
@@ -1021,6 +1083,8 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
                 ++profile_tx_fallback_frames_;
             }
         }
+        recycle_tx_node(it);
+        it = next;
     }
     ::sendto(fd, nullptr, 0, 0, nullptr, 0);
     LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": TX batch complete");
@@ -1134,11 +1198,14 @@ void Worker::submit_remote_frame(FramePayload&& frame) {
 std::vector<std::vector<uint8_t>> Worker::collect_tx_frames() {
     std::vector<std::vector<uint8_t>> out;
     auto collect = [&](InterfaceContext& ctx) {
-        std::lock_guard<std::mutex> lock(ctx.tx_mutex);
-        for (auto& frame : ctx.tx_queue) {
-            out.push_back(std::move(frame.buffer));
+        TxNode* list = pop_all_tx_nodes(ctx);
+        while (list) {
+            TxNode* next = list->next;
+            out.push_back(std::move(list->frame.buffer));
+            recycle_tx_node(list);
+            list = next;
         }
-        ctx.tx_queue.clear();
+        ctx.tx_pending.store(0, std::memory_order_relaxed);
     };
     collect(priv_ctx_);
     collect(pub_ctx_);
