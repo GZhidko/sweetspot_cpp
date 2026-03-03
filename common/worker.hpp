@@ -31,6 +31,7 @@ struct WorkerPipelineConfig {
     bool forward_pool_enabled = false;
     bool profile_enabled = false;
     uint32_t profile_interval_ms = 2000;
+    bool worker_epoll_enabled = true;
     std::vector<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>> static_tcp;
     std::vector<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>> static_udp;
     std::vector<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>> static_icmp;
@@ -136,6 +137,7 @@ class Worker {
     bool forward_pool_enabled_ = false;
     bool profile_enabled_ = false;
     uint32_t profile_interval_ms_ = 2000;
+    bool worker_epoll_enabled_ = true;
     Nat nat_;
     std::thread thread_;
     std::atomic<bool> running_{false};

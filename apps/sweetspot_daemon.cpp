@@ -80,6 +80,7 @@ struct AppConfig {
     bool forward_pool_enabled = false;
     bool profile_enabled = false;
     uint32_t profile_interval_ms = 2000;
+    bool worker_epoll_enabled = true;
     std::optional<uint32_t> acct_interim_interval;
     std::string acct_detail_file;
 };
@@ -202,6 +203,15 @@ class ConfigLoader {
                         throw std::runtime_error("missing value");
                     }
                     cfg.profile_interval_ms = static_cast<uint32_t>(std::stoul(tokens.front()));
+                } else if (lower_key == "worker-epoll-enabled") {
+                    if (tokens.empty()) {
+                        throw std::runtime_error("missing value");
+                    }
+                    std::string v = tokens.front();
+                    std::transform(v.begin(), v.end(), v.begin(),
+                                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+                    cfg.worker_epoll_enabled =
+                        (v == "1" || v == "true" || v == "yes" || v == "on");
                 } else {
                     // ignore unknown keys but log for visibility
                     LOG(DEBUG_SESSION, "Ignoring config key ", key, " at line ", line_no);
@@ -406,6 +416,7 @@ int main(int argc, char** argv) {
         pipeline_cfg.forward_pool_enabled = config.forward_pool_enabled;
         pipeline_cfg.profile_enabled = config.profile_enabled;
         pipeline_cfg.profile_interval_ms = config.profile_interval_ms;
+        pipeline_cfg.worker_epoll_enabled = config.worker_epoll_enabled;
         try {
             auto worker = std::make_unique<Worker>(pipeline_cfg);
             workers.push_back(std::move(worker));

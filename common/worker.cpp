@@ -80,6 +80,7 @@ Worker::Worker(const WorkerPipelineConfig& cfg)
     forward_pool_enabled_ = cfg.forward_pool_enabled;
     profile_enabled_ = cfg.profile_enabled;
     profile_interval_ms_ = cfg.profile_interval_ms == 0 ? 2000 : cfg.profile_interval_ms;
+    worker_epoll_enabled_ = cfg.worker_epoll_enabled;
     if (profile_enabled_) {
         profile_started_at_ = std::chrono::steady_clock::now();
         profile_last_dump_at_ = profile_started_at_;
@@ -122,7 +123,8 @@ Worker::Worker(const WorkerPipelineConfig& cfg)
         " static_tcp=", cfg_.static_tcp.size(), " static_udp=", cfg_.static_udp.size(),
         " static_icmp=", cfg_.static_icmp.size(), " static_ip=", cfg_.static_ip.size(),
         " nat_configured=", nat_.configured(), " profile_enabled=", profile_enabled_,
-        " profile_interval_ms=", profile_interval_ms_);
+        " profile_interval_ms=", profile_interval_ms_, " worker_epoll_enabled=",
+        worker_epoll_enabled_);
 }
 
 Worker::~Worker() {
@@ -336,7 +338,7 @@ void Worker::run() {
     int priv_fd = priv_ctx_.io ? priv_ctx_.io->socket().fd() : -1;
     int pub_fd = pub_ctx_.io ? pub_ctx_.io->socket().fd() : -1;
 
-    if (priv_fd >= 0 || pub_fd >= 0) {
+    if (worker_epoll_enabled_ && (priv_fd >= 0 || pub_fd >= 0)) {
         epfd = ::epoll_create1(EPOLL_CLOEXEC);
         if (epfd < 0) {
             LOG(DEBUG_ERROR, "Worker", cfg_.thread_index,
@@ -360,6 +362,9 @@ void Worker::run() {
             }
             register_fd(remote_event_fd_, 3);
         }
+    } else if (!worker_epoll_enabled_) {
+        LOG(DEBUG_RELAY, "relay epoll disabled thread=", cfg_.thread_index,
+            " using polling mode");
     }
 
     size_t iteration = 0;
@@ -379,7 +384,7 @@ void Worker::run() {
 
         if (epfd >= 0) {
             // Block when fully idle; run immediately when local work is queued.
-            int timeout_ms = (has_priv_tx || has_pub_tx) ? 0 : 5;
+            int timeout_ms = (has_priv_tx || has_pub_tx) ? 0 : 1;
             if (profile_enabled_) {
                 ++profile_epoll_wait_calls_;
             }
