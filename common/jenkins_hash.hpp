@@ -121,8 +121,11 @@ inline uint64_t siphash24_kernel_compat(const void* data_void, size_t len, const
 // Выбор слота (bucket)
 // ==============================
 inline uint32_t select_cpu(uint32_t hash, uint32_t num) {
-    return num ? (hash % num) : 0;
-    // или fastmod: (uint32_t)(((__uint128_t)hash * num) >> 64)
+    if (num == 0) {
+        return 0;
+    }
+    // Faster and typically more even than '%' for bucket mapping.
+    return static_cast<uint32_t>((static_cast<uint64_t>(hash) * num) >> 32);
 }
 
 // ==============================
@@ -150,14 +153,15 @@ inline void consistentify_v4(uint32_t& saddr_be, uint32_t& daddr_be,
 inline uint32_t hash_ipv4(uint32_t saddr_be, uint32_t daddr_be,
                           uint16_t sport_be, uint16_t dport_be, uint8_t proto = 0)
 {
-    // Для честного сравнения с ядром по TCP/UDP — симметризуем и считаем 12 байт.
+    // Симметризуем, чтобы forward/reply шли в один и тот же bucket.
     consistentify_v4(saddr_be, daddr_be, sport_be, dport_be);
 
-    unsigned char buf[12];
+    unsigned char buf[13];
     uint32_t ports_be = (uint32_t(sport_be) << 16) | dport_be;
     std::memcpy(buf + 0, &saddr_be, 4);
     std::memcpy(buf + 4, &daddr_be, 4);
     std::memcpy(buf + 8, &ports_be, 4);
+    buf[12] = proto;
 
     uint64_t h64 = siphash24_kernel_compat(buf, sizeof(buf), siphash_key());
     uint32_t h32 = (uint32_t)h64;
@@ -178,4 +182,3 @@ inline uint32_t hash_tuple(const std::tuple<uint32_t,uint32_t,uint16_t,uint16_t,
 }
 
 } // namespace CPUFanoutHash
-
