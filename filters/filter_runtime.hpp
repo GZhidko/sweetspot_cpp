@@ -34,6 +34,8 @@ void reload_filters();
 
 const Decision& current_decision();
 void set_current_filter(const std::string& name);
+void set_current_filter_id(uint32_t id);
 const std::string& current_filter_name();
+uint32_t current_filter_id();
 
 } // namespace filters

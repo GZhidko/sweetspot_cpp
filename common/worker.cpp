@@ -691,27 +691,28 @@ void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t le
     }
 
     std::string selected_filter = filters::Engine::instance().default_filter_name();
+    uint32_t selected_filter_id = filters::Engine::instance().default_filter_id();
     bool drop_for_status = false;
     if (session_ip != 0) {
         sessions::SessionStatus session_status = sessions::SessionStatus::Captured;
-        std::shared_ptr<const std::string> session_filter_name;
+        uint32_t session_filter_id = 0;
         auto& sm = sessions::SessionManager::instance();
-        if (sm.find_session_fast(session_ip, session_status, session_filter_name)) {
-            if (session_filter_name && !session_filter_name->empty()) {
-                selected_filter = *session_filter_name;
-            }
+        if (sm.find_session_fast(session_ip, session_status, session_filter_id)) {
+            selected_filter_id = session_filter_id;
             drop_for_status = (session_status == sessions::SessionStatus::Captured);
         } else if (auto session = sm.find_session(session_ip)) {
             if (!session->filter_name.empty()) {
                 selected_filter = session->filter_name;
+                selected_filter_id = filters::Engine::instance().filter_id(selected_filter);
             }
             drop_for_status = (session->status == sessions::SessionStatus::Captured);
         }
     }
 
-    filters::set_current_filter(selected_filter);
+    filters::set_current_filter_id(selected_filter_id);
     LOG(DEBUG_RELAY, "relay process_chain thread=", cfg_.thread_index,
         " origin=", origin_to_string(origin), " filter=", selected_filter,
+        " filter_id=", selected_filter_id,
         " session_ip=", session_ip, " drop_for_status=", drop_for_status);
 
     bool ok = true;

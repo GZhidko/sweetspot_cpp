@@ -112,7 +112,10 @@ class Engine {
     void reload();
 
     Decision evaluate(const PacketState& state) const;
+    Decision evaluate(const PacketState& state, uint32_t filter_id) const;
     Decision evaluate(const PacketState& state, const std::string& filter_name) const;
+    uint32_t filter_id(const std::string& filter_name) const;
+    uint32_t default_filter_id() const;
 
     std::size_t rule_count() const;
     std::size_t rule_count(const std::string& filter_name) const;
@@ -129,7 +132,10 @@ class Engine {
 
     struct EngineState {
         std::unordered_map<std::string, FilterSet> filters;
+        std::unordered_map<uint32_t, FilterSet> filters_by_id;
+        std::unordered_map<std::string, uint32_t> ids_by_name;
         std::string default_filter;
+        uint32_t default_filter_id = 0;
         std::filesystem::path default_path;
     };
 
@@ -140,6 +146,8 @@ class Engine {
 
     mutable std::mutex mutex_;
     std::shared_ptr<const EngineState> state_;
+    uint32_t next_filter_id_ = 1;
+    std::unordered_map<std::string, uint32_t> persistent_ids_;
 };
 
 } // namespace filters

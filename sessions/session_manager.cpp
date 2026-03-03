@@ -185,7 +185,7 @@ std::optional<Session> SessionManager::find_session(uint32_t ip) const {
 }
 
 bool SessionManager::find_session_fast(uint32_t ip, SessionStatus& status,
-                                       std::shared_ptr<const std::string>& filter_name) const {
+                                       uint32_t& filter_id) const {
     if (!fast_ready_.load(std::memory_order_acquire) || !netset_) {
         return false;
     }
@@ -194,7 +194,8 @@ bool SessionManager::find_session_fast(uint32_t ip, SessionStatus& status,
     if (!netset_->try_idx(ip, idx)) {
         return false;
     }
-    if (idx >= fast_status_size_ || idx >= fast_filter_ptrs_.size() || !fast_status_) {
+    if (idx >= fast_status_size_ || idx >= fast_filter_id_size_ || !fast_status_ ||
+        !fast_filter_ids_) {
         return false;
     }
 
@@ -202,8 +203,8 @@ bool SessionManager::find_session_fast(uint32_t ip, SessionStatus& status,
     status = (status_raw == static_cast<uint8_t>(SessionStatus::Released))
                  ? SessionStatus::Released
                  : SessionStatus::Captured;
-    filter_name = std::atomic_load_explicit(&fast_filter_ptrs_[idx], std::memory_order_acquire);
-    return static_cast<bool>(filter_name);
+    filter_id = fast_filter_ids_[idx].load(std::memory_order_acquire);
+    return filter_id != 0;
 }
 
 std::vector<Session> SessionManager::snapshot() const {
@@ -336,11 +337,13 @@ void SessionManager::initialize_from_netset(std::shared_ptr<Netset> netset,
     if (fast_status_size_ > 0) {
         fast_status_ = std::make_unique<std::atomic<uint8_t>[]>(fast_status_size_);
     }
-    fast_filter_ptrs_.clear();
-    fast_filter_ptrs_.resize(static_cast<size_t>(total));
-    filter_name_pool_.clear();
+    fast_filter_ids_.reset();
+    fast_filter_id_size_ = static_cast<size_t>(total);
+    if (fast_filter_id_size_ > 0) {
+        fast_filter_ids_ = std::make_unique<std::atomic<uint32_t>[]>(fast_filter_id_size_);
+    }
     auto now = Clock::now();
-    auto default_filter_ptr = intern_filter_name_unlocked(default_filter_name_);
+    const uint32_t default_filter_id = filters::Engine::instance().filter_id(default_filter_name_);
     for (uint32_t idx = 0; idx < total; ++idx) {
         uint32_t ip = netset_->ip(idx);
         Session session;
@@ -353,8 +356,8 @@ void SessionManager::initialize_from_netset(std::shared_ptr<Netset> netset,
         sessions_.emplace(ip, std::move(session));
         fast_status_[static_cast<size_t>(idx)].store(static_cast<uint8_t>(SessionStatus::Captured),
                                 std::memory_order_relaxed);
-        std::atomic_store_explicit(&fast_filter_ptrs_[static_cast<size_t>(idx)], default_filter_ptr,
-                                   std::memory_order_release);
+        fast_filter_ids_[static_cast<size_t>(idx)].store(default_filter_id,
+                                                         std::memory_order_release);
     }
     fast_ready_.store(true, std::memory_order_release);
     initialized_ = true;
@@ -450,17 +453,6 @@ void SessionManager::schedule_times(Session& session, Clock::time_point now) {
         " interim=", session.interim_interval.count());
 }
 
-std::shared_ptr<const std::string> SessionManager::intern_filter_name_unlocked(
-    const std::string& filter_name) {
-    auto it = filter_name_pool_.find(filter_name);
-    if (it != filter_name_pool_.end()) {
-        return it->second;
-    }
-    auto ptr = std::make_shared<const std::string>(filter_name);
-    filter_name_pool_.emplace(*ptr, ptr);
-    return ptr;
-}
-
 void SessionManager::update_fast_slot_unlocked(const Session& session) {
     if (!fast_ready_.load(std::memory_order_relaxed) || !netset_) {
         return;
@@ -470,13 +462,13 @@ void SessionManager::update_fast_slot_unlocked(const Session& session) {
     if (!netset_->try_idx(session.ip, idx)) {
         return;
     }
-    if (idx >= fast_status_size_ || idx >= fast_filter_ptrs_.size() || !fast_status_) {
+    if (idx >= fast_status_size_ || idx >= fast_filter_id_size_ || !fast_status_ ||
+        !fast_filter_ids_) {
         return;
     }
 
-    auto filter_ptr = intern_filter_name_unlocked(session.filter_name);
-    std::atomic_store_explicit(&fast_filter_ptrs_[static_cast<size_t>(idx)], std::move(filter_ptr),
-                               std::memory_order_release);
+    const uint32_t filter_id = filters::Engine::instance().filter_id(session.filter_name);
+    fast_filter_ids_[static_cast<size_t>(idx)].store(filter_id, std::memory_order_release);
     fast_status_[static_cast<size_t>(idx)].store(static_cast<uint8_t>(session.status),
                                                  std::memory_order_release);
 }

@@ -17,6 +17,7 @@ struct ThreadState {
     bool active = false;
     Decision decision;
     std::string filter_name;
+    uint32_t filter_id = 0;
 };
 
 thread_local ThreadState g_state;
@@ -26,10 +27,17 @@ const char* direction_to_string(Direction dir) {
 }
 
 bool evaluate_now() {
-    if (g_state.filter_name.empty()) {
-        g_state.filter_name = Engine::instance().default_filter_name();
+    if (g_state.filter_id == 0) {
+        g_state.filter_id = Engine::instance().default_filter_id();
+        if (g_state.filter_id == 0) {
+            if (g_state.filter_name.empty()) {
+                g_state.filter_name = Engine::instance().default_filter_name();
+            }
+            g_state.decision = Engine::instance().evaluate(g_state.state, g_state.filter_name);
+            return g_state.decision.allow;
+        }
     }
-    g_state.decision = Engine::instance().evaluate(g_state.state, g_state.filter_name);
+    g_state.decision = Engine::instance().evaluate(g_state.state, g_state.filter_id);
     return g_state.decision.allow;
 }
 
@@ -50,11 +58,14 @@ void begin_packet(Direction dir) {
     g_state.decision = Decision{};
     g_state.state = PacketState{};
     g_state.state.direction = dir;
-    if (g_state.filter_name.empty()) {
-        g_state.filter_name = Engine::instance().default_filter_name();
+    if (g_state.filter_id == 0 && g_state.filter_name.empty()) {
+        g_state.filter_id = Engine::instance().default_filter_id();
+        if (g_state.filter_id == 0) {
+            g_state.filter_name = Engine::instance().default_filter_name();
+        }
     }
     LOG(DEBUG_FILTER, "filter runtime begin dir=", direction_to_string(dir),
-        " current_filter=", g_state.filter_name);
+        " current_filter=", g_state.filter_name, " current_id=", g_state.filter_id);
 }
 
 void end_packet() {
@@ -155,11 +166,21 @@ void set_current_filter(const std::string& name) {
     LOG(DEBUG_FILTER, "filter runtime set_current_filter old=", g_state.filter_name,
         " new=", name);
     g_state.filter_name = name;
+    g_state.filter_id = Engine::instance().filter_id(name);
+}
+
+void set_current_filter_id(uint32_t id) {
+    g_state.filter_id = id;
+    if (id == 0) {
+        g_state.filter_name.clear();
+    }
 }
 
 const std::string& current_filter_name() {
     LOG(DEBUG_FILTER, "filter runtime current_filter=", g_state.filter_name);
     return g_state.filter_name;
 }
+
+uint32_t current_filter_id() { return g_state.filter_id; }
 
 } // namespace filters

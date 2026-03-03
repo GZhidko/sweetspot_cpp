@@ -685,6 +685,8 @@ void Engine::set_config_path(const std::string& path) {
     auto current = std::atomic_load_explicit(&state_, std::memory_order_acquire);
     EngineState next = current ? *current : EngineState{};
     next.default_filter = name;
+    auto id_it = next.ids_by_name.find(name);
+    next.default_filter_id = (id_it != next.ids_by_name.end()) ? id_it->second : 0;
     next.default_path = p;
     std::atomic_store_explicit(&state_, std::make_shared<const EngineState>(std::move(next)),
                                std::memory_order_release);
@@ -706,10 +708,23 @@ void Engine::load_filter(const std::string& name, const std::filesystem::path& p
         std::lock_guard<std::mutex> guard(mutex_);
         auto current = std::atomic_load_explicit(&state_, std::memory_order_acquire);
         EngineState next = current ? *current : EngineState{};
-        next.filters[name] = FilterSet{std::move(rules), path};
+        uint32_t id = 0;
+        auto pit = persistent_ids_.find(name);
+        if (pit != persistent_ids_.end()) {
+            id = pit->second;
+        } else {
+            id = next_filter_id_++;
+            persistent_ids_.emplace(name, id);
+        }
+        next.ids_by_name[name] = id;
+        next.filters[name] = FilterSet{rules, path};
+        next.filters_by_id[id] = FilterSet{std::move(rules), path};
         if (next.default_filter.empty()) {
             next.default_filter = name;
+            next.default_filter_id = id;
             next.default_path = path;
+        } else if (next.default_filter == name) {
+            next.default_filter_id = id;
         }
         std::atomic_store_explicit(&state_, std::make_shared<const EngineState>(std::move(next)),
                                    std::memory_order_release);
@@ -771,7 +786,25 @@ Decision Engine::evaluate(const PacketState& state) const {
     if (!snapshot) {
         return Decision{};
     }
+    if (snapshot->default_filter_id != 0) {
+        return evaluate(state, snapshot->default_filter_id);
+    }
     return evaluate(state, snapshot->default_filter);
+}
+
+Decision Engine::evaluate(const PacketState& state, uint32_t filter_id) const {
+    if (filter_id == 0) {
+        return Decision{};
+    }
+    auto snapshot = std::atomic_load_explicit(&state_, std::memory_order_acquire);
+    if (!snapshot) {
+        return Decision{};
+    }
+    auto it = snapshot->filters_by_id.find(filter_id);
+    if (it == snapshot->filters_by_id.end()) {
+        return Decision{};
+    }
+    return evaluate_rules(state, "#id", it->second.rules);
 }
 
 Decision Engine::evaluate(const PacketState& state, const std::string& filter_name) const {
@@ -793,6 +826,23 @@ Decision Engine::evaluate(const PacketState& state, const std::string& filter_na
     LOG(DEBUG_FILTER, "filter decision name=", filter_name, " allow=", decision.allow,
         " matched=", decision.matched, " rule=", decision.rule_index);
     return decision;
+}
+
+uint32_t Engine::filter_id(const std::string& filter_name) const {
+    if (filter_name.empty()) {
+        return 0;
+    }
+    auto snapshot = std::atomic_load_explicit(&state_, std::memory_order_acquire);
+    if (!snapshot) {
+        return 0;
+    }
+    auto it = snapshot->ids_by_name.find(filter_name);
+    return it != snapshot->ids_by_name.end() ? it->second : 0;
+}
+
+uint32_t Engine::default_filter_id() const {
+    auto snapshot = std::atomic_load_explicit(&state_, std::memory_order_acquire);
+    return snapshot ? snapshot->default_filter_id : 0;
 }
 
 std::size_t Engine::rule_count() const {
