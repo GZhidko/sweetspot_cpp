@@ -255,7 +255,7 @@ NatConfig build_nat_config(const AppConfig& cfg) {
 
 void configure_interface(af_packet_io::IoConfig& config, const std::string& rx_iface,
                          const std::string& tx_iface, uint16_t group) {
-    af_packet_io::FanoutParams fanout{group, PACKET_FANOUT_HASH, 0};
+    af_packet_io::FanoutParams fanout{group, PACKET_FANOUT_CPU, 0};
     config.rx_interface = rx_iface;
     config.tx_interface = tx_iface;
     config.protocol = ETH_P_ALL;

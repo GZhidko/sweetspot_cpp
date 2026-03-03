@@ -10,6 +10,7 @@
 #include "checksum.hpp"
 #include "jenkins_hash.hpp"
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -24,7 +25,10 @@
 #include <sys/eventfd.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
+#include <pthread.h>
+#include <sched.h>
 #include <tuple>
+#include <unordered_map>
 #include <unistd.h>
 #include <vector>
 
@@ -62,6 +66,86 @@ struct ScopedProfileTimer {
         }
     }
 };
+
+struct FlowKey {
+    uint32_t ip_a = 0;
+    uint32_t ip_b = 0;
+    uint16_t port_a = 0;
+    uint16_t port_b = 0;
+    uint8_t proto = 0;
+
+    bool operator==(const FlowKey& other) const noexcept {
+        return ip_a == other.ip_a && ip_b == other.ip_b && port_a == other.port_a &&
+               port_b == other.port_b && proto == other.proto;
+    }
+};
+
+struct FlowKeyHash {
+    size_t operator()(const FlowKey& key) const noexcept {
+        uint64_t h = static_cast<uint64_t>(key.ip_a) * 0x9E3779B185EBCA87ULL;
+        h ^= static_cast<uint64_t>(key.ip_b) + 0xC2B2AE3D27D4EB4FULL + (h << 6) + (h >> 2);
+        h ^= (static_cast<uint64_t>(key.port_a) << 16) | static_cast<uint64_t>(key.port_b);
+        h ^= static_cast<uint64_t>(key.proto) * 0x165667B19E3779F9ULL;
+        return static_cast<size_t>(h);
+    }
+};
+
+FlowKey make_flow_key(uint32_t src_ip, uint32_t dst_ip, uint16_t src_port, uint16_t dst_port,
+                      uint8_t proto) {
+    FlowKey key{};
+    const bool keep = (src_ip < dst_ip) || (src_ip == dst_ip && src_port <= dst_port);
+    if (keep) {
+        key.ip_a = src_ip;
+        key.ip_b = dst_ip;
+        key.port_a = src_port;
+        key.port_b = dst_port;
+    } else {
+        key.ip_a = dst_ip;
+        key.ip_b = src_ip;
+        key.port_a = dst_port;
+        key.port_b = src_port;
+    }
+    key.proto = proto;
+    return key;
+}
+
+class FlowOwnerTable {
+  public:
+    uint32_t get_or_assign(const FlowKey& key, uint32_t thread_count) {
+        if (thread_count <= 1) {
+            return 0;
+        }
+        const size_t h = hasher_(key);
+        Shard& shard = shards_[h & (kShardCount - 1)];
+        std::lock_guard<std::mutex> lock(shard.mutex);
+        auto it = shard.map.find(key);
+        if (it != shard.map.end()) {
+            return it->second % thread_count;
+        }
+        const uint32_t owner = CPUFanoutHash::select_cpu(static_cast<uint32_t>(h), thread_count);
+        if (shard.map.size() >= kMaxEntriesPerShard) {
+            // Simple cap: drop stale mix when shard grows too much.
+            shard.map.clear();
+        }
+        shard.map.emplace(key, owner);
+        return owner;
+    }
+
+  private:
+    static constexpr size_t kShardCount = 256;        // power-of-two for fast shard select
+    static constexpr size_t kMaxEntriesPerShard = 4096;
+    struct Shard {
+        std::mutex mutex;
+        std::unordered_map<FlowKey, uint32_t, FlowKeyHash> map;
+    };
+    std::array<Shard, kShardCount> shards_{};
+    FlowKeyHash hasher_{};
+};
+
+FlowOwnerTable& flow_owner_table() {
+    static FlowOwnerTable table;
+    return table;
+}
 
 const char* origin_to_string(Worker::FramePayload::Origin origin) {
     return origin == Worker::FramePayload::Origin::Private ? "private" : "public";
@@ -235,6 +319,21 @@ void Worker::join() {
 }
 
 void Worker::run() {
+    const unsigned hw_threads = std::thread::hardware_concurrency();
+    if (hw_threads > 0) {
+        const unsigned cpu = cfg_.thread_index % hw_threads;
+        cpu_set_t set;
+        CPU_ZERO(&set);
+        CPU_SET(cpu, &set);
+        const int rc = ::pthread_setaffinity_np(::pthread_self(), sizeof(set), &set);
+        if (rc == 0) {
+            LOG(DEBUG_RELAY, "relay thread pinned thread=", cfg_.thread_index, " cpu=", cpu);
+        } else {
+            LOG(DEBUG_ERROR, "Worker", cfg_.thread_index,
+                ": pthread_setaffinity_np failed rc=", rc, " cpu=", cpu);
+        }
+    }
+
     af_packet_io::RingView priv_view;
     af_packet_io::RingView pub_view;
     if (priv_ctx_.io) {
@@ -473,10 +572,9 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
     }
 
     if (cfg_.thread_count > 1 && forward_fn_) {
-        auto tuple = std::make_tuple(htonl(src_ip_host), htonl(dst_ip_host), htons(src_port),
-                                     htons(dst_port), static_cast<uint8_t>(ipv4->iph.protocol));
-        uint32_t target =
-            CPUFanoutHash::select_cpu(CPUFanoutHash::hash_tuple(tuple), cfg_.thread_count);
+        const FlowKey key =
+            make_flow_key(src_ip_host, dst_ip_host, src_port, dst_port, ipv4->iph.protocol);
+        const uint32_t target = flow_owner_table().get_or_assign(key, cfg_.thread_count);
         if (target != cfg_.thread_index) {
             LOG(DEBUG_RELAY, "relay forward thread=", cfg_.thread_index, " target=", target,
                 " origin=", origin_to_string(origin), " len=", len);
