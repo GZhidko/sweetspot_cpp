@@ -655,8 +655,6 @@ void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t le
                                  ? filters::Direction::Inbound
                                  : filters::Direction::Outbound;
 
-    filters::ScopedPacket packet_scope(dir);
-
     auto* ipv4 = chain.get<IPv4Header>();
     if (!ipv4) {
         return;
@@ -715,28 +713,43 @@ void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t le
         " filter_id=", selected_filter_id,
         " session_ip=", session_ip, " drop_for_status=", drop_for_status);
 
-    bool ok = true;
     const auto filter_started =
         profile_enabled_ ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
-    chain.for_each([&](auto& hdr) {
-        if (!Filter<std::decay_t<decltype(hdr)>>{}(hdr)) {
-            ok = false;
-        }
-    });
+    filters::PacketState packet_state{};
+    packet_state.direction = dir;
+    packet_state.has_ipv4 = true;
+    packet_state.src_ip = ntohl(ipv4->iph.saddr);
+    packet_state.dst_ip = ntohl(ipv4->iph.daddr);
+    packet_state.protocol = ipv4->iph.protocol;
+    if (auto* tcp = chain.get<TCPHeader>()) {
+        packet_state.has_l4 = true;
+        packet_state.src_port = ntohs(tcp->tcph.source);
+        packet_state.dst_port = ntohs(tcp->tcph.dest);
+        packet_state.tcp_flags_valid = true;
+        uint8_t flags = 0;
+        flags |= tcp->tcph.fin ? 0x01 : 0;
+        flags |= tcp->tcph.syn ? 0x02 : 0;
+        flags |= tcp->tcph.rst ? 0x04 : 0;
+        flags |= tcp->tcph.psh ? 0x08 : 0;
+        flags |= tcp->tcph.ack ? 0x10 : 0;
+        flags |= tcp->tcph.urg ? 0x20 : 0;
+        packet_state.tcp_flags = flags;
+    } else if (auto* udp = chain.get<UDPHeader>()) {
+        packet_state.has_l4 = true;
+        packet_state.src_port = ntohs(udp->udph.source);
+        packet_state.dst_port = ntohs(udp->udph.dest);
+    } else if (auto* icmp = chain.get<ICMPHeader>()) {
+        packet_state.has_l4 = true;
+        packet_state.src_port = ntohs(icmp->icmph.un.echo.sequence);
+        packet_state.dst_port = ntohs(icmp->icmph.un.echo.id);
+    }
+    auto decision = filters::Engine::instance().evaluate(packet_state, selected_filter_id);
     if (profile_enabled_) {
         profile_filter_ns_ += static_cast<uint64_t>(
             std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::steady_clock::now() - filter_started)
                 .count());
     }
-    if (!ok) {
-        LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": filtered");
-        LOG(DEBUG_RELAY, "relay filter drop thread=", cfg_.thread_index,
-            " origin=", origin_to_string(origin));
-        return;
-    }
-
-    auto decision = filters::current_decision();
     LOG(DEBUG_RELAY, "relay decision thread=", cfg_.thread_index, " allow=", decision.allow,
         " matched=", decision.matched, " rule=", decision.rule_index,
         " actions=", static_cast<int>(decision.actions), " shape_rate=", decision.shape_rate ,
