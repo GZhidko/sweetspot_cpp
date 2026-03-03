@@ -197,6 +197,9 @@ void Worker::recycle_remote_node(RemoteNode* node) {
     node->payload.parsed_chain.reset();
     node->payload.net_offset = 0;
     node->payload.origin = FramePayload::Origin::Private;
+    node->payload.borrowed_data = nullptr;
+    node->payload.borrowed_len = 0;
+    node->payload.block_hold.reset();
 
     RemoteNode* head = remote_free_.load(std::memory_order_relaxed);
     do {
@@ -256,9 +259,25 @@ void Worker::run() {
     af_packet_io::RingView pub_view;
     if (priv_ctx_.io) {
         priv_view = priv_ctx_.io->rx_ring();
+        priv_ctx_.rx_block_inflight_count = priv_view.block_count();
+        if (priv_ctx_.rx_block_inflight_count > 0) {
+            priv_ctx_.rx_block_inflight =
+                std::make_unique<std::atomic<uint8_t>[]>(priv_ctx_.rx_block_inflight_count);
+            for (size_t i = 0; i < priv_ctx_.rx_block_inflight_count; ++i) {
+                priv_ctx_.rx_block_inflight[i].store(0, std::memory_order_relaxed);
+            }
+        }
     }
     if (pub_ctx_.io) {
         pub_view = pub_ctx_.io->rx_ring();
+        pub_ctx_.rx_block_inflight_count = pub_view.block_count();
+        if (pub_ctx_.rx_block_inflight_count > 0) {
+            pub_ctx_.rx_block_inflight =
+                std::make_unique<std::atomic<uint8_t>[]>(pub_ctx_.rx_block_inflight_count);
+            for (size_t i = 0; i < pub_ctx_.rx_block_inflight_count; ++i) {
+                pub_ctx_.rx_block_inflight[i].store(0, std::memory_order_relaxed);
+            }
+        }
     }
 
     LOG(DEBUG_RELAY, "relay loop enter thread=", cfg_.thread_index,
@@ -390,18 +409,31 @@ void Worker::process_interface(InterfaceContext& src_ctx, af_packet_io::RingView
         if (!block) {
             continue;
         }
+        if (src_ctx.rx_block_inflight && i < src_ctx.rx_block_inflight_count &&
+            src_ctx.rx_block_inflight[i].load(std::memory_order_acquire) != 0) {
+            continue;
+        }
         if (block->hdr.bh1.block_status & TP_STATUS_USER) {
             LOG(DEBUG_RELAY, "relay block ready thread=", cfg_.thread_index,
                 " origin=", origin_to_string(origin), " block_index=", i,
                 " packets=", block->hdr.bh1.num_pkts);
-            process_rx_block(src_ctx, origin, block);
-            block->hdr.bh1.block_status = TP_STATUS_KERNEL;
+            if (process_rx_block(src_ctx, origin, block, i)) {
+                block->hdr.bh1.block_status = TP_STATUS_KERNEL;
+            }
         }
     }
 }
 
-void Worker::process_rx_block(InterfaceContext& src_ctx, FramePayload::Origin origin,
-                              tpacket_block_desc* block_desc) {
+bool Worker::process_rx_block(InterfaceContext& src_ctx, FramePayload::Origin origin,
+                              tpacket_block_desc* block_desc, size_t block_index) {
+    uint32_t forwarded_from_block = 0;
+    std::shared_ptr<ForwardBlockHold> hold;
+    if (src_ctx.rx_block_inflight && block_index < src_ctx.rx_block_inflight_count) {
+        hold = std::make_shared<ForwardBlockHold>();
+        hold->block = block_desc;
+        hold->inflight_flag = &src_ctx.rx_block_inflight[block_index];
+        hold->inflight_flag->store(1, std::memory_order_release);
+    }
     auto* hdr = reinterpret_cast<tpacket3_hdr*>(reinterpret_cast<char*>(block_desc) +
                                                 block_desc->hdr.bh1.offset_to_first_pkt);
     for (uint32_t i = 0; i < block_desc->hdr.bh1.num_pkts; ++i) {
@@ -421,21 +453,32 @@ void Worker::process_rx_block(InterfaceContext& src_ctx, FramePayload::Origin or
             ++profile_rx_packets_;
             profile_rx_bytes_ += static_cast<uint64_t>(len);
         }
-        handle_frame(origin, data, len, net_offset);
+        if (handle_frame(origin, data, len, net_offset, hold)) {
+            ++forwarded_from_block;
+        }
         hdr =
             reinterpret_cast<tpacket3_hdr*>(reinterpret_cast<uint8_t*>(hdr) + hdr->tp_next_offset);
     }
+    if (!hold) {
+        return true;
+    }
+    if (forwarded_from_block == 0) {
+        hold->inflight_flag->store(0, std::memory_order_release);
+        return true;
+    }
+    return false;
 }
 
-void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len,
-                          size_t net_offset) {
+bool Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len,
+                          size_t net_offset,
+                          const std::shared_ptr<ForwardBlockHold>& block_hold) {
     if (net_offset > len) {
         net_offset = 0;
     }
     uint8_t* l3_data = data + net_offset;
     size_t l3_len = len - net_offset;
     if (l3_len < sizeof(iphdr)) {
-        return;
+        return false;
     }
 
     LOG(DEBUG_RELAY, "relay handle_frame thread=", cfg_.thread_index,
@@ -465,12 +508,12 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
             ++profile_parse_fail_;
         }
         LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": parse failed");
-        return;
+        return false;
     }
 
     auto* ipv4 = chain.get<IPv4Header>();
     if (!ipv4) {
-        return;
+        return false;
     }
 
     const uint32_t src_ip_host = ntohl(ipv4->iph.saddr);
@@ -499,7 +542,12 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
                 " origin=", origin_to_string(origin), " len=", len);
             FramePayload payload;
             payload.origin = origin;
-            if (forward_pool_enabled_) {
+            if (block_hold) {
+                payload.borrowed_data = data;
+                payload.borrowed_len = len;
+                payload.block_hold = block_hold;
+                payload.block_hold->remaining.fetch_add(1, std::memory_order_relaxed);
+            } else if (forward_pool_enabled_) {
                 payload.buffer = acquire_forward_buffer(len);
                 std::memcpy(payload.buffer.data(), data, len);
             } else {
@@ -511,7 +559,7 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
             if (profile_enabled_) {
                 ++profile_forward_remote_;
             }
-            return;
+            return true;
         }
     }
 
@@ -521,20 +569,34 @@ void Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
         ++profile_forward_local_;
     }
     process_chain(origin, data, len, net_offset, chain);
+    return false;
 }
 
 void Worker::handle_forwarded(FramePayload&& payload) {
+    auto release_hold = [&payload]() {
+        if (payload.block_hold) {
+            auto& hold = payload.block_hold;
+            if (hold->remaining.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+                hold->block->hdr.bh1.block_status = TP_STATUS_KERNEL;
+                hold->inflight_flag->store(0, std::memory_order_release);
+            }
+        }
+    };
+
     if (!payload.parsed_chain) {
         LOG(DEBUG_NAT, "Worker", cfg_.thread_index, ": forwarded frame missing parsed chain");
+        release_hold();
         return;
     }
 
     Chain chain = std::move(*payload.parsed_chain);
+    uint8_t* payload_data = payload.borrowed_data ? payload.borrowed_data : payload.buffer.data();
+    size_t payload_len = payload.borrowed_data ? payload.borrowed_len : payload.buffer.size();
     LOG(DEBUG_RELAY, "relay handle_forwarded thread=", cfg_.thread_index,
-        " origin=", origin_to_string(payload.origin), " len=", payload.buffer.size(),
+        " origin=", origin_to_string(payload.origin), " len=", payload_len,
         " net_offset=", payload.net_offset);
-    process_chain(payload.origin, payload.buffer.data(), payload.buffer.size(), payload.net_offset,
-                  chain);
+    process_chain(payload.origin, payload_data, payload_len, payload.net_offset, chain);
+    release_hold();
 }
 
 void Worker::process_chain(FramePayload::Origin origin, uint8_t* data, size_t len,

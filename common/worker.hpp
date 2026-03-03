@@ -40,12 +40,16 @@ struct WorkerPipelineConfig {
 class Worker {
   public:
     using Chain = HeaderChainTuple<IPv4Header, TCPHeader, UDPHeader, ICMPHeader>;
+    struct ForwardBlockHold;
 
     struct FramePayload {
         enum class Origin { Private, Public } origin = Origin::Private;
         std::vector<uint8_t> buffer;
+        uint8_t* borrowed_data = nullptr;
+        size_t borrowed_len = 0;
         size_t net_offset = 0;
         std::optional<Chain> parsed_chain;
+        std::shared_ptr<ForwardBlockHold> block_hold;
     };
 
     struct TxFrame {
@@ -59,6 +63,14 @@ class Worker {
         std::vector<TxFrame> tx_queue;
         size_t tx_ring_index = 0;
         std::mutex tx_mutex;
+        std::unique_ptr<std::atomic<uint8_t>[]> rx_block_inflight;
+        size_t rx_block_inflight_count = 0;
+    };
+
+    struct ForwardBlockHold {
+        tpacket_block_desc* block = nullptr;
+        std::atomic<uint32_t> remaining{0};
+        std::atomic<uint8_t>* inflight_flag = nullptr;
     };
 
     enum class InterfaceKind { Private, Public };
@@ -88,9 +100,10 @@ class Worker {
     void run();
     void process_interface(InterfaceContext& src_ctx, af_packet_io::RingView& view,
                            FramePayload::Origin origin);
-    void process_rx_block(InterfaceContext& src_ctx, FramePayload::Origin origin,
-                          tpacket_block_desc* block_desc);
-    void handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len, size_t net_offset);
+    bool process_rx_block(InterfaceContext& src_ctx, FramePayload::Origin origin,
+                          tpacket_block_desc* block_desc, size_t block_index);
+    bool handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len, size_t net_offset,
+                      const std::shared_ptr<ForwardBlockHold>& block_hold = nullptr);
     void handle_forwarded(FramePayload&& payload);
     void enqueue_tx(InterfaceContext& ctx, std::vector<uint8_t>&& frame, size_t net_offset,
                     const char* reason);
@@ -163,7 +176,7 @@ class Worker {
     void process_frame_for_tests(std::vector<uint8_t>& frame,
                                  FramePayload::Origin origin = FramePayload::Origin::Private,
                                  size_t net_offset = 0) {
-        handle_frame(origin, frame.data(), frame.size(), net_offset);
+        (void)handle_frame(origin, frame.data(), frame.size(), net_offset);
     }
     Nat& nat_for_tests() { return nat_; }
 };
