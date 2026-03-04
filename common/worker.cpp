@@ -1164,7 +1164,7 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
 
     auto* base = static_cast<uint8_t*>(ctx.io->tx_socket().mapped_area(af_packet_io::Direction::Tx));
     size_t frame_size = tx_view.frame_size();
-    constexpr size_t hdr_size = TPACKET_ALIGN(sizeof(tpacket3_hdr));
+    constexpr size_t hdr_size = TPACKET_ALIGN(sizeof(tpacket2_hdr));
 
     for (TxNode* it = rev; it;) {
         TxNode* next = it->next;
@@ -1172,7 +1172,7 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
         bool written = false;
         for (size_t attempt = 0; attempt < frame_count; ++attempt) {
             size_t idx = ctx.tx_ring_index % frame_count;
-            auto* hdr = reinterpret_cast<tpacket3_hdr*>(base + idx * frame_size);
+            auto* hdr = reinterpret_cast<tpacket2_hdr*>(base + idx * frame_size);
             if ((hdr->tp_status & TP_STATUS_AVAILABLE) == TP_STATUS_AVAILABLE) {
                 size_t copy_len = std::min(frame.buffer.size(), frame_size - hdr_size);
                 std::memcpy(reinterpret_cast<uint8_t*>(hdr) + hdr_size, frame.buffer.data(),

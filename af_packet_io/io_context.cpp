@@ -39,7 +39,7 @@ IoContext::IoContext(const IoConfig& cfg) : cfg_(cfg) {
     if (cfg.tx_ring.block_size != 0 && cfg.tx_ring.block_count != 0 && cfg.tx_ring.frame_size != 0) {
         try {
             tx_sock_.open(cfg.protocol);
-            tx_sock_.set_tpacket_version(TPACKET_V3);
+            tx_sock_.set_tpacket_version(TPACKET_V2);
             const std::string& tx_if = cfg.tx_interface.empty() ? cfg.rx_interface : cfg.tx_interface;
             tx_sock_.bind_interface(tx_if, cfg.protocol);
             tx_sock_.enable_qdisc_bypass(true);
