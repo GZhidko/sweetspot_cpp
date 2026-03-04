@@ -84,6 +84,8 @@ struct AppConfig {
     bool forward_hash_balanced_enabled = false;
     uint32_t forward_hash_table_size = 1024;
     uint64_t forward_hash_seed = 0;
+    bool loop_guard_enabled = false;
+    uint8_t loop_guard_tos_mask = 0x04;
     std::optional<uint32_t> acct_interim_interval;
     std::string acct_detail_file;
 };
@@ -234,6 +236,24 @@ class ConfigLoader {
                         throw std::runtime_error("missing value");
                     }
                     cfg.forward_hash_seed = static_cast<uint64_t>(std::stoull(tokens.front()));
+                } else if (lower_key == "loop-guard-enabled") {
+                    if (tokens.empty()) {
+                        throw std::runtime_error("missing value");
+                    }
+                    std::string v = tokens.front();
+                    std::transform(v.begin(), v.end(), v.begin(),
+                                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+                    cfg.loop_guard_enabled =
+                        (v == "1" || v == "true" || v == "yes" || v == "on");
+                } else if (lower_key == "loop-guard-tos-mask") {
+                    if (tokens.empty()) {
+                        throw std::runtime_error("missing value");
+                    }
+                    const auto parsed = std::stoul(tokens.front(), nullptr, 0);
+                    if (parsed > 0xFFu) {
+                        throw std::runtime_error("loop-guard-tos-mask must be <= 255");
+                    }
+                    cfg.loop_guard_tos_mask = static_cast<uint8_t>(parsed);
                 } else {
                     // ignore unknown keys but log for visibility
                     LOG(DEBUG_SESSION, "Ignoring config key ", key, " at line ", line_no);
@@ -445,6 +465,8 @@ int main(int argc, char** argv) {
         pipeline_cfg.forward_hash_balanced_enabled = config.forward_hash_balanced_enabled;
         pipeline_cfg.forward_hash_table_size = config.forward_hash_table_size;
         pipeline_cfg.forward_hash_seed = config.forward_hash_seed;
+        pipeline_cfg.loop_guard_enabled = config.loop_guard_enabled;
+        pipeline_cfg.loop_guard_tos_mask = config.loop_guard_tos_mask;
         try {
             auto worker = std::make_unique<Worker>(pipeline_cfg);
             workers.push_back(std::move(worker));

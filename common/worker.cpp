@@ -94,6 +94,8 @@ Worker::Worker(const WorkerPipelineConfig& cfg)
     forward_hash_balanced_enabled_ = cfg.forward_hash_balanced_enabled;
     forward_hash_table_size_ = cfg.forward_hash_table_size == 0 ? 1024 : cfg.forward_hash_table_size;
     forward_hash_seed_ = cfg.forward_hash_seed;
+    loop_guard_enabled_ = cfg.loop_guard_enabled;
+    loop_guard_tos_mask_ = cfg.loop_guard_tos_mask;
     if (forward_hash_balanced_enabled_ && cfg_.thread_count > 1) {
         forward_hash_table_.resize(forward_hash_table_size_);
         for (uint32_t i = 0; i < forward_hash_table_size_; ++i) {
@@ -155,7 +157,8 @@ Worker::Worker(const WorkerPipelineConfig& cfg)
         " profile_interval_ms=", profile_interval_ms_, " worker_epoll_enabled=",
         worker_epoll_enabled_, " forward_hash_balanced_enabled=", forward_hash_balanced_enabled_,
         " forward_hash_table_size=", forward_hash_table_size_, " forward_hash_seed=",
-        forward_hash_seed_);
+        forward_hash_seed_, " loop_guard_enabled=", loop_guard_enabled_,
+        " loop_guard_tos_mask=0x", std::hex, static_cast<unsigned>(loop_guard_tos_mask_), std::dec);
 }
 
 Worker::~Worker() {
@@ -518,6 +521,24 @@ uint32_t Worker::select_flow_owner(uint32_t flow_hash) const {
     return target;
 }
 
+void Worker::mark_loop_guard_packet(std::vector<uint8_t>& frame, size_t net_offset) const {
+    if (!loop_guard_enabled_ || loop_guard_tos_mask_ == 0 ||
+        frame.size() < net_offset + sizeof(iphdr)) {
+        return;
+    }
+    auto* iph = reinterpret_cast<iphdr*>(frame.data() + net_offset);
+    if (iph->version != 4 || iph->ihl < 5) {
+        return;
+    }
+    const uint8_t old_tos = iph->tos;
+    const uint8_t new_tos = static_cast<uint8_t>(old_tos | loop_guard_tos_mask_);
+    if (old_tos == new_tos) {
+        return;
+    }
+    iph->tos = new_tos;
+    iph->check = checksum::recompute_ipv4_checksum(*iph);
+}
+
 bool Worker::process_rx_block(InterfaceContext& src_ctx, FramePayload::Origin origin,
                               tpacket_block_desc* block_desc, size_t block_index) {
     uint32_t forwarded_from_block = 0;
@@ -531,13 +552,6 @@ bool Worker::process_rx_block(InterfaceContext& src_ctx, FramePayload::Origin or
     auto* hdr = reinterpret_cast<tpacket3_hdr*>(reinterpret_cast<char*>(block_desc) +
                                                 block_desc->hdr.bh1.offset_to_first_pkt);
     for (uint32_t i = 0; i < block_desc->hdr.bh1.num_pkts; ++i) {
-        if (hdr->tp_status & TP_STATUS_OUTGOING) {
-            LOG(DEBUG_RELAY, "relay drop outgoing loopback thread=", cfg_.thread_index,
-                " origin=", origin_to_string(origin), " block_packet_index=", i);
-            hdr = reinterpret_cast<tpacket3_hdr*>(reinterpret_cast<uint8_t*>(hdr) +
-                                                  hdr->tp_next_offset);
-            continue;
-        }
         uint8_t* data = reinterpret_cast<uint8_t*>(hdr) + hdr->tp_mac;
         size_t len = hdr->tp_snaplen;
         size_t net_offset = 0;
@@ -545,6 +559,19 @@ bool Worker::process_rx_block(InterfaceContext& src_ctx, FramePayload::Origin or
             net_offset = static_cast<size_t>(hdr->tp_net - hdr->tp_mac);
             if (net_offset > len) {
                 net_offset = 0;
+            }
+        }
+        if (loop_guard_enabled_ && (hdr->tp_status & TP_STATUS_OUTGOING) &&
+            len >= net_offset + sizeof(iphdr)) {
+            auto* iph = reinterpret_cast<iphdr*>(data + net_offset);
+            if (iph->version == 4 &&
+                (iph->tos & loop_guard_tos_mask_) == loop_guard_tos_mask_) {
+                LOG(DEBUG_RELAY, "relay drop marked outgoing loopback thread=", cfg_.thread_index,
+                    " origin=", origin_to_string(origin), " block_packet_index=", i,
+                    " tos=0x", std::hex, static_cast<unsigned>(iph->tos), std::dec);
+                hdr = reinterpret_cast<tpacket3_hdr*>(reinterpret_cast<uint8_t*>(hdr) +
+                                                      hdr->tp_next_offset);
+                continue;
             }
         }
         LOG(DEBUG_RELAY, "relay packet thread=", cfg_.thread_index,
@@ -1456,6 +1483,7 @@ void Worker::finish_frame(Chain& chain, const filters::Decision& decision,
     const auto enqueue_started =
         profile_enabled_ ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     std::vector<uint8_t> tx_buffer(data, data + len);
+    mark_loop_guard_packet(tx_buffer, net_offset);
     bool shaped = has_flag(decision.actions, filters::ActionFlag::Shape) && decision.shape_rate > 0;
     if (shaped && shape_controller_) {
         auto target = (dest_ctx == &pub_ctx_) ? shape::ShapeController::Target::Public

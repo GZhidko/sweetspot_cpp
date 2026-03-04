@@ -35,6 +35,8 @@ struct WorkerPipelineConfig {
     bool forward_hash_balanced_enabled = false;
     uint32_t forward_hash_table_size = 1024;
     uint64_t forward_hash_seed = 0;
+    bool loop_guard_enabled = false;
+    uint8_t loop_guard_tos_mask = 0x04;
     std::vector<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>> static_tcp;
     std::vector<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>> static_udp;
     std::vector<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>> static_icmp;
@@ -125,6 +127,7 @@ class Worker {
     void process_chain(FramePayload::Origin origin, uint8_t* data, size_t len, size_t net_offset,
                        Chain& chain);
     uint32_t select_flow_owner(uint32_t flow_hash) const;
+    void mark_loop_guard_packet(std::vector<uint8_t>& frame, size_t net_offset) const;
     bool apply_inbound_dnat(FramePayload::Origin origin, Chain& chain,
                             IPv4Header& ipv4, uint8_t* l3_data, size_t l3_len,
                             const filters::Decision& decision);
@@ -146,6 +149,8 @@ class Worker {
     uint32_t forward_hash_table_size_ = 1024;
     uint64_t forward_hash_seed_ = 0;
     std::vector<uint32_t> forward_hash_table_;
+    bool loop_guard_enabled_ = false;
+    uint8_t loop_guard_tos_mask_ = 0x04;
     Nat nat_;
     std::thread thread_;
     std::atomic<bool> running_{false};
