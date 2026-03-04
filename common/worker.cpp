@@ -1119,7 +1119,7 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
     }
 
     auto tx_view = ctx.io->tx_ring();
-    int fd = ctx.io->socket().fd();
+    int fd = ctx.io->tx_socket().fd();
 
     auto send_frame = [&](const TxFrame& frame, const char* reason) {
         if (!ctx.io->send_frame(frame.buffer.data(), frame.buffer.size(), frame.net_offset,
@@ -1162,7 +1162,7 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
         return;
     }
 
-    auto* base = static_cast<uint8_t*>(ctx.io->socket().mapped_area(af_packet_io::Direction::Tx));
+    auto* base = static_cast<uint8_t*>(ctx.io->tx_socket().mapped_area(af_packet_io::Direction::Tx));
     size_t frame_size = tx_view.frame_size();
     constexpr size_t hdr_size = TPACKET_ALIGN(sizeof(tpacket3_hdr));
 

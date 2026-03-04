@@ -31,6 +31,8 @@ class IoContext {
 
     PacketSocket& socket() noexcept { return sock_; }
     const PacketSocket& socket() const noexcept { return sock_; }
+    PacketSocket& tx_socket() noexcept { return tx_sock_.is_open() ? tx_sock_ : sock_; }
+    const PacketSocket& tx_socket() const noexcept { return tx_sock_.is_open() ? tx_sock_ : sock_; }
 
     RingView rx_ring() const noexcept;
     RingView tx_ring() const noexcept;
@@ -41,6 +43,7 @@ class IoContext {
   private:
     IoConfig cfg_;
     PacketSocket sock_;
+    PacketSocket tx_sock_;
     RingConfig applied_rx_{};
     RingConfig applied_tx_{};
     int ip_tx_fd_ = -1;

@@ -34,6 +34,24 @@ IoContext::IoContext(const IoConfig& cfg) : cfg_(cfg) {
         FanoutConfig fanout_cfg{cfg.fanout.group_id, cfg.fanout.mode, cfg.fanout.flags};
         sock_.configure_fanout(fanout_cfg);
     }
+    if (cfg.tx_ring.block_size != 0 && cfg.tx_ring.block_count != 0 && cfg.tx_ring.frame_size != 0) {
+        try {
+            tx_sock_.open(cfg.protocol);
+            tx_sock_.set_tpacket_version(TPACKET_V3);
+            const std::string& tx_if = cfg.tx_interface.empty() ? cfg.rx_interface : cfg.tx_interface;
+            tx_sock_.bind_interface(tx_if, cfg.protocol);
+            tx_sock_.enable_qdisc_bypass(true);
+            tx_sock_.configure_ring(Direction::Tx, cfg.tx_ring);
+            applied_tx_ = cfg.tx_ring;
+            LOG(DEBUG_IO, "IoContext TX ring active iface=", tx_if,
+                " blocks=", cfg.tx_ring.block_count, " block_size=", cfg.tx_ring.block_size,
+                " frame_size=", cfg.tx_ring.frame_size);
+        } catch (const std::exception& ex) {
+            LOG(DEBUG_ERROR, "IoContext TX ring setup failed, fallback enabled: ", ex.what());
+            tx_sock_.close();
+            applied_tx_ = {};
+        }
+    }
     init_tx_socket();
 }
 
@@ -51,7 +69,8 @@ RingView IoContext::rx_ring() const noexcept {
 }
 
 RingView IoContext::tx_ring() const noexcept {
-    return RingView(sock_.mapped_area(Direction::Tx), sock_.mapped_length(Direction::Tx),
+    const PacketSocket& tx = tx_sock_.is_open() ? tx_sock_ : sock_;
+    return RingView(tx.mapped_area(Direction::Tx), tx.mapped_length(Direction::Tx),
                     applied_tx_.block_size, applied_tx_.block_count, applied_tx_.frame_size);
 }
 

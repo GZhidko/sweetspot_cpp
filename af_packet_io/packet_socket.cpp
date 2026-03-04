@@ -144,14 +144,8 @@ void PacketSocket::configure_ring(Direction dir, const RingConfig& cfg) {
         return;
     }
 
-    if (dir != Direction::Rx) {
-        munmap_ring(dir);
-        LOG(DEBUG_IO, "PacketSocket fd=", fd_, " configure_ring unsupported dir -> noop");
-        return;
-    }
-
-    munmap_ring(Direction::Rx);
-    mmap_ring(Direction::Rx, cfg);
+    munmap_ring(dir);
+    mmap_ring(dir, cfg);
 }
 
 void PacketSocket::configure_fanout(const FanoutConfig& cfg) {
@@ -186,10 +180,6 @@ void PacketSocket::munmap_ring(Direction dir) {
 }
 
 void PacketSocket::mmap_ring(Direction dir, const RingConfig& cfg) {
-    if (dir != Direction::Rx) {
-        return;
-    }
-
     constexpr off_t mmap_offset = 0;
     tpacket_req3 req{};
     req.tp_block_size = cfg.block_size;
@@ -200,17 +190,19 @@ void PacketSocket::mmap_ring(Direction dir, const RingConfig& cfg) {
     if (cfg.timeout_ns == 0) {
         req.tp_retire_blk_tov = 60U;
     } else {
-        // tp_retire_blk_tov expects milliseconds; convert from nanoseconds with ceiling
         unsigned long long ms = (cfg.timeout_ns + 999999ULL) / 1000000ULL;
         if (ms == 0) {
             ms = 1;
         }
         req.tp_retire_blk_tov = static_cast<unsigned int>(ms);
     }
-    req.tp_feature_req_word = TP_FT_REQ_FILL_RXHASH;
+    req.tp_feature_req_word = (dir == Direction::Rx) ? TP_FT_REQ_FILL_RXHASH : 0;
 
-    if (::setsockopt(fd_, SOL_PACKET, PACKET_RX_RING, &req, sizeof(req)) < 0) {
-        throw make_sys_error("setsockopt(PACKET_RX_RING)");
+    const int ring_opt = (dir == Direction::Rx) ? PACKET_RX_RING : PACKET_TX_RING;
+    if (::setsockopt(fd_, SOL_PACKET, ring_opt, &req, sizeof(req)) < 0) {
+        throw make_sys_error(std::string("setsockopt(") +
+                             (dir == Direction::Rx ? "PACKET_RX_RING" : "PACKET_TX_RING") +
+                             ")");
     }
 
     size_t map_length = static_cast<size_t>(req.tp_block_size) * req.tp_block_nr;
@@ -220,11 +212,16 @@ void PacketSocket::mmap_ring(Direction dir, const RingConfig& cfg) {
         throw make_sys_error("mmap(PACKET_RING)");
     }
 
-    rx_map_ = area;
-    rx_map_len_ = map_length;
-    LOG(DEBUG_IO, "PacketSocket fd=", fd_, " RX ring configured block_size=", req.tp_block_size,
-        " block_nr=", req.tp_block_nr, " frame_size=", req.tp_frame_size,
-        " timeout_ms=", req.tp_retire_blk_tov);
+    if (dir == Direction::Rx) {
+        rx_map_ = area;
+        rx_map_len_ = map_length;
+    } else {
+        tx_map_ = area;
+        tx_map_len_ = map_length;
+    }
+    LOG(DEBUG_IO, "PacketSocket fd=", fd_, " ", (dir == Direction::Rx ? "RX" : "TX"),
+        " ring configured block_size=", req.tp_block_size, " block_nr=", req.tp_block_nr,
+        " frame_size=", req.tp_frame_size, " timeout_ms=", req.tp_retire_blk_tov);
 }
 
 std::system_error make_sys_error(const std::string& what) {

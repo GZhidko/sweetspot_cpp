@@ -318,11 +318,11 @@ void configure_interface(af_packet_io::IoConfig& config, const std::string& rx_i
     config.rx_ring.block_count = 128;
     config.rx_ring.frame_size = 1 << 11;
     config.rx_ring.timeout_ns = 1ULL * 1000ULL * 1000ULL;
-    config.tx_ring.block_size = 0;
-    config.tx_ring.block_count = 0;
-    config.tx_ring.frame_size = 0;
+    config.tx_ring.block_size = 1 << 19;
+    config.tx_ring.block_count = 32;
+    config.tx_ring.frame_size = 1 << 11;
     config.tx_ring.frame_count = 0;
-    config.tx_ring.timeout_ns = 0;
+    config.tx_ring.timeout_ns = 1ULL * 1000ULL * 1000ULL;
     config.fanout = fanout;
 }
 
