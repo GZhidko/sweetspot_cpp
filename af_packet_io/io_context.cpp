@@ -10,8 +10,10 @@
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <system_error>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <cstdio>
 #include "../include/ipv4.h"
 namespace af_packet_io {
 
@@ -46,8 +48,28 @@ IoContext::IoContext(const IoConfig& cfg) : cfg_(cfg) {
             LOG(DEBUG_IO, "IoContext TX ring active iface=", tx_if,
                 " blocks=", cfg.tx_ring.block_count, " block_size=", cfg.tx_ring.block_size,
                 " frame_size=", cfg.tx_ring.frame_size);
+            std::fprintf(stderr,
+                         "IoContext TX ring active iface=%s blocks=%u block_size=%u frame_size=%u\n",
+                         tx_if.c_str(), cfg.tx_ring.block_count, cfg.tx_ring.block_size,
+                         cfg.tx_ring.frame_size);
         } catch (const std::exception& ex) {
             LOG(DEBUG_ERROR, "IoContext TX ring setup failed, fallback enabled: ", ex.what());
+            if (const auto* syserr = dynamic_cast<const std::system_error*>(&ex)) {
+                std::fprintf(stderr,
+                             "IoContext TX ring setup failed iface=%s blocks=%u block_size=%u "
+                             "frame_size=%u errno=%d category=%s message=%s (fallback raw IP)\n",
+                             (cfg.tx_interface.empty() ? cfg.rx_interface : cfg.tx_interface).c_str(),
+                             cfg.tx_ring.block_count, cfg.tx_ring.block_size, cfg.tx_ring.frame_size,
+                             syserr->code().value(), syserr->code().category().name(),
+                             syserr->code().message().c_str());
+            } else {
+                std::fprintf(stderr,
+                             "IoContext TX ring setup failed iface=%s blocks=%u block_size=%u "
+                             "frame_size=%u error=%s (fallback raw IP)\n",
+                             (cfg.tx_interface.empty() ? cfg.rx_interface : cfg.tx_interface).c_str(),
+                             cfg.tx_ring.block_count, cfg.tx_ring.block_size, cfg.tx_ring.frame_size,
+                             ex.what());
+            }
             tx_sock_.close();
             applied_tx_ = {};
         }
