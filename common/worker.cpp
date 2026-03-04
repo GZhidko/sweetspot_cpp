@@ -1164,11 +1164,29 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
 
     auto* base = static_cast<uint8_t*>(ctx.io->tx_socket().mapped_area(af_packet_io::Direction::Tx));
     size_t frame_size = tx_view.frame_size();
-    constexpr size_t hdr_size = TPACKET_ALIGN(sizeof(tpacket2_hdr));
+    constexpr size_t hdr_size = TPACKET2_HDRLEN;
 
     for (TxNode* it = rev; it;) {
         TxNode* next = it->next;
         TxFrame& frame = it->frame;
+        const bool has_eth_frame =
+            frame.buffer.size() >= sizeof(ethhdr) &&
+            [&frame]() {
+                const auto* eth = reinterpret_cast<const ethhdr*>(frame.buffer.data());
+                const uint16_t proto = ntohs(eth->h_proto);
+                return proto == ETH_P_IP || proto == ETH_P_ARP || proto == ETH_P_IPV6;
+            }();
+        if (!has_eth_frame) {
+            // TX ring path expects L2-valid frame layout.
+            // For L3-only packets keep legacy raw-IP fallback path.
+            send_frame(frame, "tx-ring-l3-fallback");
+            if (profile_enabled_) {
+                ++profile_tx_fallback_frames_;
+            }
+            recycle_tx_node(it);
+            it = next;
+            continue;
+        }
         bool written = false;
         for (size_t attempt = 0; attempt < frame_count; ++attempt) {
             size_t idx = ctx.tx_ring_index % frame_count;
@@ -1179,6 +1197,8 @@ void Worker::transmit_pending(InterfaceContext& ctx) {
                             copy_len);
                 hdr->tp_len = copy_len;
                 hdr->tp_snaplen = copy_len;
+                hdr->tp_mac = hdr_size;
+                hdr->tp_net = hdr_size + sizeof(ethhdr);
                 hdr->tp_status = TP_STATUS_SEND_REQUEST;
                 ctx.tx_ring_index = idx + 1;
                 written = true;
