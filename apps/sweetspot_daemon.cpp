@@ -81,6 +81,9 @@ struct AppConfig {
     bool profile_enabled = false;
     uint32_t profile_interval_ms = 2000;
     bool worker_epoll_enabled = true;
+    bool forward_hash_balanced_enabled = false;
+    uint32_t forward_hash_table_size = 1024;
+    uint64_t forward_hash_seed = 0;
     std::optional<uint32_t> acct_interim_interval;
     std::string acct_detail_file;
 };
@@ -212,6 +215,25 @@ class ConfigLoader {
                                    [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
                     cfg.worker_epoll_enabled =
                         (v == "1" || v == "true" || v == "yes" || v == "on");
+                } else if (lower_key == "forward-hash-balanced-enabled") {
+                    if (tokens.empty()) {
+                        throw std::runtime_error("missing value");
+                    }
+                    std::string v = tokens.front();
+                    std::transform(v.begin(), v.end(), v.begin(),
+                                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+                    cfg.forward_hash_balanced_enabled =
+                        (v == "1" || v == "true" || v == "yes" || v == "on");
+                } else if (lower_key == "forward-hash-table-size") {
+                    if (tokens.empty()) {
+                        throw std::runtime_error("missing value");
+                    }
+                    cfg.forward_hash_table_size = static_cast<uint32_t>(std::stoul(tokens.front()));
+                } else if (lower_key == "forward-hash-seed") {
+                    if (tokens.empty()) {
+                        throw std::runtime_error("missing value");
+                    }
+                    cfg.forward_hash_seed = static_cast<uint64_t>(std::stoull(tokens.front()));
                 } else {
                     // ignore unknown keys but log for visibility
                     LOG(DEBUG_SESSION, "Ignoring config key ", key, " at line ", line_no);
@@ -249,6 +271,9 @@ class ConfigLoader {
         }
         if ((cfg.thread_count % 2) != 0) {
             LOG(DEBUG_SESSION, "thread_qnty is not even, continuing with ", cfg.thread_count);
+        }
+        if (cfg.forward_hash_table_size == 0) {
+            throw std::runtime_error("forward-hash-table-size must be greater than zero");
         }
     }
 };
@@ -417,6 +442,9 @@ int main(int argc, char** argv) {
         pipeline_cfg.profile_enabled = config.profile_enabled;
         pipeline_cfg.profile_interval_ms = config.profile_interval_ms;
         pipeline_cfg.worker_epoll_enabled = config.worker_epoll_enabled;
+        pipeline_cfg.forward_hash_balanced_enabled = config.forward_hash_balanced_enabled;
+        pipeline_cfg.forward_hash_table_size = config.forward_hash_table_size;
+        pipeline_cfg.forward_hash_seed = config.forward_hash_seed;
         try {
             auto worker = std::make_unique<Worker>(pipeline_cfg);
             workers.push_back(std::move(worker));

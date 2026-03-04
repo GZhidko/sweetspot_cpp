@@ -32,6 +32,9 @@ struct WorkerPipelineConfig {
     bool profile_enabled = false;
     uint32_t profile_interval_ms = 2000;
     bool worker_epoll_enabled = true;
+    bool forward_hash_balanced_enabled = false;
+    uint32_t forward_hash_table_size = 1024;
+    uint64_t forward_hash_seed = 0;
     std::vector<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>> static_tcp;
     std::vector<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>> static_udp;
     std::vector<std::tuple<uint32_t, uint16_t, uint32_t, uint16_t>> static_icmp;
@@ -121,6 +124,7 @@ class Worker {
     void maybe_dump_profile(bool force);
     void process_chain(FramePayload::Origin origin, uint8_t* data, size_t len, size_t net_offset,
                        Chain& chain);
+    uint32_t select_flow_owner(uint32_t flow_hash) const;
     bool apply_inbound_dnat(FramePayload::Origin origin, Chain& chain,
                             IPv4Header& ipv4, uint8_t* l3_data, size_t l3_len,
                             const filters::Decision& decision);
@@ -138,6 +142,10 @@ class Worker {
     bool profile_enabled_ = false;
     uint32_t profile_interval_ms_ = 2000;
     bool worker_epoll_enabled_ = true;
+    bool forward_hash_balanced_enabled_ = false;
+    uint32_t forward_hash_table_size_ = 1024;
+    uint64_t forward_hash_seed_ = 0;
+    std::vector<uint32_t> forward_hash_table_;
     Nat nat_;
     std::thread thread_;
     std::atomic<bool> running_{false};
