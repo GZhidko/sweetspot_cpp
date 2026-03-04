@@ -26,6 +26,7 @@
 #include <sys/socket.h>
 #include <pthread.h>
 #include <sched.h>
+#include <random>
 #include <tuple>
 #include <unistd.h>
 #include <vector>
@@ -73,6 +74,15 @@ const char* interface_kind_to_string(Worker::InterfaceKind kind) {
     return kind == Worker::InterfaceKind::Private ? "private" : "public";
 }
 
+uint64_t mix64(uint64_t x) {
+    x ^= x >> 33;
+    x *= 0xff51afd7ed558ccdULL;
+    x ^= x >> 33;
+    x *= 0xc4ceb9fe1a85ec53ULL;
+    x ^= x >> 33;
+    return x;
+}
+
 } // namespace
 
 Worker::Worker(const WorkerPipelineConfig& cfg)
@@ -81,6 +91,25 @@ Worker::Worker(const WorkerPipelineConfig& cfg)
     profile_enabled_ = cfg.profile_enabled;
     profile_interval_ms_ = cfg.profile_interval_ms == 0 ? 2000 : cfg.profile_interval_ms;
     worker_epoll_enabled_ = cfg.worker_epoll_enabled;
+    forward_hash_balanced_enabled_ = cfg.forward_hash_balanced_enabled;
+    forward_hash_table_size_ = cfg.forward_hash_table_size == 0 ? 1024 : cfg.forward_hash_table_size;
+    forward_hash_seed_ = cfg.forward_hash_seed;
+    if (forward_hash_balanced_enabled_ && cfg_.thread_count > 1) {
+        forward_hash_table_.resize(forward_hash_table_size_);
+        for (uint32_t i = 0; i < forward_hash_table_size_; ++i) {
+            forward_hash_table_[i] = i % cfg_.thread_count;
+        }
+        uint64_t seed = forward_hash_seed_;
+        if (seed == 0) {
+            seed = 0x9e3779b97f4a7c15ULL ^ static_cast<uint64_t>(cfg_.thread_count);
+        }
+        std::mt19937_64 rng(seed);
+        for (uint32_t i = forward_hash_table_size_ - 1; i > 0; --i) {
+            std::uniform_int_distribution<uint32_t> dist(0, i);
+            const uint32_t j = dist(rng);
+            std::swap(forward_hash_table_[i], forward_hash_table_[j]);
+        }
+    }
     if (profile_enabled_) {
         profile_started_at_ = std::chrono::steady_clock::now();
         profile_last_dump_at_ = profile_started_at_;
@@ -124,7 +153,9 @@ Worker::Worker(const WorkerPipelineConfig& cfg)
         " static_icmp=", cfg_.static_icmp.size(), " static_ip=", cfg_.static_ip.size(),
         " nat_configured=", nat_.configured(), " profile_enabled=", profile_enabled_,
         " profile_interval_ms=", profile_interval_ms_, " worker_epoll_enabled=",
-        worker_epoll_enabled_);
+        worker_epoll_enabled_, " forward_hash_balanced_enabled=", forward_hash_balanced_enabled_,
+        " forward_hash_table_size=", forward_hash_table_size_, " forward_hash_seed=",
+        forward_hash_seed_);
 }
 
 Worker::~Worker() {
@@ -472,6 +503,21 @@ void Worker::process_interface(InterfaceContext& src_ctx, af_packet_io::RingView
     }
 }
 
+uint32_t Worker::select_flow_owner(uint32_t flow_hash) const {
+    if (!forward_hash_balanced_enabled_ || cfg_.thread_count <= 1 || forward_hash_table_.empty()) {
+        return CPUFanoutHash::select_cpu(flow_hash, cfg_.thread_count);
+    }
+    const uint64_t mixed = mix64(static_cast<uint64_t>(flow_hash) ^ forward_hash_seed_);
+    const auto scaled = static_cast<unsigned __int128>(mixed) *
+                        static_cast<unsigned __int128>(forward_hash_table_.size());
+    const uint32_t bucket = static_cast<uint32_t>(scaled >> 64);
+    const uint32_t target = forward_hash_table_[bucket];
+    if (target >= cfg_.thread_count) {
+        return CPUFanoutHash::select_cpu(flow_hash, cfg_.thread_count);
+    }
+    return target;
+}
+
 bool Worker::process_rx_block(InterfaceContext& src_ctx, FramePayload::Origin origin,
                               tpacket_block_desc* block_desc, size_t block_index) {
     uint32_t forwarded_from_block = 0;
@@ -485,6 +531,13 @@ bool Worker::process_rx_block(InterfaceContext& src_ctx, FramePayload::Origin or
     auto* hdr = reinterpret_cast<tpacket3_hdr*>(reinterpret_cast<char*>(block_desc) +
                                                 block_desc->hdr.bh1.offset_to_first_pkt);
     for (uint32_t i = 0; i < block_desc->hdr.bh1.num_pkts; ++i) {
+        if (hdr->tp_status & TP_STATUS_OUTGOING) {
+            LOG(DEBUG_RELAY, "relay drop outgoing loopback thread=", cfg_.thread_index,
+                " origin=", origin_to_string(origin), " block_packet_index=", i);
+            hdr = reinterpret_cast<tpacket3_hdr*>(reinterpret_cast<uint8_t*>(hdr) +
+                                                  hdr->tp_next_offset);
+            continue;
+        }
         uint8_t* data = reinterpret_cast<uint8_t*>(hdr) + hdr->tp_mac;
         size_t len = hdr->tp_snaplen;
         size_t net_offset = 0;
@@ -583,8 +636,8 @@ bool Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
     if (cfg_.thread_count > 1 && forward_fn_) {
         auto tuple = std::make_tuple(htonl(src_ip_host), htonl(dst_ip_host), htons(src_port),
                                      htons(dst_port), static_cast<uint8_t>(ipv4->iph.protocol));
-        uint32_t target =
-            CPUFanoutHash::select_cpu(CPUFanoutHash::hash_tuple(tuple), cfg_.thread_count);
+        const uint32_t flow_hash = CPUFanoutHash::hash_tuple(tuple);
+        const uint32_t target = select_flow_owner(flow_hash);
         if (target != cfg_.thread_index) {
             LOG(DEBUG_RELAY, "relay forward thread=", cfg_.thread_index, " target=", target,
                 " origin=", origin_to_string(origin), " len=", len);
