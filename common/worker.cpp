@@ -10,7 +10,6 @@
 #include "checksum.hpp"
 #include "jenkins_hash.hpp"
 #include <algorithm>
-#include <array>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -29,7 +28,6 @@
 #include <sched.h>
 #include <random>
 #include <tuple>
-#include <unordered_map>
 #include <unistd.h>
 #include <vector>
 
@@ -83,85 +81,6 @@ uint64_t mix64(uint64_t x) {
     x *= 0xc4ceb9fe1a85ec53ULL;
     x ^= x >> 33;
     return x;
-}
-
-struct FlowKey {
-    uint32_t ip_a = 0;
-    uint32_t ip_b = 0;
-    uint16_t port_a = 0;
-    uint16_t port_b = 0;
-    uint8_t proto = 0;
-
-    bool operator==(const FlowKey& other) const noexcept {
-        return ip_a == other.ip_a && ip_b == other.ip_b && port_a == other.port_a &&
-               port_b == other.port_b && proto == other.proto;
-    }
-};
-
-struct FlowKeyHash {
-    size_t operator()(const FlowKey& key) const noexcept {
-        uint64_t h = static_cast<uint64_t>(key.ip_a) * 0x9E3779B185EBCA87ULL;
-        h ^= static_cast<uint64_t>(key.ip_b) + 0xC2B2AE3D27D4EB4FULL + (h << 6) + (h >> 2);
-        h ^= (static_cast<uint64_t>(key.port_a) << 16) | static_cast<uint64_t>(key.port_b);
-        h ^= static_cast<uint64_t>(key.proto) * 0x165667B19E3779F9ULL;
-        return static_cast<size_t>(h);
-    }
-};
-
-FlowKey make_flow_key(uint32_t src_ip, uint32_t dst_ip, uint16_t src_port, uint16_t dst_port,
-                      uint8_t proto) {
-    FlowKey key{};
-    const bool keep = (src_ip < dst_ip) || (src_ip == dst_ip && src_port <= dst_port);
-    if (keep) {
-        key.ip_a = src_ip;
-        key.ip_b = dst_ip;
-        key.port_a = src_port;
-        key.port_b = dst_port;
-    } else {
-        key.ip_a = dst_ip;
-        key.ip_b = src_ip;
-        key.port_a = dst_port;
-        key.port_b = src_port;
-    }
-    key.proto = proto;
-    return key;
-}
-
-class FlowOwnerTable {
-  public:
-    uint32_t get_or_assign(const FlowKey& key, uint32_t owner_guess, uint32_t thread_count) {
-        if (thread_count <= 1) {
-            return 0;
-        }
-        const size_t h = hasher_(key);
-        Shard& shard = shards_[h & (kShardCount - 1)];
-        std::lock_guard<std::mutex> lock(shard.mutex);
-        auto it = shard.map.find(key);
-        if (it != shard.map.end()) {
-            return it->second % thread_count;
-        }
-        const uint32_t owner = owner_guess % thread_count;
-        if (shard.map.size() >= kMaxEntriesPerShard) {
-            shard.map.clear();
-        }
-        shard.map.emplace(key, owner);
-        return owner;
-    }
-
-  private:
-    static constexpr size_t kShardCount = 256;
-    static constexpr size_t kMaxEntriesPerShard = 4096;
-    struct Shard {
-        std::mutex mutex;
-        std::unordered_map<FlowKey, uint32_t, FlowKeyHash> map;
-    };
-    std::array<Shard, kShardCount> shards_{};
-    FlowKeyHash hasher_{};
-};
-
-FlowOwnerTable& flow_owner_table() {
-    static FlowOwnerTable table;
-    return table;
 }
 
 } // namespace
@@ -742,14 +661,10 @@ bool Worker::handle_frame(FramePayload::Origin origin, uint8_t* data, size_t len
     }
 
     if (cfg_.thread_count > 1 && forward_fn_) {
-        const FlowKey flow_key =
-            make_flow_key(src_ip_host, dst_ip_host, src_port, dst_port, ipv4->iph.protocol);
         auto tuple = std::make_tuple(htonl(src_ip_host), htonl(dst_ip_host), htons(src_port),
                                      htons(dst_port), static_cast<uint8_t>(ipv4->iph.protocol));
         const uint32_t flow_hash = CPUFanoutHash::hash_tuple(tuple);
-        const uint32_t target_guess = select_flow_owner(flow_hash);
-        const uint32_t target =
-            flow_owner_table().get_or_assign(flow_key, target_guess, cfg_.thread_count);
+        const uint32_t target = select_flow_owner(flow_hash);
         if (target != cfg_.thread_index) {
             LOG(DEBUG_RELAY, "relay forward thread=", cfg_.thread_index, " target=", target,
                 " origin=", origin_to_string(origin), " len=", len);
